@@ -37,6 +37,15 @@ export function normalize(text) {
   return t.replace(/\s+/g, ' ').replace(/^(\s*,\s*)+|(\s*,\s*)+$/g, '').replace(/(\s*,\s*)+/g, ' , ').trim()
 }
 
+// Respuesta a "¿cómo te fue?": 'bien' | 'masomenos' | 'mal' | null
+export function howItWent(text) {
+  const t = normalize(text)
+  if (/\b(mas o menos|maso|masomenos|ahi nomas|ahi va|regular|normal|ni bien ni mal|zafa|zafe|zafo)\b/.test(t)) return 'masomenos'
+  if (/\b(no (me fue |salio |estuvo )?(tan |muy |re )?bien|mal|malisimo|horrible|pesimo|desaprobe|un desastre|fatal|para atras)\b/.test(t)) return 'mal'
+  if (/\b(bien|genial|joya|excelente|barbaro|aprobe|de diez|espectacular|buenisimo|increible|perfecto|zarpado|me saque un (7|8|9|10|siete|ocho|nueve|diez))\b/.test(t)) return 'bien'
+  return null
+}
+
 // ───────────── Apps, sitios y carpetas ─────────────
 
 function buildIndex(customApps = []) {
@@ -317,6 +326,14 @@ const RULES = [
   },
   (t) => (/\b(clima|tiempo hace|que tiempo|el tiempo|temperatura|llueve|llover|lluvia|frio|calor|pronostico|paraguas|abrigo|campera|nublado|soleado|como esta el dia)\b/.test(t) ? intent('clima') : null),
 
+  // Jugar al Pong ("quiero jugar Minecraft" abre la app, no el Pong)
+  (t, ctx) => {
+    const wantsGame = /\b(pong|juguemos|jugamos|jugar con vos|jugar un rato|jugar a algo|jueguito|revancha|un partido)\b/.test(t) || /^(quiero )?jugar$/.test(t)
+    if (!wantsGame) return null
+    const e = /\bpong\b/.test(t) ? null : findEntity(t, ctx.index)
+    return e && e.dist === undefined ? null : intent('jugar')
+  },
+
   // Saludos y charla
   (t) => (/^(buen dia|buenos dias|buenas tardes|buenas noches)\b/.test(t) ? intent('buen_dia') : null),
   (t) => (/\b(quien sos|quien eres|que sos|que eres|como te llamas|tu nombre|presentate|quien te (hizo|creo|programo)|cuantos anos tenes|que edad tenes)\b/.test(t) ? chat('quien_sos') : null),
@@ -330,6 +347,8 @@ const RULES = [
   (t) => (/\b(tengo que estudiar|voy a estudiar|a estudiar|modo estudio|me pongo a estudiar|tengo tarea)\b/.test(t) ? chat('estudiar') : null),
   (t) => (/\b(como estas|como andas|como te va|todo bien|como te sentis|que tal)\b/.test(t) ? chat('como_estas') : null),
   (t) => (/^(hola|holis|hey|ey|buenas|que onda|como va)$/.test(t) ? intent('saludo') : null),
+  (t) => (/^(ahora no|no ahora|no gracias|despues|mas tarde|otro dia|otro rato|en otro momento|paso)$/.test(t) ? chat('ahora_no') : null),
+  (t) => (/^((ja|je|ji|js|aj){2,}[a-z]*|lol|xd+|me mori|me muero( de risa)?|que gracioso|que buen chiste)$/.test(t) ? chat('risa') : null),
   (t) => (/\b(gracias|genial|buenisimo|joya|excelente|perfecto|de diez|barbaro|espectacular)\b/.test(t) ? intent('gracias') : null),
   (t) => (/\b(ayuda|ayudame|que (sabes |haces )?hacer|que haces|comandos|opciones)\b/.test(t) ? intent('ayuda') : null),
   (t) => (/\b(escondete|ocultate|anda a dormir|chau|adios|nos vemos|hasta luego|hasta manana)\b/.test(t) ? intent('ocultar') : null),
@@ -365,6 +384,38 @@ const RULES = [
     const n = t.match(/\b(\d{1,3})\b/)
     const pasos = n ? Math.min(50, Math.max(1, Math.round(parseInt(n[1], 10) / 2))) : 5
     return intent('volumen', { cambio: up ? 'subir' : 'bajar', pasos })
+  },
+
+  // YouTube (con la extensión de Chrome)
+  (t) => (/\b(dislike|no me gusta este video|dale no me gusta)\b/.test(t) ? intent('youtube', { accion: 'dislike' }) : null),
+  (t) => (/\b(dale like|dale me gusta|un like|like al video|me gusta este video|megusta|pone(le)? like|like)\b/.test(t) && !/\bdislike\b/.test(t) ? intent('youtube', { accion: 'like' }) : null),
+  (t) => (/\b(suscribime|suscribirme|suscribite|suscribete|suscribir(me)? al canal|suscripcion al canal)\b/.test(t) ? intent('youtube', { accion: 'suscribir' }) : null),
+  (t) => (/\b(salta|saltar|saltea|saltear|saca|sacar|skip|skipea)\b.*\b(anuncio|publicidad|propaganda|ad)\b/.test(t) ? intent('youtube', { accion: 'saltar_anuncio' }) : null),
+  (t) => (/\b(subtitulos|subtitulado|captions)\b/.test(t) ? intent('youtube', { accion: 'subtitulos' }) : null),
+  (t) => {
+    const m = t.match(/\b(?:a|velocidad)\s*(\d(?:[.,]\d+)?)\s*x?\b/)
+    if (m && /\b(velocidad|x)\b|\dx\b/.test(t)) return intent('youtube', { accion: 'velocidad', valor: parseFloat(m[1].replace(',', '.')) })
+    if (/\bvelocidad normal\b/.test(t)) return intent('youtube', { accion: 'velocidad', valor: 1 })
+    if (/\b(mas rapido|aceleralo|acelera el video)\b/.test(t)) return intent('youtube', { accion: 'mas_rapido' })
+    if (/\b(mas lento|mas lenta)\b/.test(t)) return intent('youtube', { accion: 'mas_lento' })
+    return null
+  },
+  (t) => {
+    const fwd = /\b(adelanta|adelantame|adelantalo|avanza|avanzame|avanzalo)\b/.test(t)
+    const back = /\b(atrasa|atrasame|atrasalo|retrocede|retrocedelo|rebobina)\b/.test(t)
+    if (!fwd && !back) return null
+    const n = t.match(/\b(\d{1,4})\b/)
+    const mult = /\bminutos?\b/.test(t) ? 60 : 1
+    return intent('youtube', { accion: fwd ? 'adelantar' : 'atrasar', valor: n ? parseInt(n[1], 10) * mult : 10 })
+  },
+  (t) => (/\b(siguiente video|proximo video|otro video|pasa de video)\b/.test(t) ? intent('youtube', { accion: 'siguiente' }) : null),
+  (t) => (/\b(que estoy viendo|que video es este|que video es|de quien es este video|como se llama este video)\b/.test(t) ? intent('youtube', { accion: 'que_veo' }) : null),
+
+  // Resumir el mail o la página abierta
+  (t) => {
+    if (!/\b(resumi|resumime|resumilo|resumila|resumen de|haceme un resumen|de que (se )?trata|que dice|lee|leeme|leelo)\b/.test(t)) return null
+    if (/\b(del dia|de hoy)\b/.test(t)) return null
+    return intent('resumir', { que: /\b(mail|correo|email|mensaje|gmail)\b/.test(t) ? 'mail' : 'pagina' })
   },
 
   // Búsquedas
@@ -420,7 +471,7 @@ const RULES = [
   },
 
   // Preguntas de conocimiento: se buscan en Google
-  (t) => (KNOWLEDGE.test(t) ? intent('buscar', { sitio: 'google', consulta: t }) : null)
+  (t) => (KNOWLEDGE.test(t) ? { ...intent('buscar', { sitio: 'google', consulta: t }), knowledge: true } : null)
 ]
 
 const GREETING_LEAD = /^(hola|holis|hey|ey|buenas|che)\s+/

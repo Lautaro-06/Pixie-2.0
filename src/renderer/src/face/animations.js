@@ -91,7 +91,9 @@ export const REACTIONS = {
     mouth: 'flat',
     ...keyframes(t, [[0, { lookY: 0, openL: 1, openR: 1 }], [400, { lookY: 0.8, openL: 0.7, openR: 0.7 }], [1200, { lookY: 0.8, openL: 0.7, openR: 0.7 }], [1600, { lookY: 0, openL: 1, openR: 1 }]])
   })],
-  wiggle: [900, (t) => ({ eyes: t < 450 ? 'happy' : 'normal', dx: Math.round(Math.sin(t / 70)), dy: t % 300 < 150 ? -1 : 0 })]
+  wiggle: [900, (t) => ({ eyes: t < 450 ? 'happy' : 'normal', dx: Math.round(Math.sin(t / 70)), dy: t % 300 < 150 ? -1 : 0 })],
+  // Jajaja: ojos felices, boca que se abre y se cierra, saltitos
+  laugh: [1600, (t) => ({ eyes: 'happy', mouth: Math.floor(t / 120) % 2 ? 'o' : 'talk', dy: Math.floor(t / 120) % 2 ? -1 : 0 })]
 }
 
 // Qué hace solo, de vez en cuando, según cómo se siente.

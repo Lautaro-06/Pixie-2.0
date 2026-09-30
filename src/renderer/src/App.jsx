@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Face from './face/Face.jsx'
+import PongGame from './games/PongGame.jsx'
 import { api, isPreview } from './api.js'
 import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady } from './voice.js'
 
@@ -30,6 +31,7 @@ export default function App() {
   const [shortcut, setShortcut] = useState('Ctrl+Espacio')
   const [notice, setNotice] = useState(null) // aviso que Pixie da por su cuenta
   const [feeling, setFeeling] = useState('normal')
+  const [game, setGame] = useState(null) // 'pong' mientras se juega
   const inputRef = useRef(null)
   const faceRef = useRef(null)
   const history = useRef([])
@@ -37,6 +39,7 @@ export default function App() {
   const lastActivity = useRef(Date.now())
   const asleepRef = useRef(false)
   const expandedRef = useRef(false)
+  const gameRef = useRef(null)
   const noticeTimer = useRef(null)
 
   const react = useCallback((type) => setReaction({ type, id: Date.now() + Math.random() }), [])
@@ -51,6 +54,12 @@ export default function App() {
   }, [react])
 
   const show = useCallback((result) => {
+    if (result.game) {
+      // Pixie transforma su cara en el juego
+      setExpanded(false)
+      setNotice(null)
+      setGame(result.game)
+    }
     setReply(result)
     if (result.face && result.face !== 'idle') react(result.face)
     const talkingVoice = voiceOn && voiceAvailable && result.speak !== false
@@ -77,9 +86,21 @@ export default function App() {
   // La ventana cambia de tamaño según el modo.
   useEffect(() => {
     expandedRef.current = expanded
-    api.setMode(expanded ? 'expanded' : notice ? 'notice' : 'compact')
+    api.setMode(game ? 'game' : expanded ? 'expanded' : notice ? 'notice' : 'compact')
     if (expanded) inputRef.current?.focus()
-  }, [expanded, notice])
+  }, [expanded, notice, game])
+
+  // Mensajes de Pixie durante el juego (con voz si está activada)
+  const sayInGame = useCallback((text) => {
+    if (voiceOn) speak(text)
+  }, [voiceOn])
+
+  const endGame = useCallback((winner) => {
+    setGame(null)
+    lastActivity.current = Date.now()
+    if (winner) api.gameResult?.({ juego: 'pong', ganador: winner })
+    react(winner === 'user' ? 'love' : 'happy')
+  }, [react])
 
   useEffect(() => {
     api.info().then((info) => {
@@ -88,7 +109,7 @@ export default function App() {
     }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
-      if (event.type === 'open') open()
+      if (event.type === 'open' && !gameRef.current) open()
       if (event.type === 'cursor') {
         setCursor({ x: event.x, y: event.y, at: Date.now() })
         const r = faceRef.current?.getBoundingClientRect()
@@ -140,18 +161,22 @@ export default function App() {
   useEffect(() => {
     const id = setInterval(() => {
       const after = feeling === 'cansado' ? SLEEP_WHEN_TIRED_MS : SLEEP_AFTER_MS
-      if (!expanded && !notice && !asleepRef.current && Date.now() - lastActivity.current > after) {
+      if (!expanded && !notice && !game && !asleepRef.current && Date.now() - lastActivity.current > after) {
         asleepRef.current = true
         setAsleep(true)
       }
     }, 5000)
     return () => clearInterval(id)
-  }, [expanded, notice, feeling])
+  }, [expanded, notice, feeling, game])
+
+  useEffect(() => {
+    gameRef.current = game
+  }, [game])
 
   // Si hacés clic en otra ventana, Pixie se achica.
   useEffect(() => {
     if (isPreview) return
-    const onBlur = () => setTimeout(() => !document.hasFocus() && close(), 150)
+    const onBlur = () => setTimeout(() => !document.hasFocus() && !gameRef.current && close(), 150)
     window.addEventListener('blur', onBlur)
     return () => window.removeEventListener('blur', onBlur)
   }, [close])
@@ -187,6 +212,7 @@ export default function App() {
   }
 
   function onKeyDown(e) {
+    if (game) return // el juego maneja sus teclas
     if (e.key === 'Escape') {
       e.preventDefault()
       close()
@@ -214,6 +240,14 @@ export default function App() {
   }
 
   const chips = reply?.suggestions ?? (reply ? null : STARTERS)
+
+  if (game === 'pong') {
+    return (
+      <div className="pixie is-game">
+        <PongGame say={sayInGame} onExit={endGame} />
+      </div>
+    )
+  }
 
   return (
     <div className={`pixie ${expanded ? 'is-expanded' : 'is-compact'}`} onKeyDown={onKeyDown}>

@@ -9,6 +9,7 @@ const preview = {
   info: async () => ({ shortcut: 'Ctrl+Espacio', version: 'navegador' }),
   setMode: () => {},
   hide: () => {},
+  gameResult: () => {},
   onEvent: () => () => {}
 }
 

@@ -1,6 +1,7 @@
 import { describeWeather } from './weather.js'
 import { timersSummary } from './timers.js'
 import { evaluate } from '../calc.js'
+import { JOKES, FACTS } from '../content.js'
 
 const locale = 'es-AR'
 const pick = (list) => list[Math.floor(Math.random() * list.length)]
@@ -19,26 +20,6 @@ function greeting(date = new Date()) {
   if (h >= 12 && h < 20) return 'Buenas tardes'
   return 'Buenas noches'
 }
-
-const JOKES = [
-  '¿Por qué la computadora fue al médico? Porque tenía un virus.',
-  '¿Qué le dijo el 0 al 8? Lindo cinturón.',
-  '¿Por qué el libro de matemática estaba triste? Porque tenía muchos problemas.',
-  '¿Cómo se despiden los químicos? Ácido un placer.',
-  '¿Qué hace una abeja en el gimnasio? ¡Zum-ba!',
-  'Había una vez un perro llamado Pegamento. Se cayó y se pegó.',
-  '¿Por qué los programadores confunden Halloween con Navidad? Porque OCT 31 es igual a DEC 25.',
-  '¿Cuál es el café más peligroso del mundo? El ex-preso.'
-]
-
-const FACTS = [
-  'Un pulpo tiene tres corazones.',
-  'La ENIAC, una de las primeras computadoras, pesaba unas 27 toneladas.',
-  'La palabra «robot» viene del checo «robota», que significa trabajo forzado.',
-  'El primer «bug» informático fue una polilla de verdad, atrapada en una computadora en 1947.',
-  'Un rayo es unas cinco veces más caliente que la superficie del Sol.',
-  'La miel casi no se echa a perder: se encontró miel en tumbas egipcias de miles de años.'
-]
 
 const CHAT = {
   quien_sos: () => ({
@@ -60,6 +41,8 @@ const CHAT = {
     suggestions: ['contame un chiste', 'dato curioso', 'poné videos de gatos']
   }),
   callate: () => ({ text: 'Ok, me callo.', face: 'sad', speak: false }),
+  ahora_no: () => ({ text: pick(['¡Dale! Cuando quieras.', 'Ok, otro rato será.', 'Tranqui, acá estoy si me necesitás.']), face: 'wink' }),
+  risa: () => ({ text: pick(['¡Jaja! Sabía que te iba a gustar.', '¡Ya sé, soy re gracioso!', 'Tengo más, eh. Pedime otro cuando quieras.']), face: 'laugh' }),
   animo: () => ({
     text: '¡Ánimo! Todos tenemos días así. ¿Te cuento un chiste o te pongo algo de música?',
     face: 'love',
@@ -152,6 +135,15 @@ export const infoActions = [
         'y lo que me cuentes, y te aviso a tiempo. Me doy cuenta de lo que hacés en la compu y te hablo cuando hace falta.',
       face: 'happy',
       suggestions: ['el martes tengo prueba de historia', 'anotá comprar cartuchos', '¿qué tengo esta semana?', '¿cuánto usé la compu hoy?']
+    })
+  },
+  {
+    name: 'jugar',
+    description: 'Juega al Pong contra Pixie: sus ojos y su boca se vuelven el juego',
+    run: () => ({
+      text: pick(['¡Dale, juguemos al Pong!', '¡Sí! Preparate que no te la dejo fácil.', '¡Pong! A ver quién gana.']),
+      face: 'happy',
+      game: 'pong'
     })
   },
   {

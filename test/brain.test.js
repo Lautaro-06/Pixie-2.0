@@ -246,3 +246,47 @@ test('recupera las tildes del texto original', async () => {
   assert.equal(restoreAccents('me llamo Lautaro', 'lautaro'), 'Lautaro')
   assert.equal(restoreAccents('algo', 'otra cosa'), 'otra cosa')
 })
+
+test('YouTube, resumir y jugar', () => {
+  const a = (p) => {
+    const r = interpret(p)
+    return r && [r.action, r.params]
+  }
+  assert.deepEqual(a('dale like'), ['youtube', { accion: 'like' }])
+  assert.deepEqual(a('no me gusta este video'), ['youtube', { accion: 'dislike' }])
+  assert.deepEqual(a('suscribime al canal'), ['youtube', { accion: 'suscribir' }])
+  assert.deepEqual(a('saltá el anuncio'), ['youtube', { accion: 'saltar_anuncio' }])
+  assert.deepEqual(a('ponelo a 1.5x'), ['youtube', { accion: 'velocidad', valor: 1.5 }])
+  assert.deepEqual(a('adelantá 30 segundos'), ['youtube', { accion: 'adelantar', valor: 30 }])
+  assert.deepEqual(a('atrasá 2 minutos'), ['youtube', { accion: 'atrasar', valor: 120 }])
+  assert.deepEqual(a('¿qué estoy viendo?'), ['youtube', { accion: 'que_veo' }])
+  assert.deepEqual(a('resumime este mail'), ['resumir', { que: 'mail' }])
+  assert.deepEqual(a('¿de qué se trata esta página?'), ['resumir', { que: 'pagina' }])
+  assert.deepEqual(a('resumen del día'), ['buen_dia', {}])
+  assert.deepEqual(a('¿jugamos?'), ['jugar', {}])
+  assert.deepEqual(a('quiero jugar'), ['jugar', {}])
+  // lo de antes sigue igual
+  assert.deepEqual(a('siguiente canción'), ['musica', { control: 'siguiente' }])
+  assert.deepEqual(a('pausá el video'), ['musica', { control: 'pausa' }])
+})
+
+test('entiende cómo te fue', async () => {
+  const { howItWent } = await import('../src/main/brain.js')
+  assert.equal(howItWent('¡Re bien!'), 'bien')
+  assert.equal(howItWent('aprobé!'), 'bien')
+  assert.equal(howItWent('me saqué un 9'), 'bien')
+  assert.equal(howItWent('Más o menos'), 'masomenos')
+  assert.equal(howItWent('maso'), 'masomenos')
+  assert.equal(howItWent('Mal'), 'mal')
+  assert.equal(howItWent('no tan bien'), 'mal')
+  assert.equal(howItWent('abrí spotify'), null)
+})
+
+test('respuestas a lo que Pixie propone', () => {
+  const tema = (q) => interpretAll(q)?.map((i) => i.params.tema ?? i.action)
+  assert.deepEqual(tema('ahora no'), ['ahora_no'])
+  assert.deepEqual(tema('no gracias'), ['ahora_no'])
+  assert.deepEqual(tema('jajaja'), ['risa'])
+  assert.deepEqual(tema('¡dale, juguemos!'), ['jugar'])
+  assert.deepEqual(tema('otro dato curioso'), ['dato'])
+})

@@ -2,9 +2,9 @@
 
 Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pantalla con su cara animada: lo llamás con **Ctrl+Espacio**, le escribís lo que necesitás y lo hace en tu compu.
 
-## Qué hace (versión 0.3)
+## Qué hace (versión 0.4)
 
-Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones.
+Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
 | Pedido de ejemplo | Qué hace |
 |---|---|
@@ -30,6 +30,9 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «acordate que mi color favorito es el azul», «¿cuál es mi color favorito?», «¿qué sabés de mí?» | Recuerda lo que le contás |
 | «¿qué estoy haciendo?», «¿cuánto usé la compu hoy?», «¿cuánto estuve en YouTube?» | Se da cuenta de lo que hacés |
 | «no me molestes por media hora», «ya podés hablar» | Modo no molestar |
+| «juguemos», «jugamos al pong», «revancha» | Pong contra Pixie: su cara se vuelve el juego |
+| «dale like», «suscribime», «saltá el anuncio», «poné subtítulos», «adelantá 30 segundos», «velocidad 1,5», «siguiente video», «¿qué estoy viendo?» | YouTube en Chrome (con la extensión) |
+| «resumime este mail», «¿de qué trata esta página?» | Resume el mail abierto en Gmail o la página que estás viendo (con la extensión) |
 
 ## Pixie se acuerda, se da cuenta y habla primero
 
@@ -44,6 +47,8 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 - Después de 50 minutos seguidos te propone una pausa.
 - Si llevás 40 minutos en videos o redes, te pregunta si volvemos a lo tuyo. Si hay un Pomodoro andando, te lo dice enseguida.
 - Te saluda cuando volvés, avisa si se corta internet o queda poca batería, y a la madrugada te sugiere ir a dormir.
+- Después de algo que tenías agendado, te pregunta cómo te fue («Hoy tenías la prueba de historia. ¿Cómo te fue?») y se acuerda de lo que le contestes.
+- Si hace más de una hora y media que no charlan, te habla de algo: te invita a un Pong, te cuenta un chiste o un dato curioso, te recuerda un pendiente o te pregunta si tomaste agua. Como mucho 4 veces por día, entre las 10 y las 22, y nunca si estás estudiando, jugando o en un Pomodoro.
 - En pantalla completa (juegos, videos, presentaciones) o en modo no molestar se queda callado. Solo los recordatorios y la batería muy baja avisan igual, sin voz.
 
 Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas haciendo.
@@ -53,6 +58,53 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 ### Privacidad
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
+
+Con la IA activada, cada mensaje que va a la IA viaja a la API de Claude junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. La clave queda solo en tu compu, en `config.json`.
+
+## Pong
+
+Pedile jugar y sus ojos y su boca se transforman en un Pong. Pixie maneja la paleta de la derecha y vos la de la izquierda, con el mouse o con las flechas ↑↓ (o W y S). Gana el primero que llega a 3. Cuando te hace un punto se ríe; cuando se lo hacés vos, te felicita. Al final podés pedir la revancha o volver a su cara. Está calibrado para que sea parejo: si prestás atención le ganás, si te distraés te gana.
+
+## Con IA: entiende cualquier cosa
+
+Sin IA, Pixie entiende con reglas: rápido, gratis y sin internet, pero con frases que conoce. Con una clave de la API de Claude entiende **cualquier cosa** que le escribas: le podés contar cosas, preguntarle lo que sea y pedirle cosas a tu manera («el jueves rindo física, agendalo y recordame estudiar mañana a las 6»). Usa sus mismas acciones como herramientas, sabe qué estás haciendo, qué tenés agendado y lo que le contaste, y guarda solo lo importante de lo que le contás.
+
+Para activarla:
+
+1. Creá una clave en la consola de Anthropic (https://console.anthropic.com), en *API Keys*. La cuenta necesita crédito cargado.
+2. En el ícono de Pixie → «Abrir config.json», agregá la clave y guardá:
+
+   ```json
+   "claveIA": "sk-ant-..."
+   ```
+
+   También sirve la variable de entorno `ANTHROPIC_API_KEY`.
+
+Opcionales en `config.json`:
+
+| Clave | Qué hace |
+|---|---|
+| `modeloIA` | El modelo de Claude a usar (por defecto `claude-opus-5-5`) |
+| `esfuerzoIA` | Cuánto piensa antes de responder: `low` (por defecto, más rápido y barato), `medium` o `high` |
+| `ia` | `false` para apagar la IA sin borrar la clave |
+
+Cómo se usa para no gastar de más: las órdenes cortas que las reglas ya entienden («abrí Spotify», «subí el volumen») no pasan por la IA y no cuestan nada. Van a la IA la charla, las preguntas, las frases largas y lo que las reglas no entienden. Cada uno de esos mensajes gasta un poco del crédito de la cuenta. Si no hay internet o la clave no anda, Pixie sigue con las reglas. Si el modelo se niega a responder algo, la API prueba sola con otro modelo.
+
+Las acciones riesgosas (apagar, bloquear, cerrar apps) siempre te piden confirmación con botones, aunque las pida la IA.
+
+## Pixie para Chrome (YouTube y Gmail)
+
+Para que Pixie pueda darle like a un video o resumir un mail, instalá la extensión que está en la carpeta `extension/`:
+
+1. En Chrome, abrí `chrome://extensions` (en Edge, `edge://extensions`).
+2. Activá el **Modo de desarrollador** (arriba a la derecha en Chrome, a la izquierda en Edge).
+3. Tocá **Cargar extensión sin empaquetar** (o «Cargar desempaquetada») y elegí la carpeta `extension` de este repo.
+
+Con Pixie abierto, la extensión se conecta sola (tarda hasta 30 segundos). Después probá con un video de YouTube abierto: «dale like» o «¿qué estoy viendo?». Para el mail, abrí uno en Gmail y decile «resumime este mail».
+
+Sin IA, el resumen es simple (de quién es, el asunto y las primeras oraciones). Con IA es un resumen de verdad y le podés hacer preguntas sobre el mail o la página.
+
+La extensión solo hace algo cuando se lo pide Pixie, y Pixie solo acepta conexiones de extensiones del navegador desde la misma compu (`127.0.0.1`, puerto 47631).
 
 ## La cara de Pixie
 
@@ -89,7 +141,11 @@ npm run dist:win  # arma el instalador en dist/
 src/
   main/            ← Node.js: la parte que tiene permisos sobre Windows
     index.js       ← arranque, atajo global y conexión con la interfaz
-    brain.js       ← entiende las frases (reglas flexibles, sin IA todavía)
+    brain.js       ← entiende las frases con reglas flexibles (sin internet)
+    ai.js          ← el cerebro con IA (Claude): conversa y usa las acciones como herramientas
+    ai-tools.js    ← las acciones que la IA puede usar
+    browser.js     ← la conexión con la extensión de Chrome
+    content.js     ← chistes y datos curiosos
     calc.js        ← la calculadora
     dates.js       ← entiende fechas y horas («el martes a las 6 de la tarde»)
     memory.js      ← la memoria: nombre, datos, pendientes, agenda y uso
@@ -105,8 +161,9 @@ src/
     window.js      ← la ventana flotante
     tray.js        ← el ícono al lado del reloj
   preload/         ← el puente seguro entre la interfaz y las acciones
-  renderer/        ← la interfaz en React: la barra para escribir y la cara (src/face/)
-test/              ← pruebas de las frases, fechas, memoria, iniciativa, la cara y más
+  renderer/        ← la interfaz en React: la barra para escribir, la cara (src/face/) y el Pong (src/games/)
+extension/         ← la extensión «Pixie para Chrome» (YouTube, Gmail y páginas)
+test/              ← pruebas de las frases, fechas, memoria, iniciativa, la cara, el Pong, la IA y más
 ```
 
 La interfaz (React) nunca toca Windows directamente: le pasa el texto a `main`, que decide qué acción corresponde y solo ejecuta las que están en `src/main/actions`.
@@ -136,18 +193,17 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
-Lo nuevo de la versión 0.3 que todavía no se probó en una PC con Windows:
+Lo nuevo de la versión 0.4 que todavía no se probó en una PC con Windows:
 
-- «¿qué estoy haciendo?» y «¿cuánto usé la compu hoy?»: dependen de un proceso de PowerShell que corre de fondo. Si no responden bien, pásenme lo que diga la terminal.
-- El resumen al empezar el día, los recordatorios de la agenda y el aviso de pausa (se puede probar agendando algo para dentro de 20 minutos).
-- Que se quede callado en pantalla completa y con «no me molestes».
-- El aviso de batería (en notebooks) y el de internet (desconectando el wifi).
+- **La IA:** que responda con una clave real, que use las acciones («poné un timer de 5 minutos y contame un chiste») y que guarde lo que le contás («mi perro se llama Toby» y después «¿cómo se llama mi perro?»).
+- **La extensión:** que se conecte con Pixie, los botones de YouTube (like, suscribirse, anuncios, subtítulos) y el resumen de un mail de Gmail. YouTube y Gmail cambian su página seguido: si algo no anda, pásenme qué pedido fue y qué contestó Pixie.
+- **Pong:** que la ventana se agrande bien y que se juegue cómodo con el mouse y las flechas.
+- **Hablar primero:** agendar algo para dentro de 5 minutos y ver que 2 horas después pregunte cómo te fue.
 
 ## Próximos pasos
 
-- Entender cualquier pedido con IA, usando estas mismas acciones como herramientas y la memoria como contexto.
 - Hablarle con la voz.
-- Rutinas: «modo estudio», «buenas noches».
+- Más juegos en la cara de Pixie.
 
 ## Equipo
 

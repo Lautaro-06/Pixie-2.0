@@ -73,6 +73,16 @@ export function alertsFor(cuando, conHora) {
   ]
 }
 
+// Cuándo preguntar "¿cómo te fue?": 2 horas después si tenía hora, a las 19 si era de todo el día.
+// Después de 20 horas ya no se pregunta.
+export function followUpAt(cuando, conHora) {
+  const at = new Date(cuando)
+  if (conHora) return new Date(at.getTime() + 2 * 60 * MIN)
+  at.setHours(19, 0, 0, 0)
+  return at
+}
+const FOLLOW_UP_WINDOW = 20 * 60 * MIN
+
 export function createMemory(file) {
   let data = load()
 
@@ -200,6 +210,21 @@ export function createMemory(file) {
       data.agenda = data.agenda.filter((e) => now - new Date(e.cuando) < 2 * 24 * 60 * MIN)
       if (changed || data.agenda.length !== before) save()
       return due
+    },
+
+    // Eventos que ya pasaron y todavía no le preguntó cómo le fue
+    followUpsDue(now = new Date()) {
+      return data.agenda.filter((e) => {
+        if (e.seguimiento) return false
+        const at = followUpAt(e.cuando, e.conHora)
+        return at <= now && now - at < FOLLOW_UP_WINDOW
+      })
+    },
+    markFollowUp(id) {
+      const e = data.agenda.find((x) => x.id === id)
+      if (!e) return
+      e.seguimiento = true
+      save()
     },
 
     // Uso de la compu

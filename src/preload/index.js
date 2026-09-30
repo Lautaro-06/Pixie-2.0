@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('pixie', {
   info: () => ipcRenderer.invoke('pixie:info'),
   setMode: (mode) => ipcRenderer.send('pixie:mode', mode),
   hide: () => ipcRenderer.send('pixie:hide'),
+  gameResult: (result) => ipcRenderer.send('pixie:game-result', result),
   onEvent: (callback) => {
     const handler = (_event, data) => callback(data)
     ipcRenderer.on('pixie:event', handler)

@@ -5,11 +5,18 @@ import { loadConfig, getConfig, saveConfig, logAction } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createTray } from './tray.js'
 import { createMind } from './mind.js'
+import { createAI, aiErrorText } from './ai.js'
+import { createBrowserBridge } from './browser.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 let activeShortcut = null
 let pending = null // acción esperando que la persona confirme
 let mind = null
+let ai = null
+let browser = null
+
+// Lo que conviene mandarle a la IA aunque las reglas lo entiendan: charla y preguntas
+const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar_memoria'])
 
 function shortcutLabel() {
   if (!activeShortcut) return 'el ícono de la barra de tareas'
@@ -60,6 +67,25 @@ async function ask(text) {
   const options = { customApps: getConfig().apps ?? [] }
   const intents = interpretAll(input, options)
   mind?.interacted(moodKind(intents))
+
+  // Con IA: charla, preguntas, frases largas y lo que las reglas no entienden.
+  // Las órdenes cortas siguen por las reglas, que son instantáneas y gratis.
+  const words = input.trim().split(/\s+/).length
+  const social = intents?.every((i) => AI_PREFERRED.has(i.action) || i.knowledge)
+  if (ai?.enabled() && (!intents || social || words > 10)) {
+    try {
+      return await ai.chat(input, mind.contextText())
+    } catch (err) {
+      const msg = aiErrorText(err)
+      if (msg) return { text: msg, face: 'confused' }
+      logAction(`IA sin conexión, sigo con reglas: ${err.message}`)
+    }
+  }
+
+  // ¿Es la respuesta a algo que Pixie preguntó por su cuenta? ("Hoy tenías prueba. ¿Cómo te fue?")
+  const answer = mind?.answerQuestion(input)
+  if (answer) return answer
+
   if (!intents) {
     return {
       text: 'No te entendí del todo. ¿Era alguna de estas?',
@@ -103,6 +129,7 @@ function mergeResults(results) {
     face,
     confirm: last.confirm,
     suggestions: last.suggestions,
+    game: results.find((r) => r.game)?.game,
     speak: results.every((r) => r.speak !== false)
   }
 }
@@ -125,6 +152,7 @@ async function confirm(yes) {
   const waiting = pending
   pending = null
   if (!waiting) return { text: 'No había nada para confirmar.', face: 'idle' }
+  ai?.note(`El usuario ${yes ? 'confirmó' : 'canceló'} «${waiting.action}».`)
   if (!yes) return { text: 'Listo, no hago nada.', face: 'happy' }
   return runAction(waiting.action, waiting.params, ctx)
 }
@@ -140,9 +168,19 @@ if (!app.requestSingleInstanceLock()) {
 
     ipcMain.handle('pixie:ask', (_e, text) => ask(text))
     ipcMain.handle('pixie:confirm', (_e, yes) => confirm(Boolean(yes)))
-    ipcMain.handle('pixie:info', () => ({ shortcut: shortcutLabel(), version: app.getVersion(), feeling: mind?.feeling() }))
+    ipcMain.handle('pixie:info', () => ({
+      shortcut: shortcutLabel(),
+      version: app.getVersion(),
+      feeling: mind?.feeling(),
+      ai: Boolean(ai?.enabled())
+    }))
     ipcMain.on('pixie:mode', (_e, mode) => setMode(mode))
     ipcMain.on('pixie:hide', () => getWindow()?.hide())
+    ipcMain.on('pixie:game-result', (_e, result) => {
+      const ganador = result?.ganador === 'user' ? 'vos' : 'Pixie'
+      logAction(`partido de pong: ganó ${ganador}`)
+      mind?.interacted(result?.ganador === 'user' ? 'gracias' : 'chiste')
+    })
 
     mind = createMind({
       ctx,
@@ -154,7 +192,15 @@ if (!app.requestSingleInstanceLock()) {
         if (win && !win.isVisible()) win.showInactive()
       }
     })
+    browser = createBrowserBridge({ log: logAction })
+    ai = createAI({ getConfig, ctx })
     Object.assign(ctx, {
+      ai,
+      browser,
+      readPage: (que) => browser.request('leer', { que }),
+      setPending: (intent) => {
+        pending = intent
+      },
       memory: mind.memory,
       awareness: mind.snapshot,
       setQuiet: mind.setQuiet,
@@ -180,5 +226,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
     mind?.stop()
+    browser?.close()
   })
 }

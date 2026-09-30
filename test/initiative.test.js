@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createInitiative } from '../src/main/initiative.js'
+import { createInitiative, TIMES } from '../src/main/initiative.js'
 import { createMemory } from '../src/main/memory.js'
 
 const MIN = 60 * 1000
@@ -11,6 +11,8 @@ const memory = () => createMemory(join(mkdtempSync(join(tmpdir(), 'pixie-')), 'm
 const base = { inactivoSeg: 0, bloqueada: false, online: true, bateria: null, pantallaCompleta: false, actividad: null, pomodoro: false }
 const at = (h, m = 0) => new Date(2026, 8, 30, h, m)
 const kinds = (r) => r.notices.map((n) => n.kind)
+const noBreaks = { ...TIMES, pausaCada: Infinity } // para probar horas enteras sin la pausa activa
+const onlyFollowUps = { ...noBreaks, charla: Infinity }
 
 test('saluda con el resumen la primera vez del día, una sola vez', () => {
   const mem = memory()
@@ -94,4 +96,93 @@ test('a la madrugada sugiere ir a dormir, una vez', () => {
   mem.markDone('resumen', night)
   assert.deepEqual(kinds(ini.tick(night, base, mem)), ['tarde'])
   assert.deepEqual(kinds(ini.tick(new Date(2026, 9, 1, 1, 40), base, mem)), [])
+})
+
+test('pregunta cómo te fue, una sola vez y cuando ya pasó', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(9))
+  mem.addEvent({ texto: 'la prueba de historia', cuando: at(10), conHora: true })
+  const ini = createInitiative(onlyFollowUps)
+  ini.tick(at(9, 30), base, mem)
+  ini.tick(at(9, 45), base, mem) // aviso de 15 minutos antes
+  ini.tick(at(10), base, mem) // aviso de la hora
+  assert.deepEqual(kinds(ini.tick(at(11, 59), base, mem)), [])
+  const r = ini.tick(at(12), base, mem)
+  assert.deepEqual(r.notices.map((n) => n.text), ['Hoy tenías la prueba de historia. ¿Cómo te fue?'])
+  assert.deepEqual(r.notices[0].pregunta, { tipo: 'como_fue', evento: 'la prueba de historia' })
+  assert.deepEqual(kinds(ini.tick(at(12, 1), base, mem)), [])
+})
+
+test('lo de todo el día lo pregunta a la noche, y si no estabas, al otro día', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(9))
+  mem.addEvent({ texto: 'el cumple de Sofi', cuando: at(0), conHora: false })
+  const ini = createInitiative(onlyFollowUps)
+  ini.tick(at(18), base, mem)
+  assert.deepEqual(kinds(ini.tick(at(18, 59), base, mem)), [])
+  assert.deepEqual(kinds(ini.tick(at(19), { ...base, pantallaCompleta: true }, mem)), []) // espera
+  assert.deepEqual(kinds(ini.tick(at(19, 1), { ...base, inactivoSeg: 600 }, mem)), []) // no está
+
+  const tomorrow = new Date(2026, 9, 1, 9)
+  mem.markDone('resumen', tomorrow)
+  assert.deepEqual(ini.tick(tomorrow, base, mem).notices.map((n) => n.text), ['¡Volviste!']) // de a una cosa por vez
+  const next = new Date(tomorrow.getTime() + 5000)
+  assert.deepEqual(ini.tick(next, base, mem).notices.map((n) => n.text), ['Ayer tenías el cumple de Sofi. ¿Cómo te fue?'])
+})
+
+test('pasadas 20 horas ya no pregunta', () => {
+  const mem = memory()
+  mem.addEvent({ texto: 'dentista', cuando: at(10), conHora: true })
+  const ini = createInitiative(onlyFollowUps)
+  const later = new Date(2026, 9, 1, 9)
+  mem.markDone('resumen', later)
+  assert.deepEqual(kinds(ini.tick(later, base, mem)), [])
+})
+
+test('si hace rato que no hablan, charla por su cuenta (pocas veces y sin repetir)', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(10))
+  const ini = createInitiative(noBreaks, () => 0)
+  ini.tick(at(10), base, mem)
+  assert.deepEqual(kinds(ini.tick(at(11, 29), base, mem)), [])
+  const first = ini.tick(at(11, 30), base, mem).notices
+  assert.deepEqual(first.map((n) => n.kind), ['charla'])
+  assert.ok(first[0].text.includes('Pong'))
+  assert.deepEqual(first[0].suggestions, ['¡dale, juguemos!', 'ahora no'])
+  assert.deepEqual(kinds(ini.tick(at(12), base, mem)), []) // no insiste enseguida
+  const second = ini.tick(at(13), base, mem).notices
+  assert.equal(second[0].kind, 'charla')
+  assert.ok(!second[0].text.includes('Pong')) // no repite lo mismo
+  ini.tick(at(14, 30), base, mem)
+  ini.tick(at(16), base, mem)
+  assert.deepEqual(kinds(ini.tick(at(17, 30), base, mem)), []) // hasta 4 por día
+})
+
+test('no charla si le hablaste hace poco, si estás estudiando o de noche', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(10))
+  const ini = createInitiative(noBreaks)
+  ini.tick(at(10), base, mem)
+  mem.setMood({ ultimoContacto: at(11).getTime() })
+  assert.deepEqual(kinds(ini.tick(at(11, 30), base, mem)), [])
+  const studying = { ...base, actividad: { categoria: 'estudio', app: 'Word' } }
+  assert.deepEqual(kinds(ini.tick(at(13), studying, mem)), [])
+  assert.deepEqual(kinds(ini.tick(at(13), { ...base, pomodoro: true }, mem)), [])
+
+  const night = memory()
+  const late = new Date(2026, 8, 30, 22, 30)
+  night.markDone('resumen', late)
+  const ini2 = createInitiative(noBreaks)
+  ini2.tick(new Date(2026, 8, 30, 20), base, night)
+  assert.deepEqual(kinds(ini2.tick(late, base, night)), [])
+})
+
+test('si tenés pendientes, a veces te los recuerda', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(10))
+  mem.addTodo('comprar cartuchos')
+  const ini = createInitiative(noBreaks, () => 0.99)
+  ini.tick(at(10), base, mem)
+  const r = ini.tick(at(11, 30), base, mem)
+  assert.equal(r.notices[0].text, 'Te quedó pendiente «comprar cartuchos». ¿Le damos ahora?')
 })

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 const SIZES = {
   compact: { width: 210, height: 164 },
   notice: { width: 400, height: 300 },
+  game: { width: 380, height: 300 },
   expanded: { width: 420, height: 400 }
 }
 const MARGIN = 16

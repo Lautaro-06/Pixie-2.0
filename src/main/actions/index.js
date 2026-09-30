@@ -9,7 +9,9 @@ import { systemActions } from './system.js'
 import { timerActions } from './timers.js'
 import { weatherActions } from './weather.js'
 import { memoryActions, contextActions } from './memory.js'
+import { browserActions } from './browser.js'
 import { OnlyWindowsError } from '../windows.js'
+import { BrowserError } from '../browser.js'
 
 const ALL = [
   ...infoActions,
@@ -19,7 +21,8 @@ const ALL = [
   ...timerActions,
   ...weatherActions,
   ...memoryActions,
-  ...contextActions
+  ...contextActions,
+  ...browserActions
 ]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
@@ -33,7 +36,7 @@ export async function runAction(name, params, ctx) {
     return result
   } catch (err) {
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → error: ${err.message}`)
-    if (err instanceof OnlyWindowsError) return { text: err.message, face: 'confused' }
+    if (err instanceof OnlyWindowsError || err instanceof BrowserError) return { text: err.message, face: 'confused' }
     console.error(err)
     return { text: 'Algo salió mal al hacerlo. Probá de nuevo.', face: 'confused' }
   }

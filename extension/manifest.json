@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Pixie para Chrome",
+  "version": "0.4.0",
+  "description": "Deja que Pixie, tu asistente de escritorio, te ayude con YouTube, Gmail y la página que estás viendo.",
+  "permissions": ["tabs", "scripting", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "128": "icon.png" }
+}

@@ -1,7 +1,7 @@
 {
   "name": "pixie",
   "productName": "Pixie",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Pixie, un asistente de escritorio para Windows que hace cosas en tu compu.",
   "main": "./out/main/index.js",
   "author": "Sofia Power, Thomas Barrera Fuentes, Mauro Joel Beltrán, Lautaro Gabriel Palombo",
@@ -13,12 +13,14 @@
     "build": "electron-vite build",
     "prestart": "node -e \"require('electron')\"",
     "start": "electron-vite preview",
-    "test": "node --test \"test/**/*.test.js\"",
+    "test": "node --import ./test/helpers/register.mjs --test \"test/**/*.test.js\"",
     "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.130.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.2.0",
