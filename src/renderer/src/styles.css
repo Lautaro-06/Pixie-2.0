@@ -1,0 +1,147 @@
+/* Pixie vive siempre sobre un fondo oscuro, como su pantallita OLED. */
+:root {
+  --screen: #04060a;
+  --pixel: #9cd3ff;
+  --bezel: #141922;
+  --panel: rgba(13, 17, 24, 0.95);
+  --line: rgba(156, 211, 255, 0.18);
+  --text: #e6edf7;
+  --muted: #93a0b4;
+  --accent: #9cd3ff;
+  --accent-ink: #06121f;
+  --field: #0a0e14;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  user-select: none;
+}
+
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pixie {
+  height: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Cara: también es la manija para mover la ventana */
+.face {
+  -webkit-app-region: drag;
+  background: var(--bezel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), 0 0 22px rgba(156, 211, 255, 0.08);
+  cursor: grab;
+}
+.screen {
+  display: block;
+  width: 160px;
+  height: 80px;
+  border-radius: 4px;
+  background: var(--screen);
+  image-rendering: pixelated;
+}
+
+.talk {
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.talk:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Panel para escribirle */
+.panel {
+  -webkit-app-region: no-drag;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.bubble {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: text;
+}
+.bubble p { margin: 0; font-size: 15px; }
+.muted { color: var(--muted); }
+
+.confirm, .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.confirm button, .chip {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.chip { color: var(--muted); font-size: 13px; }
+.chip:hover, .confirm button:hover { color: var(--accent); border-color: var(--accent); }
+.confirm .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.confirm .primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+
+.ask { display: flex; gap: 8px; }
+.ask input {
+  flex: 1;
+  min-width: 0;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.ask input::placeholder { color: var(--muted); }
+.ask input:focus { outline: none; border-color: var(--accent); }
+.ask button {
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ask button:disabled { opacity: 0.45; cursor: default; }
+
+.footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+.link { border: 0; background: none; padding: 0; color: var(--muted); cursor: pointer; }
+.link:hover { color: var(--accent); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel { animation: rise 140ms ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}

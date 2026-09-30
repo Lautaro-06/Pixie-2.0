@@ -1,0 +1,20 @@
+appId: com.pixie.asistente
+productName: Pixie
+directories:
+  buildResources: resources
+files:
+  - out/**
+  - resources/**
+  - package.json
+asarUnpack:
+  - resources/**
+win:
+  executableName: pixie
+  icon: resources/icon.png
+  target:
+    - nsis
+nsis:
+  artifactName: Pixie-${version}-instalador.${ext}
+  shortcutName: Pixie
+  uninstallDisplayName: Pixie
+  createDesktopShortcut: always
