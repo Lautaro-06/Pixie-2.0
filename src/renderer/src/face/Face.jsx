@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { renderFace, WIDTH, HEIGHT } from './draw.js'
-import { REACTIONS, compose, talking } from './animations.js'
+import { REACTIONS, IDLE_BY_FEELING, compose, talking } from './animations.js'
 
 const SCALE = 2
 const FOLLOW_MS = 4000 // sigue al mouse hasta 4 s después de que se deja de mover
@@ -10,9 +10,14 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 // reaction: { type, id } — una animación de REACTIONS
 // speech: { id, ms } — mueve la boca durante ms
 // cursor: { x, y, at } — posición del mouse en la pantalla
-export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null }) {
+// feeling: contento | normal | aburrido | cansado — cambia lo que hace cuando está solo
+export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null, feeling = 'normal' }) {
   const canvasRef = useRef(null)
-  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, lastKey: '' })
+  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, lastKey: '', feeling })
+
+  useEffect(() => {
+    engine.current.feeling = feeling
+  }, [feeling])
 
   useEffect(() => {
     const e = engine.current
@@ -69,6 +74,11 @@ export default function Face({ mood = 'idle', reaction = null, speech = null, cu
             else if (r < 0.24) type = 'glanceRight'
             else if (r < 0.3) type = 'lookAround'
           }
+          if (e.mood === 'idle') {
+            const r2 = Math.random()
+            const special = (IDLE_BY_FEELING[e.feeling] ?? []).find(([p]) => r2 < p)
+            if (special) type = special[1]
+          }
           const [duration, fn] = REACTIONS[type]
           e.overlays.push({ kind: 'idle', duration, fn, start: performance.now() })
         }
@@ -94,7 +104,7 @@ export default function Face({ mood = 'idle', reaction = null, speech = null, cu
       const now = performance.now()
       e.overlays = e.overlays.filter((o) => now - o.start < o.duration)
       const follow = e.follow && Date.now() - e.follow.at < FOLLOW_MS ? e.follow.look : null
-      const bits = renderFace(compose(e.mood, e.moodStart, e.overlays, now, { still, follow }))
+      const bits = renderFace(compose(e.mood, e.moodStart, e.overlays, now, { still, follow, tired: e.feeling === 'cansado' }))
       const key = bits.join('')
       if (key === e.lastKey) return
       e.lastKey = key

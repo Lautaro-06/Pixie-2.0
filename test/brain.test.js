@@ -193,3 +193,56 @@ test('frases de ánimo, estudio, apagado y más', () => {
   assert.deepEqual(a('reiniciá la pc').params, { modo: 'reiniciar' })
   assert.equal(a('cancelá el apagado').action, 'cancelar_apagado')
 })
+
+test('agenda, pendientes y datos', () => {
+  const now = new Date(2026, 8, 30, 18, 0) // miércoles 30/9, 18:00
+  const a = (p) => {
+    const r = interpret(p, { now })
+    if (!r) return null
+    const params = { ...r.params }
+    if (params.cuando) {
+      const d = new Date(params.cuando)
+      params.cuando = `${d.getDate()}/${d.getMonth() + 1}${params.conHora ? ` ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` : ''}`
+    }
+    return [r.action, params]
+  }
+  assert.deepEqual(a('el martes tengo prueba de historia'), ['agendar', { texto: 'prueba de historia', cuando: '6/10', conHora: false }])
+  assert.deepEqual(a('recordame mañana a las 8 llevar la carpeta'), ['agendar', { texto: 'llevar la carpeta', cuando: '1/10 8:00', conHora: true }])
+  assert.deepEqual(a('mañana hay reunión a las 10'), ['agendar', { texto: 'reunion', cuando: '1/10 10:00', conHora: true }])
+  assert.deepEqual(a('la prueba de matemática es el 15 de octubre'), ['agendar', { texto: 'prueba de matematica', cuando: '15/10', conHora: false }])
+  assert.deepEqual(a('acordate que mi color favorito es el azul'), ['recordar_dato', { texto: 'mi color favorito es el azul' }])
+  assert.deepEqual(a('acordate de comprar pan'), ['agregar_pendiente', { texto: 'comprar pan' }])
+  assert.deepEqual(a('anotá comprar cartuchos'), ['agregar_pendiente', { texto: 'comprar cartuchos' }])
+  assert.deepEqual(a('recordame llamar a la abuela'), ['agregar_pendiente', { texto: 'llamar a la abuela' }])
+  assert.deepEqual(a('recordame en 10 minutos sacar la pizza'), ['crear_timer', { segundos: 600, etiqueta: 'sacar la pizza' }])
+  assert.deepEqual(a('¿qué tengo esta semana?'), ['ver_agenda', { dias: 7 }])
+  assert.equal(a('¿qué tengo mañana?')[0], 'ver_agenda')
+  assert.deepEqual(a('¿cuándo es la prueba?'), ['consultar_memoria', { buscar: 'la prueba' }])
+  assert.deepEqual(a('¿cuál es mi color favorito?'), ['consultar_memoria', { buscar: 'cual es mi color favorito' }])
+  assert.deepEqual(a('¿qué tengo pendiente?'), ['ver_pendientes', {}])
+  assert.deepEqual(a('ya compré los cartuchos'), ['completar_pendiente', { buscar: 'compre los cartuchos' }])
+  assert.deepEqual(a('tachá la 2'), ['completar_pendiente', { numero: 2 }])
+  assert.deepEqual(a('borrá comprar pan de la lista'), ['completar_pendiente', { buscar: 'comprar pan' }])
+  assert.deepEqual(a('borrá todos los pendientes'), ['limpiar_pendientes', {}])
+  assert.deepEqual(a('me llamo Lautaro'), ['guardar_nombre', { nombre: 'lautaro' }])
+  assert.deepEqual(a('¿cómo me llamo?'), ['quien_soy', {}])
+  assert.deepEqual(a('¿qué sabés de mí?'), ['ver_datos', {}])
+  assert.deepEqual(a('olvidate de todo'), ['olvidar_todo', {}])
+  assert.deepEqual(a('¿qué estoy haciendo?'), ['que_hago', {}])
+  assert.deepEqual(a('¿cuánto tiempo estuve en YouTube?'), ['uso_hoy', { buscar: 'youtube' }])
+  assert.deepEqual(a('¿cuánto usé la compu hoy?'), ['uso_hoy', {}])
+  assert.deepEqual(a('no me molestes por media hora'), ['no_molestar', { minutos: 30 }])
+  assert.deepEqual(a('ya podés hablar'), ['molestar', {}])
+  // lo de antes sigue igual
+  assert.deepEqual(a('hasta mañana'), ['ocultar', {}])
+  assert.deepEqual(a('¿va a llover mañana?'), ['clima', {}])
+  assert.deepEqual(a('poné una alarma'), ['crear_timer', {}])
+  assert.deepEqual(a('que dia es hoy'), ['decir_hora', { fecha: true }])
+})
+
+test('recupera las tildes del texto original', async () => {
+  const { restoreAccents } = await import('../src/main/brain.js')
+  assert.equal(restoreAccents('mañana hay reunión a las 10', 'reunion'), 'reunión')
+  assert.equal(restoreAccents('me llamo Lautaro', 'lautaro'), 'Lautaro')
+  assert.equal(restoreAccents('algo', 'otra cosa'), 'otra cosa')
+})

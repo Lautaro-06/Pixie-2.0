@@ -79,7 +79,27 @@ export const REACTIONS = {
   surprised: [1000, (t) => ({ eyes: 'wide', mouth: 'o', dy: t < 150 ? -2 : 0 })],
   alarm: [2600, (t) => ({ eyes: 'wide', mouth: 'o', extra: 'exclaim', dx: t < 2000 ? shake(t) : 0, dy: t < 2000 ? (Math.floor(t / 160) % 2 ? -1 : 0) : 0 })],
   music: [2600, (t) => ({ eyes: 'happy', mouth: 'smile', extra: 'notes', extraT: loop(t, 1300), dy: Math.floor(t / 300) % 2 ? -1 : 0 })],
-  wake: [900, (t) => keyframes(t, [[0, { openL: 0.1, openR: 0.1, eyes: 'wide' }], [200, { openL: 1, openR: 1, eyes: 'wide' }], [900, { openL: 1, openR: 1, eyes: 'normal' }]])]
+  wake: [900, (t) => keyframes(t, [[0, { openL: 0.1, openR: 0.1, eyes: 'wide' }], [200, { openL: 1, openR: 1, eyes: 'wide' }], [900, { openL: 1, openR: 1, eyes: 'normal' }]])],
+  // Según cómo se siente
+  yawn: [1800, (t) => ({
+    ...keyframes(t, [[0, { openL: 1, openR: 1 }], [300, { openL: 0.3, openR: 0.3 }], [1400, { openL: 0.3, openR: 0.3 }], [1800, { openL: 1, openR: 1 }]]),
+    mouth: t > 200 && t < 1500 ? 'o' : 'small',
+    dy: t > 300 && t < 1400 ? -1 : 0
+  })],
+  sigh: [1600, (t) => ({
+    brow: 'sad',
+    mouth: 'flat',
+    ...keyframes(t, [[0, { lookY: 0, openL: 1, openR: 1 }], [400, { lookY: 0.8, openL: 0.7, openR: 0.7 }], [1200, { lookY: 0.8, openL: 0.7, openR: 0.7 }], [1600, { lookY: 0, openL: 1, openR: 1 }]])
+  })],
+  wiggle: [900, (t) => ({ eyes: t < 450 ? 'happy' : 'normal', dx: Math.round(Math.sin(t / 70)), dy: t % 300 < 150 ? -1 : 0 })]
+}
+
+// Qué hace solo, de vez en cuando, según cómo se siente.
+export const IDLE_BY_FEELING = {
+  contento: [[0.15, 'wiggle'], [0.25, 'happy']],
+  aburrido: [[0.2, 'sigh'], [0.3, 'lookAround']],
+  cansado: [[0.3, 'yawn']],
+  normal: []
 }
 
 // Boca que se mueve mientras Pixie "habla".
@@ -90,10 +110,14 @@ export function talking(t) {
 
 // Combina el estado de ánimo con las animaciones activas.
 // overlays: [{ fn, start, duration }] en orden; las últimas mandan.
-export function compose(mood, moodStart, overlays, now, { still = false, follow = null } = {}) {
+export function compose(mood, moodStart, overlays, now, { still = false, follow = null, tired = false } = {}) {
   const base = MOODS[mood] ?? MOODS.idle
   const params = { ...base(now - moodStart) }
   if (mood === 'idle' && follow) Object.assign(params, follow)
+  if (tired && mood !== 'sleeping') {
+    params.openL = Math.min(params.openL ?? 1, 0.75)
+    params.openR = Math.min(params.openR ?? 1, 0.75)
+  }
   for (const o of overlays) Object.assign(params, o.fn(now - o.start))
   if (still) {
     params.dx = 0

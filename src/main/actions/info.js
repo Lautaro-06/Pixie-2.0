@@ -45,10 +45,11 @@ const CHAT = {
     text: 'Soy Pixie, tu asistente de escritorio. Me hicieron Sofía, Thomas, Mauro y Lautaro. Vivo en esta esquina y te ayudo con la compu.',
     face: 'happy'
   }),
-  como_estas: () => ({
-    text: pick(['¡Re bien! Con ganas de ayudarte. ¿Qué necesitás?', 'Todo piola por acá. ¿Y vos?', 'Bien, un poco aburrido. ¡Pedime algo!']),
-    face: 'happy'
-  }),
+  como_estas: (ctx) => {
+    const text = ctx?.howAreYou?.() ?? pick(['¡Re bien! Con ganas de ayudarte. ¿Qué necesitás?', 'Todo piola por acá. ¿Y vos?'])
+    const feeling = ctx?.feeling?.()
+    return { text, face: { contento: 'love', aburrido: 'sad', cansado: 'sad' }[feeling] ?? 'happy' }
+  },
   chiste: () => ({ text: pick(JOKES), face: 'wink' }),
   dato: () => ({ text: `¿Sabías que…? ${pick(FACTS)}`, face: 'surprised' }),
   carino: () => ({ text: pick(['¡Aww, yo también te quiero!', '¡Me vas a hacer sonrojar los píxeles!', '¡Gracias! Vos también sos lo más.']), face: 'love' }),
@@ -84,13 +85,26 @@ export const infoActions = [
   },
   {
     name: 'buen_dia',
-    description: 'Resumen del momento: hora, clima y timers',
+    description: 'Resumen del momento: hora, agenda, pendientes, clima y timers',
     run: async (_params, ctx) => {
-      const parts = [`${greeting()}. Hoy es ${dateText()} y son las ${timeText()}.`]
+      const now = new Date()
+      const name = ctx.memory?.getName()
+      const parts = [`${greeting(now)}${name ? `, ${name}` : ''}. Hoy es ${dateText(now)} y son las ${timeText(now)}.`]
+      if (ctx.memory) {
+        const start = new Date(now)
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(start.getTime() + 86400000 - 1)
+        const events = ctx.memory.eventsBetween(start, end).map((e) =>
+          e.conHora ? `${e.texto} a las ${new Date(e.cuando).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}` : e.texto
+        )
+        if (events.length) parts.push(`Hoy tenés: ${events.join(', ')}.`)
+        const todos = ctx.memory.listTodos().length
+        if (todos) parts.push(`Te ${todos === 1 ? 'queda un pendiente' : `quedan ${todos} pendientes`}.`)
+      }
       try {
         parts.push(await describeWeather(ctx))
       } catch {
-        parts.push('No pude ver el clima.')
+        // sin internet: el resumen sale igual
       }
       parts.push(timersSummary())
       return { text: parts.filter(Boolean).join(' '), face: 'happy' }
@@ -101,8 +115,8 @@ export const infoActions = [
     description: 'Saluda',
     run: (_params, ctx) => ({
       text: pick([
-        `¡Hola! Soy Pixie. Pedime lo que necesites o llamame con ${ctx.shortcutLabel()}.`,
-        '¡Hola, hola! ¿En qué te ayudo?',
+        `¡Hola${ctx.memory?.getName() ? `, ${ctx.memory.getName()}` : ''}! Pedime lo que necesites o llamame con ${ctx.shortcutLabel()}.`,
+        `¡Hola, hola${ctx.memory?.getName() ? ` ${ctx.memory.getName()}` : ''}! ¿En qué te ayudo?`,
         '¡Buenas! Acá estoy. ¿Qué hacemos?'
       ]),
       face: 'happy'
@@ -116,7 +130,7 @@ export const infoActions = [
   {
     name: 'charla',
     description: 'Charla: quién es, chistes, datos curiosos',
-    run: ({ tema }) => (CHAT[tema] ?? CHAT.como_estas)()
+    run: ({ tema }, ctx) => (CHAT[tema] ?? CHAT.como_estas)(ctx)
   },
   {
     name: 'calcular',
@@ -134,10 +148,10 @@ export const infoActions = [
     run: () => ({
       text:
         'Puedo abrir apps, sitios y carpetas, buscar en Google, YouTube o Maps, manejar el volumen y la música, ' +
-        'poner timers, hacer cuentas, decirte la hora y el clima, bloquear la compu, sacar capturas, ' +
-        'contarte chistes y datos curiosos. Podés pedirme varias cosas juntas. Probá «buen día».',
+        'poner timers, hacer cuentas y decirte la hora y el clima. También me acuerdo de cosas: agenda, pendientes ' +
+        'y lo que me cuentes, y te aviso a tiempo. Me doy cuenta de lo que hacés en la compu y te hablo cuando hace falta.',
       face: 'happy',
-      suggestions: ['buen día', 'abrí YouTube y subí el volumen', 'contame un chiste', 'cuánto es 25 por 4']
+      suggestions: ['el martes tengo prueba de historia', 'anotá comprar cartuchos', '¿qué tengo esta semana?', '¿cuánto usé la compu hoy?']
     })
   },
   {

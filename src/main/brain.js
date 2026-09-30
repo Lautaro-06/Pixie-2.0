@@ -4,6 +4,7 @@
 // Más adelante se puede sumar una IA que elija entre las mismas acciones.
 import { APPS, SITES, FOLDERS } from './catalog.js'
 import { toExpression } from './calc.js'
+import { parseWhen, withoutSpans } from './dates.js'
 
 // ───────────── Normalización ─────────────
 
@@ -183,11 +184,100 @@ const MUSIC_WORDS = /\b(musica|cancion|canciones|tema|temazo|playlist|video)\b/
 const VOLUME_WORDS = /\b(volumen|sonido|audio)\b/
 const KNOWLEDGE = /^(que es|que son|que significa|quien es|quien fue|quienes son|quienes fueron|como se hace|como hago|como se|como funciona|cuando fue|cuando es|cuando nacio|cuando murio|por que|cual es|cuales son|cuanto mide|cuanto pesa|cuanto cuesta|cuanto sale|cuanto esta|cuanto es|cuantos|cuantas|de donde es|que paso)\b/
 
+const REMEMBER_VERBS = /\b(acordate|acordame|recorda|recordate|guarda|guardate|memoriza|no te olvides)\b/
+const NOTE_VERBS = /\b(anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar)\b/
+const REMIND_VERBS = /\b(recordame|recuerdame|recordarme|avisame|avisa|avises|despertame)\b/
+const AGENDA_WORDS = /\b(tengo|tenemos|hay|me toca|voy a|vamos a|es el|es la|cumple|cumpleanos|examen|prueba|parcial|turno|entrega|reunion|partido|clase|viaje|cita|dentista|medico)\b/
+const STOP_NAMES = new Set(['yo', 'un', 'una', 'el', 'la', 'la hora', 'algo'])
+const EVENT_LEAD = /^(es|son|recordame|recorda|recuerdame|recordarme|acordate|acordame|avisame|avisa|avises|anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar|despertame|guarda|guardate|memoriza|no te olvides|que|de|el|la|los|las|tengo|tenemos|hay|me toca|voy a|vamos a|para|y|en la lista|en mis pendientes|a la lista|a mis pendientes)\b\s*/
+const EVENT_TAIL = /\s*\b(es|son|el|la|para|de|que|a|y|en la lista|a la lista|en mis pendientes|a mis pendientes|en pendientes)$/
+
+function cleanEventText(s) {
+  let out = s.trim()
+  let prev
+  do {
+    prev = out
+    out = out.replace(EVENT_LEAD, '').replace(EVENT_TAIL, '').trim()
+  } while (out !== prev)
+  return out
+}
+
 const RULES = [
   // Configuración
   (t) => {
     const m = t.match(/^(?:mi ciudad es|estoy en|vivo en|soy de|cambia(?:r)? (?:la )?ciudad a|usa la ciudad)\s+(.+)$/)
     return m ? intent('configurar_ciudad', { ciudad: m[1] }) : null
+  },
+
+  // Memoria: tu nombre y lo que le contás
+  (t) => {
+    const m = t.match(/^(?:me llamo|mi nombre es|llamame|decime)\s+([a-zñ]+(?: [a-zñ]+)?)$/)
+    return m && !STOP_NAMES.has(m[1]) ? intent('guardar_nombre', { nombre: m[1] }) : null
+  },
+  (t) => (/\b(como me llamo|sabes (como me llamo|mi nombre)|quien soy|cual es mi nombre)\b/.test(t) ? intent('quien_soy') : null),
+  (t) => (/\b(que sabes de mi|que sabes sobre mi|que te acordas|que recordas|que te conte|que tenes guardado)\b/.test(t) ? intent('ver_datos') : null),
+  (t) => {
+    const m = t.match(/^(?:olvidate|olvida|olvidar)\s+(?:de\s+)?(?:que\s+)?(.+)$/)
+    if (!m) return null
+    return /^(todo|todo lo que sabes)$/.test(m[1]) ? intent('olvidar_todo') : intent('olvidar', { buscar: m[1] })
+  },
+
+  // No molestar
+  (t) => {
+    if (!/\b(no (me )?molestes|modo no molestar|no hables|silencio por|dejame tranquil[oa]|dejame concentrar)\b/.test(t)) return null
+    const d = parseDuration(t)
+    return intent('no_molestar', { minutos: d ? Math.round(d.seconds / 60) : 60 })
+  },
+  (t) => (/\b(ya (podes )?hablar|desactiva(r)? (el )?no molestar|volve a hablar|ya (podes )?molestar)\b/.test(t) ? intent('molestar') : null),
+
+  // Pendientes
+  (t) => (/^(vacia|limpia)\b.*\b(lista|pendientes)\b|^(borra|borrame|elimina)\b.*\b(todos los pendientes|toda la lista)\b/.test(t) ? intent('limpiar_pendientes') : null),
+  (t) => {
+    const m = t.match(/^(?:tacha|tachame|borra|saca|elimina|completa|marca)\s+(?:el |la |lo )?(?:pendiente |numero |nro )?(\d{1,2})$/)
+    return m ? intent('completar_pendiente', { numero: parseInt(m[1], 10) }) : null
+  },
+  (t) => {
+    const m =
+      t.match(/^(?:tacha|tachame|completa|marca como hech[oa]|marca)\s+(.+)$/) ||
+      t.match(/^(?:borra|saca|elimina)\s+(.+?)\s+de (?:la lista|pendientes|mis pendientes|mis tareas)$/) ||
+      t.match(/^ya ((?:hice|termine|complete|compre|llame|entregue|estudie|lave|limpie|arregle|mande|pague|saque|busque|lei|ordene|cocine|escribi|hable)\b.*)$/)
+    return m ? intent('completar_pendiente', { buscar: m[1] }) : null
+  },
+  (t) => (/\b(que tengo pendiente|mis pendientes|los pendientes|pendientes|mis tareas|lista de tareas|que me falta hacer|que me falta|mi lista)\b/.test(t) ? intent('ver_pendientes') : null),
+
+  // Agenda: consultar
+  (t, ctx) => {
+    if (!/\b(que tengo|tengo algo|que hay|mi agenda|la agenda|que eventos|proximos eventos|que me toca)\b/.test(t)) return null
+    const when = parseWhen(t, ctx.now)
+    if (when) return intent('ver_agenda', { dia: when.date.toISOString() })
+    return intent('ver_agenda', { dias: 7 })
+  },
+  (t) => {
+    const m =
+      t.match(/^(?:cuando (?:es|era|tengo|tenia|cae|son)|para cuando es|que dia (?:es|era|tengo|cae))\s+(.+)$/) ||
+      t.match(/^((?:cual|cuales|que|como se llama|como se llaman|donde)\b.*\b(?:mi|mis)\b.*)$/)
+    if (!m || /^(hoy|manana|pasado manana)$/.test(m[1])) return null
+    return intent('consultar_memoria', { buscar: m[1] })
+  },
+
+  // Agenda, pendientes y datos: guardar
+  (t, ctx) => {
+    const remember = REMEMBER_VERBS.test(t)
+    const note = NOTE_VERBS.test(t)
+    const remind = REMIND_VERBS.test(t)
+    const when = parseDuration(t) ? null : parseWhen(t, ctx.now)
+    if (when && (remember || note || remind || AGENDA_WORDS.test(t))) {
+      const texto = cleanEventText(withoutSpans(t, when.spans))
+      return intent('agendar', { texto, cuando: when.date.toISOString(), conHora: when.hasTime })
+    }
+    if (parseDuration(t)) return null // "recordame en 10 minutos…" es un timer
+    if (note || remind) return intent('agregar_pendiente', { texto: cleanEventText(t) })
+    if (remember) {
+      const rest = t.replace(/^.*?\b(?:acordate|acordame|recorda|recordate|guarda|guardate|memoriza|no te olvides)\b\s*/, '')
+      if (/^de\s/.test(rest)) return intent('agregar_pendiente', { texto: cleanEventText(rest) })
+      return intent('recordar_dato', { texto: rest.replace(/^que\s+/, '') })
+    }
+    return null
   },
 
   // Cuentas
@@ -209,7 +299,7 @@ const RULES = [
   (t) => {
     const d = parseDuration(t)
     if (TIMER_WORDS.test(t)) {
-      if (!d) return intent('crear_timer')
+      if (!d) return /\b(timer|temporizador|alarma|cronometro)\b/.test(t) ? intent('crear_timer') : null
       const etiqueta = timerLabel(t, d)
       return intent('crear_timer', etiqueta ? { segundos: d.seconds, etiqueta } : { segundos: d.seconds })
     }
@@ -243,6 +333,15 @@ const RULES = [
   (t) => (/\b(gracias|genial|buenisimo|joya|excelente|perfecto|de diez|barbaro|espectacular)\b/.test(t) ? intent('gracias') : null),
   (t) => (/\b(ayuda|ayudame|que (sabes |haces )?hacer|que haces|comandos|opciones)\b/.test(t) ? intent('ayuda') : null),
   (t) => (/\b(escondete|ocultate|anda a dormir|chau|adios|nos vemos|hasta luego|hasta manana)\b/.test(t) ? intent('ocultar') : null),
+
+  // Lo que estás haciendo y cuánto usaste la compu
+  (t) => (/\b(que estoy haciendo|en que estoy|que app estoy usando|que estoy mirando)\b/.test(t) ? intent('que_hago') : null),
+  (t) => {
+    if (!/\b(cuanto (tiempo )?(use|estuve|llevo|pase|estoy|vengo)|tiempo de pantalla|uso de hoy|como use la compu)\b/.test(t)) return null
+    const m = t.match(/\ben (?:el |la |los |las )?([a-z0-9 ]+?)(?: hoy)?$/)
+    return intent('uso_hoy', m && !/^(la compu|la pc|la computadora)$/.test(m[1]) ? { buscar: m[1] } : {})
+  },
+  (t) => (/\b(resumen del dia|resumime el dia|como viene el dia)\b/.test(t) ? intent('buen_dia') : null),
 
   // Estado de la compu y sistema
   (t) => (/\b(como (esta|anda|va) (la|mi) (compu|pc|computadora)|estado de (la|mi) (compu|pc|computadora)|memoria|ram|cpu|procesador|rendimiento|(anda|va|esta) lenta|se tilda)\b/.test(t) ? intent('estado_pc') : null),
@@ -340,7 +439,18 @@ function interpretSegment(segment, ctx) {
 }
 
 function context(options = {}) {
-  return { index: options.customApps?.length ? buildIndex(options.customApps) : DEFAULT_INDEX }
+  return {
+    index: options.customApps?.length ? buildIndex(options.customApps) : DEFAULT_INDEX,
+    now: options.now ?? new Date()
+  }
+}
+
+// Recupera las tildes del texto original: "reunion" → "reunión".
+export function restoreAccents(original, phrase) {
+  const src = String(original ?? '')
+  const folded = fold(src) // misma longitud que el original
+  const i = folded.indexOf(phrase)
+  return i >= 0 && folded.length === src.length ? src.slice(i, i + phrase.length) : phrase
 }
 
 // Un solo pedido.

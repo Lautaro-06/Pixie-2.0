@@ -4,6 +4,7 @@ import { join } from 'node:path'
 // Tamaños de la ventana: solo la cara, o la cara con la barra para escribir.
 const SIZES = {
   compact: { width: 210, height: 164 },
+  notice: { width: 400, height: 300 },
   expanded: { width: 420, height: 400 }
 }
 const MARGIN = 16

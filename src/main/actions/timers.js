@@ -19,6 +19,10 @@ function describe(timer) {
   return `${timer.etiqueta ? `«${timer.etiqueta}»` : 'el timer'} (faltan ${durationText(left)})`
 }
 
+export function isPomodoroRunning() {
+  return [...timers.values()].some((t) => t.etiqueta === 'Pomodoro')
+}
+
 export function timersSummary() {
   if (!timers.size) return ''
   const list = [...timers.values()].map(describe)
@@ -40,11 +44,14 @@ export const timerActions = [
       const timer = { id, etiqueta, endsAt: Date.now() + segundos * 1000 }
       timer.handle = setTimeout(() => {
         timers.delete(id)
-        const text = etiqueta
-          ? `¡Tiempo! Te aviso: ${etiqueta}.`
-          : `¡Terminó el timer de ${durationText(segundos)}!`
+        const pomodoro = etiqueta === 'Pomodoro'
+        const text = pomodoro
+          ? '¡Terminó el Pomodoro! Muy bien. Tomate 5 minutos de descanso.'
+          : etiqueta
+            ? `¡Tiempo! Te aviso: ${etiqueta}.`
+            : `¡Terminó el timer de ${durationText(segundos)}!`
         ctx.notify('Pixie', text)
-        ctx.emit({ type: 'alarm', text })
+        ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
         ctx.log(`timer terminado: ${etiqueta ?? durationText(segundos)}`)
       }, segundos * 1000)
       timers.set(id, timer)

@@ -1,13 +1,15 @@
 import { app, ipcMain, globalShortcut, Notification, screen } from 'electron'
-import { interpretAll, suggest, isYes, isNo } from './brain.js'
+import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction } from './actions/index.js'
 import { loadConfig, getConfig, saveConfig, logAction } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createTray } from './tray.js'
+import { createMind } from './mind.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 let activeShortcut = null
 let pending = null // acción esperando que la persona confirme
+let mind = null
 
 function shortcutLabel() {
   if (!activeShortcut) return 'el ícono de la barra de tareas'
@@ -57,6 +59,7 @@ async function ask(text) {
 
   const options = { customApps: getConfig().apps ?? [] }
   const intents = interpretAll(input, options)
+  mind?.interacted(moodKind(intents))
   if (!intents) {
     return {
       text: 'No te entendí del todo. ¿Era alguna de estas?',
@@ -68,6 +71,8 @@ async function ask(text) {
   // Puede haber varios pedidos juntos: se hacen en orden y lo riesgoso frena para preguntar.
   const results = []
   for (const it of intents) {
+    // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
+    for (const key of ['texto', 'nombre']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     const action = actions[it.action]
     if (action?.confirm) {
       pending = it
@@ -77,6 +82,16 @@ async function ask(text) {
     results.push(await runAction(it.action, it.params, ctx))
   }
   return mergeResults(results)
+}
+
+// Cómo le cae a Pixie lo que le dijiste
+function moodKind(intents) {
+  const temas = (intents ?? []).map((i) => (i.action === 'charla' ? i.params.tema : i.action))
+  if (temas.includes('insulto')) return 'insulto'
+  if (temas.includes('carino')) return 'carino'
+  if (temas.includes('gracias') || temas.includes('guardar_nombre')) return 'gracias'
+  if (temas.includes('chiste')) return 'chiste'
+  return 'mensaje'
 }
 
 function mergeResults(results) {
@@ -125,14 +140,33 @@ if (!app.requestSingleInstanceLock()) {
 
     ipcMain.handle('pixie:ask', (_e, text) => ask(text))
     ipcMain.handle('pixie:confirm', (_e, yes) => confirm(Boolean(yes)))
-    ipcMain.handle('pixie:info', () => ({ shortcut: shortcutLabel(), version: app.getVersion() }))
+    ipcMain.handle('pixie:info', () => ({ shortcut: shortcutLabel(), version: app.getVersion(), feeling: mind?.feeling() }))
     ipcMain.on('pixie:mode', (_e, mode) => setMode(mode))
     ipcMain.on('pixie:hide', () => getWindow()?.hide())
+
+    mind = createMind({
+      ctx,
+      sendEvent,
+      notify: ctx.notify,
+      log: logAction,
+      showWindow: () => {
+        const win = getWindow()
+        if (win && !win.isVisible()) win.showInactive()
+      }
+    })
+    Object.assign(ctx, {
+      memory: mind.memory,
+      awareness: mind.snapshot,
+      setQuiet: mind.setQuiet,
+      feeling: mind.feeling,
+      howAreYou: mind.howAreYou
+    })
 
     createPixieWindow()
     registerShortcut()
     followCursor()
     createTray({ onTalk: openBar, shortcutLabel })
+    mind.start()
   })
 
   // Pixie no navega a otras páginas ni abre ventanas nuevas.
@@ -143,5 +177,8 @@ if (!app.requestSingleInstanceLock()) {
 
   // Vive en la barra de tareas: cerrar la ventana no cierra la app.
   app.on('window-all-closed', () => {})
-  app.on('will-quit', () => globalShortcut.unregisterAll())
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
+    mind?.stop()
+  })
 }

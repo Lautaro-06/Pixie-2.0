@@ -3,8 +3,9 @@ import Face from './face/Face.jsx'
 import { api, isPreview } from './api.js'
 import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady } from './voice.js'
 
-const STARTERS = ['buen día', 'abrí YouTube y subí el volumen', 'contame un chiste', 'timer de 5 minutos']
+const STARTERS = ['buen día', '¿qué tengo esta semana?', 'anotá comprar cartuchos', 'contame un chiste']
 const SLEEP_AFTER_MS = 2 * 60 * 1000 // se duerme si no lo usás un rato
+const SLEEP_WHEN_TIRED_MS = 45 * 1000
 const WAKE_DISTANCE = 140 // se despierta si acercás el mouse
 
 function loadVoicePref() {
@@ -27,12 +28,16 @@ export default function App() {
   const [voiceOn, setVoiceOn] = useState(loadVoicePref)
   const [voiceAvailable, setVoiceAvailable] = useState(hasSpanishVoice)
   const [shortcut, setShortcut] = useState('Ctrl+Espacio')
+  const [notice, setNotice] = useState(null) // aviso que Pixie da por su cuenta
+  const [feeling, setFeeling] = useState('normal')
   const inputRef = useRef(null)
   const faceRef = useRef(null)
   const history = useRef([])
   const historyPos = useRef(-1)
   const lastActivity = useRef(Date.now())
   const asleepRef = useRef(false)
+  const expandedRef = useRef(false)
+  const noticeTimer = useRef(null)
 
   const react = useCallback((type) => setReaction({ type, id: Date.now() + Math.random() }), [])
 
@@ -57,6 +62,8 @@ export default function App() {
 
   const open = useCallback(() => {
     wake()
+    clearTimeout(noticeTimer.current)
+    setNotice(null)
     setExpanded(true)
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [wake])
@@ -69,12 +76,16 @@ export default function App() {
 
   // La ventana cambia de tamaño según el modo.
   useEffect(() => {
-    api.setMode(expanded ? 'expanded' : 'compact')
+    expandedRef.current = expanded
+    api.setMode(expanded ? 'expanded' : notice ? 'notice' : 'compact')
     if (expanded) inputRef.current?.focus()
-  }, [expanded])
+  }, [expanded, notice])
 
   useEffect(() => {
-    api.info().then((info) => setShortcut(info.shortcut)).catch(() => {})
+    api.info().then((info) => {
+      setShortcut(info.shortcut)
+      if (info.feeling) setFeeling(info.feeling)
+    }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
       if (event.type === 'open') open()
@@ -87,9 +98,32 @@ export default function App() {
           if (Math.hypot(dx, dy) < WAKE_DISTANCE) wake()
         }
       }
+      if (event.type === 'feeling') setFeeling(event.feeling)
+      if (event.type === 'presence') {
+        if (event.away) {
+          asleepRef.current = true
+          setAsleep(true)
+        } else {
+          wake()
+        }
+      }
+      // Pixie habla por su cuenta: aparece arriba de la cara sin sacarte el teclado
+      if (event.type === 'notice') {
+        wake()
+        if (expandedRef.current) {
+          setReply({ text: event.text, suggestions: event.suggestions })
+        } else {
+          setNotice({ text: event.text, suggestions: event.suggestions })
+          clearTimeout(noticeTimer.current)
+          noticeTimer.current = setTimeout(() => setNotice(null), Math.max(8000, event.text.length * 90))
+        }
+        if (event.face && event.face !== 'idle') react(event.face)
+        setSpeech({ id: Date.now(), ms: Math.min(6000, Math.max(600, event.text.length * 45)) })
+        if (voiceOn && event.voice !== false) speak(event.text)
+      }
       if (event.type === 'alarm') {
         open()
-        setReply({ text: event.text })
+        setReply({ text: event.text, suggestions: event.suggestions })
         react('alarm')
         beep()
         setSpeech({ id: Date.now(), ms: 2500 })
@@ -105,13 +139,14 @@ export default function App() {
   // Si no lo usás por un rato, se duerme.
   useEffect(() => {
     const id = setInterval(() => {
-      if (!expanded && !asleepRef.current && Date.now() - lastActivity.current > SLEEP_AFTER_MS) {
+      const after = feeling === 'cansado' ? SLEEP_WHEN_TIRED_MS : SLEEP_AFTER_MS
+      if (!expanded && !notice && !asleepRef.current && Date.now() - lastActivity.current > after) {
         asleepRef.current = true
         setAsleep(true)
       }
     }, 5000)
     return () => clearInterval(id)
-  }, [expanded])
+  }, [expanded, notice, feeling])
 
   // Si hacés clic en otra ventana, Pixie se achica.
   useEffect(() => {
@@ -232,11 +267,46 @@ export default function App() {
         </section>
       )}
 
+      {!expanded && notice && (
+        <section className="notice" aria-live="polite" onClick={open}>
+          <p>{notice.text}</p>
+          {notice.suggestions && (
+            <div className="chips">
+              {notice.suggestions.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="chip"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    open()
+                    send(c)
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="close"
+            aria-label="Cerrar aviso"
+            onClick={(e) => {
+              e.stopPropagation()
+              setNotice(null)
+            }}
+          >
+            ×
+          </button>
+        </section>
+      )}
+
       <div className="face" ref={faceRef} title="Arrastrame para moverme">
-        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} />
+        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} />
       </div>
 
-      {!expanded && (
+      {!expanded && !notice && (
         <button type="button" className="talk" onClick={open}>
           {shortcut}
         </button>

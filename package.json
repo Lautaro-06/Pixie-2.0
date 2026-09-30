@@ -1,7 +1,7 @@
 {
   "name": "pixie",
   "productName": "Pixie",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Pixie, un asistente de escritorio para Windows que hace cosas en tu compu.",
   "main": "./out/main/index.js",
   "author": "Sofia Power, Thomas Barrera Fuentes, Mauro Joel Beltrán, Lautaro Gabriel Palombo",

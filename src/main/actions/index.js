@@ -8,9 +8,19 @@ import { mediaActions } from './media.js'
 import { systemActions } from './system.js'
 import { timerActions } from './timers.js'
 import { weatherActions } from './weather.js'
+import { memoryActions, contextActions } from './memory.js'
 import { OnlyWindowsError } from '../windows.js'
 
-const ALL = [...infoActions, ...openActions, ...mediaActions, ...systemActions, ...timerActions, ...weatherActions]
+const ALL = [
+  ...infoActions,
+  ...openActions,
+  ...mediaActions,
+  ...systemActions,
+  ...timerActions,
+  ...weatherActions,
+  ...memoryActions,
+  ...contextActions
+]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
 
