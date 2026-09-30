@@ -7,8 +7,11 @@
   "author": "Sofia Power, Thomas Barrera Fuentes, Mauro Joel Beltrán, Lautaro Gabriel Palombo",
   "private": true,
   "scripts": {
+    "postinstall": "install-electron",
+    "predev": "node -e \"require('electron')\"",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "prestart": "node -e \"require('electron')\"",
     "start": "electron-vite preview",
     "test": "node --test \"test/**/*.test.js\"",
     "dist:win": "npm run build && electron-builder --win"
