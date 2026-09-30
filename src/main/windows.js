@@ -70,3 +70,11 @@ export function lockScreen() {
   if (!isWindows) throw new OnlyWindowsError()
   return run('rundll32.exe', ['user32.dll,LockWorkStation'])
 }
+
+// Apagar o reiniciar con 30 segundos de margen, o cancelar lo pendiente.
+export function shutdown(mode) {
+  if (!isWindows) throw new OnlyWindowsError()
+  const args = { apagar: ['/s', '/t', '30'], reiniciar: ['/r', '/t', '30'], cancelar: ['/a'] }[mode]
+  if (!args) throw new Error('Modo no permitido')
+  return run('shutdown.exe', args)
+}

@@ -42,8 +42,17 @@ async function currentPlace(ctx) {
   return lugar
 }
 
-export async function describeWeather(ctx) {
-  const lugar = await currentPlace(ctx)
+const RAIN_CODES = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
+
+// Devuelve { text, face }. Sin ciudad usa la de la configuración.
+export async function getWeather(ctx, ciudad) {
+  let lugar
+  if (ciudad) {
+    lugar = await geocode(ciudad)
+    if (!lugar) return { text: `No encontré «${ciudad}».`, face: 'confused' }
+  } else {
+    lugar = await currentPlace(ctx)
+  }
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lugar.lat}&longitude=${lugar.lon}` +
     '&current=temperature_2m,apparent_temperature,weather_code' +
@@ -62,16 +71,21 @@ export async function describeWeather(ctx) {
   if (rain != null) text += `, ${rain}% de probabilidad de lluvia`
   text += '.'
   if (rain >= 60) text += ' Llevá paraguas.'
-  return text
+  const rainy = RAIN_CODES.includes(now.weather_code) || rain >= 60
+  return { text, face: rainy ? 'sad' : 'happy' }
+}
+
+export async function describeWeather(ctx) {
+  return (await getWeather(ctx)).text
 }
 
 export const weatherActions = [
   {
     name: 'clima',
-    description: 'Dice el clima de la ciudad configurada',
-    run: async (_params, ctx) => {
+    description: 'Dice el clima de la ciudad configurada o de otra',
+    run: async ({ ciudad }, ctx) => {
       try {
-        return { text: await describeWeather(ctx), face: 'happy' }
+        return await getWeather(ctx, ciudad)
       } catch {
         return { text: 'No pude conseguir el clima. ¿Hay internet?', face: 'confused' }
       }

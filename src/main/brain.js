@@ -1,6 +1,101 @@
-// Cerebro de Pixie: convierte lo que escribe la persona en una acción de la lista.
-// Por ahora usa reglas. Más adelante (paso 5) se puede sumar una IA que elija
-// entre las mismas acciones.
+// Cerebro de Pixie: convierte lo que escribe la persona en acciones de la lista.
+// Usa reglas flexibles: entiende sinónimos, voseo, errores de tipeo en nombres
+// de apps y varios pedidos juntos ("abrí YouTube y subí el volumen").
+// Más adelante se puede sumar una IA que elija entre las mismas acciones.
+import { APPS, SITES, FOLDERS } from './catalog.js'
+import { toExpression } from './calc.js'
+
+// ───────────── Normalización ─────────────
+
+const SLANG = {
+  q: 'que', k: 'que', xq: 'por que', pq: 'por que', porq: 'por que', tmb: 'tambien', tb: 'tambien',
+  vol: 'volumen', min: 'minutos', mins: 'minutos', seg: 'segundos', segs: 'segundos',
+  hr: 'hora', hrs: 'horas', hs: 'horas', porfa: '', porfis: '', plis: '', pls: '', please: '', xfa: ''
+}
+
+const FILLERS = [
+  'por favor', 'me podrias', 'me podes', 'me puedes', 'podrias', 'podes', 'puedes', 'quiero que',
+  'necesito que', 'quisiera que', 'te pido que', 'dale y', 'che', 'oye', 'bueno', 'pixie', 'eh'
+]
+
+export function fold(text) {
+  return String(text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+export function normalize(text) {
+  let t = fold(text)
+    .replace(/[¿?¡!;:"«»]/g, ' ')
+    .replace(/(\d),(\d)/g, '$1‚$2') // coma decimal protegida
+    .replace(/,/g, ' , ')
+    .replace(/‚/g, ',')
+    .replace(/\.(?=\s|$)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  t = t.split(' ').map((w) => (w in SLANG ? SLANG[w] : w)).join(' ')
+  for (const f of FILLERS) t = t.replace(new RegExp(`(^|\\s)${f}(?=\\s|$)`, 'g'), ' ')
+  return t.replace(/\s+/g, ' ').replace(/^(\s*,\s*)+|(\s*,\s*)+$/g, '').replace(/(\s*,\s*)+/g, ' , ').trim()
+}
+
+// ───────────── Apps, sitios y carpetas ─────────────
+
+function buildIndex(customApps = []) {
+  const entries = []
+  const add = (list, tipo) => {
+    for (const item of list) for (const alias of item.alias ?? []) entries.push({ alias: fold(alias).trim(), tipo, nombre: item.nombre })
+  }
+  add(FOLDERS, 'carpeta')
+  add(SITES, 'sitio')
+  add(customApps, 'app')
+  add(APPS, 'app')
+  return entries
+}
+const DEFAULT_INDEX = buildIndex()
+
+// Distancia entre palabras contando letras cambiadas, de más, de menos o invertidas.
+function distance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)])
+  for (let j = 1; j <= b.length; j++) d[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+    }
+  }
+  return d[a.length][b.length]
+}
+
+const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/
+
+// Busca un nombre conocido dentro del texto. Devuelve { alias, nombre, tipo } o null.
+export function findEntity(t, index = DEFAULT_INDEX, { loose = false } = {}) {
+  const words = t.split(' ').filter((w) => w && w !== ',')
+  for (let n = Math.min(4, words.length); n >= 1; n--) {
+    for (let i = 0; i + n <= words.length; i++) {
+      const phrase = words.slice(i, i + n).join(' ')
+      const hit = index.find((e) => e.alias === phrase)
+      if (hit) return hit
+    }
+  }
+  const domain = words.find((w) => DOMAIN.test(w))
+  if (domain) return { alias: domain, nombre: domain, tipo: 'sitio' }
+  let best = null
+  for (let n = 1; n <= Math.min(3, words.length); n++) {
+    for (let i = 0; i + n <= words.length; i++) {
+      const phrase = words.slice(i, i + n).join(' ')
+      if (phrase.length < 5) continue
+      for (const e of index) {
+        if (e.alias.length < 5 || e.alias.split(' ').length !== n) continue
+        const max = (e.alias.length >= 7 ? 2 : 1) + (loose ? 1 : 0)
+        const dist = distance(phrase, e.alias)
+        if (dist <= max && (!best || dist < best.dist)) best = { ...e, dist }
+      }
+    }
+  }
+  return best
+}
+
+// ───────────── Duraciones ─────────────
 
 const NUMBER_WORDS = {
   un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7,
@@ -14,25 +109,6 @@ const DURATION_RE = new RegExp(
   'g'
 )
 
-const FILLERS = [
-  'por favor', 'porfa', 'me podrias', 'me podes', 'me puedes', 'podrias', 'podes', 'puedes',
-  'quiero que', 'necesito que', 'quisiera que', 'che', 'oye', 'pixie'
-]
-const GREETING_LEAD = /^(hola|holis|hey|ey)\s+/
-
-export function normalize(text) {
-  let t = String(text ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[¿?¡!,;:"«»()]/g, ' ')
-    .replace(/\.(?=\s|$)/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  for (const f of FILLERS) t = t.replace(new RegExp(`(^|\\s)${f}(?=\\s|$)`, 'g'), ' ')
-  return t.replace(/\s+/g, ' ').trim()
-}
-
 function toNumber(word) {
   if (word in NUMBER_WORDS) return NUMBER_WORDS[word]
   return parseFloat(word.replace(',', '.'))
@@ -43,7 +119,8 @@ export function parseDuration(t) {
   const fixed = [
     [/\bhora y media\b/, 5400],
     [/\bmedia hora\b/, 1800],
-    [/\bun cuarto de hora\b/, 900]
+    [/\bun cuarto de hora\b/, 900],
+    [/\bun minuto y medio\b/, 90]
   ]
   for (const [re, seconds] of fixed) {
     const m = re.exec(t)
@@ -53,18 +130,17 @@ export function parseDuration(t) {
   let start = -1
   let end = -1
   for (const m of t.matchAll(DURATION_RE)) {
-    const n = toNumber(m[1])
     const unit = m[2]
     const factor = unit.startsWith('h') ? 3600 : unit.startsWith('m') ? 60 : 1
-    seconds += n * factor
+    seconds += toNumber(m[1]) * factor
     if (start < 0) start = m.index
     end = m.index + m[0].length
   }
   return seconds > 0 ? { seconds: Math.round(seconds), start, end } : null
 }
 
-const TIMER_WORDS = /\b(timer|temporizador|alarma|cronometro|avisame|avisa|recordame|recorda|recuerdame)\b/
-const LABEL_LEAD = /^(pone|poneme|pon|crea|crear|arma|un|una|timer|temporizador|alarma|cronometro|avisame|avisa|recordame|recorda|recuerdame|que|para|de|en|dentro de|y|el|la)\b\s*/
+const TIMER_WORDS = /\b(timer|temporizador|alarma|cronometro|cronometra|avisame|avisa|avises|recordame|recorda|recuerdame|recordarme|despertame|acordate|acordame)\b/
+const LABEL_LEAD = /^(pone|poneme|pon|crea|crear|arma|un|una|unos|timer|temporizador|alarma|cronometro|cronometra|avisame|avisa|avises|recordame|recorda|recuerdame|recordarme|despertame|acordate|acordame|que|para|de|en|dentro de|y|el|la)\b\s*/
 const LABEL_TAIL = /\s*\b(en|de|dentro de|dentro|y)$/
 
 function cleanLabel(s) {
@@ -78,136 +154,247 @@ function cleanLabel(s) {
 }
 
 function timerLabel(t, d) {
-  const after = cleanLabel(t.slice(d.end))
-  if (after) return after
-  return cleanLabel(t.slice(0, d.start))
+  return cleanLabel(t.slice(d.end)) || cleanLabel(t.slice(0, d.start))
 }
 
-const YES = /^(si|sii|dale|ok|okey|okay|de una|confirmo|hacelo|hazlo|obvio|claro)$/
-const NO = /^(no|nop|cancela|cancelar|mejor no|deja|dejalo|para)$/
+// ───────────── Confirmaciones ─────────────
 
-export function isYes(text) { return YES.test(normalize(text)) }
-export function isNo(text) { return NO.test(normalize(text)) }
+const YES = /^(si|sii|dale|ok|okey|okay|de una|confirmo|hacelo|hazlo|obvio|claro|si dale|mandale)$/
+const NO = /^(no|nop|cancela|cancelar|mejor no|deja|dejalo|para|no gracias)$/
 
-// Cada regla devuelve { action, params } o null. El orden importa.
+export function isYes(text) { return YES.test(normalize(text).replace(/ , /g, ' ')) }
+export function isNo(text) { return NO.test(normalize(text).replace(/ , /g, ' ')) }
+
+// ───────────── Reglas ─────────────
+
+const OPEN_VERBS = new Set([
+  'abri', 'abre', 'abrir', 'abras', 'abrime', 'abrilo', 'abrila', 'abrimelo', 'abrimela', 'entra', 'entrar',
+  'entres', 'entrame', 'anda', 'ir', 've', 'vamos', 'lanza', 'lanzar', 'ejecuta', 'ejecutar', 'inicia',
+  'iniciar', 'arranca', 'arrancar', 'pone', 'poner', 'pongas', 'poneme', 'mostrame', 'muestra', 'mostrar',
+  'necesito', 'quiero', 'dame', 'traeme', 'llevame', 'prende', 'prendeme', 'activa', 'usa', 'usar',
+  'jugar', 'juguemos', 'conectame', 'conecta'
+])
+const ARTICLES = /^(?:el |la |los |las |mi |mis |un |una |al |a )+/
+const has = (re) => (t) => re.test(t)
+const intent = (action, params = {}) => ({ action, params })
+const chat = (tema) => intent('charla', { tema })
+
+const MUSIC_WORDS = /\b(musica|cancion|canciones|tema|temazo|playlist|video)\b/
+const VOLUME_WORDS = /\b(volumen|sonido|audio)\b/
+const KNOWLEDGE = /^(que es|que son|que significa|quien es|quien fue|quienes son|quienes fueron|como se hace|como hago|como se|como funciona|cuando fue|cuando es|cuando nacio|cuando murio|por que|cual es|cuales son|cuanto mide|cuanto pesa|cuanto cuesta|cuanto sale|cuanto esta|cuanto es|cuantos|cuantas|de donde es|que paso)\b/
+
 const RULES = [
   // Configuración
   (t) => {
-    const m = t.match(/^(?:mi ciudad es|estoy en|vivo en|cambia(?:r)? (?:la )?ciudad a|usa la ciudad)\s+(.+)$/)
-    return m ? { action: 'configurar_ciudad', params: { ciudad: m[1] } } : null
+    const m = t.match(/^(?:mi ciudad es|estoy en|vivo en|soy de|cambia(?:r)? (?:la )?ciudad a|usa la ciudad)\s+(.+)$/)
+    return m ? intent('configurar_ciudad', { ciudad: m[1] }) : null
+  },
+
+  // Cuentas
+  (t) => {
+    const withPrefix = t.match(/^(?:cuanto es|cuanto da|calcula(?:me)?|calcular|resolve(?:me)?|hace(?:me)? la cuenta)\s+(.+)$/)
+    const expr = toExpression(withPrefix ? withPrefix[1] : t)
+    return expr ? intent('calcular', { expresion: expr }) : null
   },
 
   // Timers
   (t) => {
-    const timerWord = /\b(timers?|temporizador(es)?|alarmas?|pomodoro|recordatorios?)\b/.test(t)
+    const timerWord = /\b(timers?|temporizador(es)?|alarmas?|pomodoro|recordatorios?|cronometro)\b/.test(t)
     const stopAtStart = /^(cancela|cancelar|cancelame|borra|borrar|para|parar|frena|frenar|deten|detene|apaga|apagar|saca|sacar|elimina|eliminar|quita|quitar)\b/.test(t)
     const cancelAnywhere = /\b(cancela|cancelar|cancelame|borra|borrar|elimina|eliminar)\b/.test(t)
-    return timerWord && (stopAtStart || cancelAnywhere) ? { action: 'cancelar_timers', params: {} } : null
+    return timerWord && (stopAtStart || cancelAnywhere) ? intent('cancelar_timers') : null
   },
-  (t) => /\b(cuanto (falta|queda)|timers? activos?|que timers?|mis timers?)\b/.test(t)
-    ? { action: 'ver_timers', params: {} } : null,
-  (t) => /\bpomodoro\b/.test(t)
-    ? { action: 'crear_timer', params: { segundos: 1500, etiqueta: 'Pomodoro' } } : null,
+  (t) => (/\b(cuanto (falta|queda)|cuanto tiempo (falta|queda)|timers? activos?|que timers?|mis timers?)\b/.test(t) ? intent('ver_timers') : null),
+  (t) => (/\bpomodoro\b/.test(t) ? intent('crear_timer', { segundos: 1500, etiqueta: 'Pomodoro' }) : null),
   (t) => {
-    if (!TIMER_WORDS.test(t)) return null
     const d = parseDuration(t)
-    if (!d) return { action: 'crear_timer', params: {} }
-    const etiqueta = timerLabel(t, d)
-    return { action: 'crear_timer', params: etiqueta ? { segundos: d.seconds, etiqueta } : { segundos: d.seconds } }
+    if (TIMER_WORDS.test(t)) {
+      if (!d) return intent('crear_timer')
+      const etiqueta = timerLabel(t, d)
+      return intent('crear_timer', etiqueta ? { segundos: d.seconds, etiqueta } : { segundos: d.seconds })
+    }
+    // Solo una duración: "5 minutos", "en media hora"
+    if (d && !cleanLabel(t.slice(0, d.start)) && !cleanLabel(t.slice(d.end))) return { ...intent('crear_timer', { segundos: d.seconds }), bare: true }
+    return null
   },
-
-  // Saludos y ayuda
-  (t) => /^(hola\s+)?(buen dia|buenos dias|buenas tardes|buenas noches|buenas)\b/.test(t)
-    ? { action: 'buen_dia', params: {} } : null,
-  (t) => /^(hola|holis|hey|ey|que tal|como estas|como andas|como va)\b/.test(t)
-    ? { action: 'saludo', params: {} } : null,
-  (t) => /\b(gracias|genial|buenisimo|joya|excelente)\b/.test(t)
-    ? { action: 'gracias', params: {} } : null,
-  (t) => /\b(ayuda|ayudame|que (sabes |haces )?hacer|que haces|comandos|opciones)\b/.test(t)
-    ? { action: 'ayuda', params: {} } : null,
-  (t) => /\b(escondete|ocultate|anda a dormir|chau|adios|nos vemos|hasta luego)\b/.test(t)
-    ? { action: 'ocultar', params: {} } : null,
 
   // Hora, fecha y clima
-  (t) => /\b(que dia|que fecha|fecha de hoy|dia es hoy|dia de hoy)\b/.test(t)
-    ? { action: 'decir_hora', params: { fecha: true } } : null,
-  (t) => /\b(que hora|hora es|la hora|hora)\b/.test(t)
-    ? { action: 'decir_hora', params: {} } : null,
-  (t) => /\b(clima|tiempo hace|temperatura|llueve|llover|lluvia|hace frio|hace calor|pronostico|paraguas|abrigo)\b/.test(t)
-    ? { action: 'clima', params: {} } : null,
+  (t) => (/\b(que dia|que fecha|fecha de hoy|dia es hoy|dia de hoy|a que estamos|en que mes)\b/.test(t) ? intent('decir_hora', { fecha: true }) : null),
+  (t) => (/\b(que hora|hora es|la hora|tenes hora|hora)\b/.test(t) ? intent('decir_hora') : null),
+  (t) => {
+    const m = t.match(/\b(?:clima|tiempo|temperatura|pronostico)\s+(?:en|de|para)\s+(.+)$/)
+    return m ? intent('clima', { ciudad: m[1] }) : null
+  },
+  (t) => (/\b(clima|tiempo hace|que tiempo|el tiempo|temperatura|llueve|llover|lluvia|frio|calor|pronostico|paraguas|abrigo|campera|nublado|soleado|como esta el dia)\b/.test(t) ? intent('clima') : null),
 
-  // Estado de la compu
-  (t) => /\b(como (esta|anda|va) (la|mi) (compu|pc|computadora)|estado de (la|mi) (compu|pc|computadora)|memoria|ram|cpu|procesador|rendimiento)\b/.test(t)
-    ? { action: 'estado_pc', params: {} } : null,
+  // Saludos y charla
+  (t) => (/^(buen dia|buenos dias|buenas tardes|buenas noches)\b/.test(t) ? intent('buen_dia') : null),
+  (t) => (/\b(quien sos|quien eres|que sos|que eres|como te llamas|tu nombre|presentate|quien te (hizo|creo|programo)|cuantos anos tenes|que edad tenes)\b/.test(t) ? chat('quien_sos') : null),
+  (t) => (/\b(chistes?|algo gracioso|hace(me)? reir)\b/.test(t) ? chat('chiste') : null),
+  (t) => (/\b(dato curioso|algo interesante|sabias que|contame algo)\b/.test(t) ? chat('dato') : null),
+  (t) => (/\b(te quiero|te amo|te re quiero|sos (el |la |un |una )?(mejor|genio|crack|capo|groso|grosa|lindo|linda|hermoso|tierno|tierna)|(que|muy) (lindo|linda|tierno|tierna))\b/.test(t) ? chat('carino') : null),
+  (t) => (/^(callate|silencio pixie|shh+)$/.test(t) ? chat('callate') : null),
+  (t) => (/\b(tonto|tonta|boludo|boluda|inutil|idiota|estupido|estupida|pelotudo|basura|sos malo|sos feo|sos fea|te odio)\b/.test(t) ? chat('insulto') : null),
+  (t) => (/\b(aburrido|aburrida|me aburro|no se que hacer)\b/.test(t) ? chat('aburrido') : null),
+  (t) => (/\b(estoy triste|me siento mal|estoy mal|estoy cansad[oa]|que bajon|tuve un mal dia)\b/.test(t) ? chat('animo') : null),
+  (t) => (/\b(tengo que estudiar|voy a estudiar|a estudiar|modo estudio|me pongo a estudiar|tengo tarea)\b/.test(t) ? chat('estudiar') : null),
+  (t) => (/\b(como estas|como andas|como te va|todo bien|como te sentis|que tal)\b/.test(t) ? chat('como_estas') : null),
+  (t) => (/^(hola|holis|hey|ey|buenas|que onda|como va)$/.test(t) ? intent('saludo') : null),
+  (t) => (/\b(gracias|genial|buenisimo|joya|excelente|perfecto|de diez|barbaro|espectacular)\b/.test(t) ? intent('gracias') : null),
+  (t) => (/\b(ayuda|ayudame|que (sabes |haces )?hacer|que haces|comandos|opciones)\b/.test(t) ? intent('ayuda') : null),
+  (t) => (/\b(escondete|ocultate|anda a dormir|chau|adios|nos vemos|hasta luego|hasta manana)\b/.test(t) ? intent('ocultar') : null),
 
-  // Sistema
-  (t) => /\b(bloquea|bloquear|bloqueame|bloquea la|bloquee)\b/.test(t)
-    ? { action: 'bloquear_pc', params: {} } : null,
-  (t) => /\b(captura|capturas|screenshot|recorte|recorta)\b/.test(t)
-    ? { action: 'captura', params: {} } : null,
+  // Estado de la compu y sistema
+  (t) => (/\b(como (esta|anda|va) (la|mi) (compu|pc|computadora)|estado de (la|mi) (compu|pc|computadora)|memoria|ram|cpu|procesador|rendimiento|(anda|va|esta) lenta|se tilda)\b/.test(t) ? intent('estado_pc') : null),
+  (t) => (/\b(bloquea|bloquear|bloqueame|bloquees|bloquee|me voy|ya vuelvo|vuelvo en un rato|me tengo que ir)\b/.test(t) ? intent('bloquear_pc') : null),
+  (t) => (/\b(cancela|cancelar|frena|para)\b.*\b(apagado|reinicio)\b/.test(t) ? intent('cancelar_apagado') : null),
+  (t) => (/\b(apaga|apagar|apagues|apagame)\b.*\b(compu|pc|computadora|todo)\b/.test(t) ? intent('apagar_pc', { modo: 'apagar' }) : null),
+  (t) => (/\b(reinicia|reiniciar|reinicies|reiniciame)\b.*\b(compu|pc|computadora)\b/.test(t) ? intent('apagar_pc', { modo: 'reiniciar' }) : null),
+  (t) => (/\b(captura|capturas|screenshot|recorte|recorta|foto (a|de) la pantalla)\b/.test(t) ? intent('captura') : null),
 
   // Volumen
-  (t) => /\b(silencia|silenciar|silencio|mutea|mutear|mute|desmutea|sin sonido)\b/.test(t)
-    ? { action: 'volumen', params: { cambio: 'silenciar' } } : null,
+  (t) => (/\b(silencia|silenciar|silencio|mutea|mutear|mute|desmutea|sin sonido|sin volumen)\b/.test(t) ? intent('volumen', { cambio: 'silenciar' }) : null),
   (t) => {
-    if (!/\b(volumen|sonido|audio)\b/.test(t)) return null
-    const up = /\b(subi|sube|subir|subile|subime|aumenta|aumentar|mas|arriba|alto)\b/.test(t)
-    const down = /\b(baja|bajar|bajale|bajame|disminui|disminuir|menos|abajo|bajo)\b/.test(t)
+    if (/\b(volumen al (maximo|tope|100)|a todo volumen|maximo volumen)\b/.test(t)) return intent('volumen', { cambio: 'subir', pasos: 50 })
+    if (/\b(volumen al minimo|minimo volumen)\b/.test(t)) return intent('volumen', { cambio: 'bajar', pasos: 50 })
+    const volWord = VOLUME_WORDS.test(t)
+    const up = (volWord && /\b(subi|sube|subir|subas|subile|subime|aumenta|aumentar|mas|arriba|alto|fuerte)\b/.test(t)) ||
+      /\b(subilo|subile|mas fuerte|mas alto|no (se )?escucho|no se escucha|no escucho nada|no oigo|se escucha (muy |re )?bajo)\b/.test(t)
+    const down = (volWord && /\b(baja|bajar|bajes|bajale|bajame|disminui|disminuir|menos|abajo|bajo)\b/.test(t)) ||
+      /\b(bajalo|bajale|mas bajo|mas despacio|muy fuerte|esta fuerte|me aturde)\b/.test(t)
     if (up === down) return null
     const n = t.match(/\b(\d{1,3})\b/)
     const pasos = n ? Math.min(50, Math.max(1, Math.round(parseInt(n[1], 10) / 2))) : 5
-    return { action: 'volumen', params: { cambio: up ? 'subir' : 'bajar', pasos } }
+    return intent('volumen', { cambio: up ? 'subir' : 'bajar', pasos })
   },
 
-  // Búsquedas (antes que música y abrir, para que "poné X en youtube" busque)
+  // Búsquedas
   (t) => {
-    const m = t.match(/^(?:busca|buscame|buscar|pone|poneme|reproduci|reproducime|mira|ver|quiero ver)\s+(.+?)\s+en youtube$/)
-    return m ? { action: 'buscar', params: { sitio: 'youtube', consulta: m[1] } } : null
+    const m =
+      t.match(/^(?:busca(?:me)?|buscar|busques|pone(?:me)?|pongas|reproduci(?:me)?|mira|ver|quiero ver|quiero escuchar|escuchar|mostrame)\s+(.+?)\s+en (?:youtube|yt)$/) ||
+      t.match(/^(?:youtube|yt)\s+(.+)$/) ||
+      t.match(/\ben (?:youtube|yt)\s+(.+)$/) ||
+      t.match(/^(?:pone(?:me)?|pongas|mostrame|quiero ver)\s+(?:un |unos )?videos? de\s+(.+)$/)
+    if (m) return intent('buscar', { sitio: 'youtube', consulta: m[1] })
+    const music = t.match(/^(?:pone(?:me)?|pongas|quiero escuchar|reproduci(?:me)?)\s+(?:musica|temas?|canciones?)\s+de\s+(.+)$/)
+    return music ? intent('buscar', { sitio: 'youtube', consulta: `música de ${music[1]}` }) : null
   },
   (t) => {
-    const m = t.match(/^(?:busca|buscame|buscar|googlea|googleame|investiga)\s+(?:en google\s+)?(.+?)(?:\s+en google)?$/)
-    return m ? { action: 'buscar', params: { sitio: 'google', consulta: m[1] } } : null
+    const m = t.match(/^(?:donde queda|donde esta|como llego a|como ir a|mapa de|ubicacion de)\s+(.+)$/)
+    return m ? intent('buscar', { sitio: 'maps', consulta: m[1] }) : null
+  },
+  (t) => {
+    const m = t.match(/^(?:busca(?:me)?|buscar|busques|googlea(?:me)?|googlear|investiga(?:me)?|averigua(?:me)?|fijate)\s+(?:en google\s+|en internet\s+|sobre\s+|que\s+|si\s+)?(.+?)(?:\s+en (?:google|internet))?$/)
+    return m ? intent('buscar', { sitio: 'google', consulta: m[1] }) : null
   },
 
   // Música
-  (t) => /\b(siguiente|proxima (cancion|tema)|pasa (la cancion|el tema|de tema|de cancion)|salta(la|lo)?( el tema| la cancion)?|skip)\b/.test(t) &&
-    !/\b(abri|abre|abrir)\b/.test(t)
-    ? { action: 'musica', params: { control: 'siguiente' } } : null,
-  (t) => /\b(anterior|volve (el tema|la cancion)|tema de antes)\b/.test(t)
-    ? { action: 'musica', params: { control: 'anterior' } } : null,
+  (t) => (/\b(siguiente|proxima (cancion|tema)|la que sigue|otra cancion|otro tema|cambia (de )?(tema|cancion)|pasa (la cancion|el tema|de tema|de cancion|esta)|saltala|saltalo|saltea|skip)\b/.test(t) ? intent('musica', { control: 'siguiente' }) : null),
+  (t) => (/\b(anterior|volve (el tema|la cancion|a la anterior)|tema de antes|la de antes)\b/.test(t) ? intent('musica', { control: 'anterior' }) : null),
   (t) => {
-    const mediaVerb = /\b(pausa|pausar|pausala|pausalo|play|reanuda|reanudar|continua|segui)\b/.test(t)
-    const stopVerb = /\b(para|frena|deten|detene|pone|pon|dale)\b/.test(t) &&
-      /\b(musica|cancion|tema|spotify|video)\b/.test(t)
-    return mediaVerb || stopVerb ? { action: 'musica', params: { control: 'pausa' } } : null
+    const mediaVerb = /\b(pausa|pausar|pausala|pausalo|play|reanuda|reanudar|continua|segui|resume)\b/.test(t) || /^reproduci$/.test(t)
+    const withMusic = /\b(para|frena|deten|detene|pone|pon|poneme|pongas|dale|escuchar|corta|cortala|apaga)\b/.test(t) && MUSIC_WORDS.test(t)
+    return mediaVerb || withMusic || /^(musica|algo de musica)$/.test(t) ? intent('musica', { control: 'pausa' }) : null
   },
 
-  // Cerrar y abrir cosas
-  (t) => {
-    const m = t.match(/^(?:cerra|cierra|cerrar|cerrame|mata|matar)\s+(?:el |la |los |las |mi |mis )?(.+)$/)
-    return m ? { action: 'cerrar_app', params: { objetivo: m[1] } } : null
+  // Cerrar y abrir
+  (t, ctx) => {
+    const m = t.match(/^(?:cerra|cierra|cerrar|cierres|cerrame|mata|matar)\s+(.+)$/)
+    if (!m) return null
+    const rest = m[1].replace(ARTICLES, '')
+    return intent('cerrar_app', { objetivo: findEntity(rest, ctx.index)?.alias ?? rest })
   },
-  (t) => {
-    const m = t.match(/^(?:abri|abre|abrir|abrime|entra a|entra en|entrar a|anda a|ir a|ve a|lanza|ejecuta|inicia|arranca|pone|poneme|mostrame)\s+(?:el |la |los |las |mi |mis )?(.+)$/)
-    return m ? { action: 'abrir', params: { objetivo: m[1] } } : null
-  }
+  (t, ctx) => {
+    const words = t.split(' ')
+    if (!words.some((w) => OPEN_VERBS.has(w))) return null
+    const e = findEntity(t, ctx.index)
+    if (e) return intent('abrir', { objetivo: e.alias })
+    const m = t.match(/^(?:abri|abre|abrir|abras|abrime|entra a|entra en|entrar a|anda a|ir a|ve a|lanza|ejecuta|inicia|arranca|mostrame)\s+(.+)$/)
+    return m ? intent('abrir', { objetivo: m[1].replace(ARTICLES, '') }) : null
+  },
+  (t, ctx) => {
+    const rest = t.replace(ARTICLES, '')
+    const e = findEntity(rest, ctx.index)
+    if (!e) return null
+    const exact = e.alias === rest || (e.dist !== undefined && rest.split(' ').length === e.alias.split(' ').length)
+    return exact ? { ...intent('abrir', { objetivo: e.alias }), implicit: true } : null
+  },
+
+  // Preguntas de conocimiento: se buscan en Google
+  (t) => (KNOWLEDGE.test(t) ? intent('buscar', { sitio: 'google', consulta: t }) : null)
 ]
 
-function applyRules(t) {
-  for (const rule of RULES) {
-    const result = rule(t)
-    if (result) return result
+const GREETING_LEAD = /^(hola|holis|hey|ey|buenas|che)\s+/
+
+function interpretSegment(segment, ctx) {
+  const t = segment.replace(/ , /g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return null
+  const tries = GREETING_LEAD.test(t) ? [t.replace(GREETING_LEAD, ''), t] : [t]
+  for (const candidate of tries) {
+    for (const rule of RULES) {
+      const result = rule(candidate, ctx)
+      if (result) return result
+    }
   }
   return null
 }
 
-export function interpret(text) {
+function context(options = {}) {
+  return { index: options.customApps?.length ? buildIndex(options.customApps) : DEFAULT_INDEX }
+}
+
+// Un solo pedido.
+export function interpret(text, options) {
+  return interpretSegment(normalize(text), context(options))
+}
+
+const SOCIAL = new Set(['saludo', 'gracias', 'charla'])
+const SPLIT = /\s*(?:,|\by despues\b|\by luego\b|\by tambien\b|\bdespues\b|\bluego\b|\by\b)\s*/
+
+// Uno o varios pedidos: "abrí YouTube y subí el volumen" → 2 acciones.
+export function interpretAll(text, options) {
   const t = normalize(text)
-  if (!t) return null
-  // "hola, abrí YouTube": primero se prueba sin el saludo.
-  if (GREETING_LEAD.test(t)) {
-    const result = applyRules(t.replace(GREETING_LEAD, ''))
-    if (result) return result
+  const ctx = context(options)
+  const parts = t.split(SPLIT).filter(Boolean)
+  if (parts.length > 1 && parts.length <= 5) {
+    const intents = []
+    for (const part of parts) {
+      const r = interpretSegment(part, ctx)
+      if (!r) break
+      const prev = intents[intents.length - 1]
+      // "cerrá Spotify y Discord": el segundo también se cierra
+      if (r.implicit && prev?.action === 'cerrar_app') intents.push(intent('cerrar_app', r.params))
+      else intents.push(r)
+    }
+    if (intents.length === parts.length && !intents.some((i) => i.bare)) {
+      // "sos un genio, gracias": la charla sobra si hay acciones; si todo es charla, vale la última
+      const useful = intents.some((i) => !SOCIAL.has(i.action))
+        ? intents.filter((i) => !SOCIAL.has(i.action))
+        : intents.slice(-1)
+      const seen = new Set()
+      return useful.filter((i) => {
+        const key = JSON.stringify([i.action, i.params])
+        return seen.has(key) ? false : seen.add(key)
+      })
+    }
   }
-  return applyRules(t)
+  const one = interpretSegment(t, ctx)
+  return one ? [one] : null
+}
+
+// Ideas para cuando Pixie no entiende.
+export function suggest(text, options) {
+  const t = normalize(text).replace(/ , /g, ' ')
+  const out = []
+  const e = t && findEntity(t, context(options).index, { loose: true })
+  if (e) out.push(`abrí ${e.nombre}`)
+  if (/volum|sonid|audio/.test(t)) out.push('subí el volumen', 'bajá el volumen')
+  if (/music|cancio|tema/.test(t)) out.push('pausá la música', 'siguiente canción')
+  if (/timer|alarm|minut|avis|record/.test(t)) out.push('timer de 5 minutos')
+  if (/clim|lluv|frio|calor|tiemp/.test(t)) out.push('¿cómo está el clima?')
+  if (/hora|dia|fecha/.test(t)) out.push('¿qué hora es?')
+  if (out.length < 2) out.push('¿qué podés hacer?')
+  const original = String(text ?? '').trim()
+  if (original && original.length <= 60) out.push(`buscá ${original}`)
+  return [...new Set(out)].slice(0, 4)
 }

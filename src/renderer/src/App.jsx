@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Face from './components/Face.jsx'
+import Face from './face/Face.jsx'
 import { api, isPreview } from './api.js'
 import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady } from './voice.js'
 
-const STARTERS = ['buen día', '¿qué hora es?', 'abrí YouTube', 'timer de 5 minutos']
+const STARTERS = ['buen día', 'abrí YouTube y subí el volumen', 'contame un chiste', 'timer de 5 minutos']
+const SLEEP_AFTER_MS = 2 * 60 * 1000 // se duerme si no lo usás un rato
+const WAKE_DISTANCE = 140 // se despierta si acercás el mouse
 
 function loadVoicePref() {
   try {
@@ -19,27 +21,48 @@ export default function App() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [reaction, setReaction] = useState(null)
+  const [speech, setSpeech] = useState(null)
+  const [cursor, setCursor] = useState(null)
+  const [asleep, setAsleep] = useState(false)
   const [voiceOn, setVoiceOn] = useState(loadVoicePref)
   const [voiceAvailable, setVoiceAvailable] = useState(hasSpanishVoice)
   const [shortcut, setShortcut] = useState('Ctrl+Espacio')
   const inputRef = useRef(null)
+  const faceRef = useRef(null)
   const history = useRef([])
   const historyPos = useRef(-1)
+  const lastActivity = useRef(Date.now())
+  const asleepRef = useRef(false)
 
   const react = useCallback((type) => setReaction({ type, id: Date.now() + Math.random() }), [])
+
+  const wake = useCallback(() => {
+    lastActivity.current = Date.now()
+    if (asleepRef.current) {
+      asleepRef.current = false
+      setAsleep(false)
+      react('wake')
+    }
+  }, [react])
 
   const show = useCallback((result) => {
     setReply(result)
     if (result.face && result.face !== 'idle') react(result.face)
-    if (voiceOn) speak(result.text)
-  }, [react, voiceOn])
+    const talkingVoice = voiceOn && voiceAvailable && result.speak !== false
+    const perChar = talkingVoice ? 62 : 28
+    setSpeech({ id: Date.now(), ms: Math.min(6000, Math.max(500, result.text.length * perChar)) })
+    if (result.speak === false) stopSpeaking()
+    else if (voiceOn) speak(result.text)
+  }, [react, voiceOn, voiceAvailable])
 
   const open = useCallback(() => {
+    wake()
     setExpanded(true)
     requestAnimationFrame(() => inputRef.current?.focus())
-  }, [])
+  }, [wake])
 
   const close = useCallback(() => {
+    lastActivity.current = Date.now()
     setExpanded(false)
     stopSpeaking()
   }, [])
@@ -55,11 +78,21 @@ export default function App() {
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
       if (event.type === 'open') open()
+      if (event.type === 'cursor') {
+        setCursor({ x: event.x, y: event.y, at: Date.now() })
+        const r = faceRef.current?.getBoundingClientRect()
+        if (r && asleepRef.current) {
+          const dx = event.x - (window.screenX + r.left + r.width / 2)
+          const dy = event.y - (window.screenY + r.top + r.height / 2)
+          if (Math.hypot(dx, dy) < WAKE_DISTANCE) wake()
+        }
+      }
       if (event.type === 'alarm') {
         open()
         setReply({ text: event.text })
         react('alarm')
         beep()
+        setSpeech({ id: Date.now(), ms: 2500 })
         if (voiceOn) setTimeout(() => speak(event.text), 900)
       }
     })
@@ -67,7 +100,18 @@ export default function App() {
       stopVoices()
       stopEvents()
     }
-  }, [open, react, voiceOn])
+  }, [open, react, voiceOn, wake])
+
+  // Si no lo usás por un rato, se duerme.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!expanded && !asleepRef.current && Date.now() - lastActivity.current > SLEEP_AFTER_MS) {
+        asleepRef.current = true
+        setAsleep(true)
+      }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [expanded])
 
   // Si hacés clic en otra ventana, Pixie se achica.
   useEffect(() => {
@@ -77,9 +121,12 @@ export default function App() {
     return () => window.removeEventListener('blur', onBlur)
   }, [close])
 
+  const mood = busy ? 'thinking' : expanded ? 'listening' : asleep ? 'sleeping' : 'idle'
+
   async function send(text) {
     const clean = text.trim()
     if (!clean || busy) return
+    lastActivity.current = Date.now()
     history.current = [clean, ...history.current.filter((h) => h !== clean)].slice(0, 30)
     historyPos.current = -1
     setInput('')
@@ -185,8 +232,8 @@ export default function App() {
         </section>
       )}
 
-      <div className="face" title="Arrastrame para moverme">
-        <Face thinking={busy} reaction={reaction} />
+      <div className="face" ref={faceRef} title="Arrastrame para moverme">
+        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} />
       </div>
 
       {!expanded && (

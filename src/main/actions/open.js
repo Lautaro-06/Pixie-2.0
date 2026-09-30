@@ -49,14 +49,16 @@ export const openActions = [
   },
   {
     name: 'buscar',
-    description: 'Busca algo en Google o YouTube',
+    description: 'Busca algo en Google, YouTube o Google Maps',
     run: async ({ sitio, consulta }) => {
       const q = encodeURIComponent(consulta ?? '')
-      const url = sitio === 'youtube'
-        ? `https://www.youtube.com/results?search_query=${q}`
-        : `https://www.google.com/search?q=${q}`
-      await launch({ tipo: 'uri', valor: url })
-      return { text: `Buscando «${consulta}» en ${sitio === 'youtube' ? 'YouTube' : 'Google'}.`, face: 'happy' }
+      const where = {
+        youtube: ['YouTube', `https://www.youtube.com/results?search_query=${q}`],
+        maps: ['Google Maps', `https://www.google.com/maps/search/${q}`],
+        google: ['Google', `https://www.google.com/search?q=${q}`]
+      }[sitio] ?? ['Google', `https://www.google.com/search?q=${q}`]
+      await launch({ tipo: 'uri', valor: where[1] })
+      return { text: `Buscando «${consulta}» en ${where[0]}.`, face: 'happy' }
     }
   }
 ]

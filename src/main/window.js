@@ -36,7 +36,9 @@ export function createPixieWindow() {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // Pixie siempre está a la vista: que Windows no le frene las animaciones
+      backgroundThrottling: false
     }
   })
   win.setAlwaysOnTop(true, 'floating')

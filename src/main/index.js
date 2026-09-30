@@ -1,5 +1,5 @@
-import { app, ipcMain, globalShortcut, Notification } from 'electron'
-import { interpret, isYes, isNo } from './brain.js'
+import { app, ipcMain, globalShortcut, Notification, screen } from 'electron'
+import { interpretAll, suggest, isYes, isNo } from './brain.js'
 import { actions, runAction } from './actions/index.js'
 import { loadConfig, getConfig, saveConfig, logAction } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
@@ -55,21 +55,55 @@ async function ask(text) {
     if (isNo(input)) return { text: 'Listo, no hago nada.', face: 'happy' }
   }
 
-  const intent = interpret(input)
-  if (!intent) {
+  const options = { customApps: getConfig().apps ?? [] }
+  const intents = interpretAll(input, options)
+  if (!intents) {
     return {
-      text: 'No entendí. Probá con otra forma o pedime ayuda.',
+      text: 'No te entendí del todo. ¿Era alguna de estas?',
       face: 'confused',
-      suggestions: ['¿qué podés hacer?', 'abrí YouTube', 'timer de 5 minutos']
+      suggestions: suggest(input, options)
     }
   }
 
-  const action = actions[intent.action]
-  if (action?.confirm) {
-    pending = intent
-    return { text: action.confirmText(intent.params, ctx), face: 'idle', confirm: true }
+  // Puede haber varios pedidos juntos: se hacen en orden y lo riesgoso frena para preguntar.
+  const results = []
+  for (const it of intents) {
+    const action = actions[it.action]
+    if (action?.confirm) {
+      pending = it
+      results.push({ text: action.confirmText(it.params, ctx), face: 'idle', confirm: true })
+      break
+    }
+    results.push(await runAction(it.action, it.params, ctx))
   }
-  return runAction(intent.action, intent.params, ctx)
+  return mergeResults(results)
+}
+
+function mergeResults(results) {
+  if (results.length === 1) return results[0]
+  const last = results[results.length - 1]
+  const face = [...results].reverse().find((r) => r.face && r.face !== 'idle')?.face ?? 'idle'
+  return {
+    text: results.map((r) => r.text).join(' '),
+    face,
+    confirm: last.confirm,
+    suggestions: last.suggestions,
+    speak: results.every((r) => r.speak !== false)
+  }
+}
+
+// Le pasa a la cara dónde está el mouse, para que lo siga con la mirada.
+function followCursor() {
+  let last = ''
+  setInterval(() => {
+    const win = getWindow()
+    if (!win || win.isDestroyed() || !win.isVisible()) return
+    const { x, y } = screen.getCursorScreenPoint()
+    const key = `${x},${y}`
+    if (key === last) return
+    last = key
+    sendEvent({ type: 'cursor', x, y })
+  }, 120)
 }
 
 async function confirm(yes) {
@@ -97,6 +131,7 @@ if (!app.requestSingleInstanceLock()) {
 
     createPixieWindow()
     registerShortcut()
+    followCursor()
     createTray({ onTalk: openBar, shortcutLabel })
   })
 

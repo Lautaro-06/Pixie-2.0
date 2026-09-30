@@ -1,5 +1,5 @@
 import os from 'node:os'
-import { launch, lockScreen } from '../windows.js'
+import { launch, lockScreen, shutdown } from '../windows.js'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const fmt = (n) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 })
@@ -34,6 +34,30 @@ export const systemActions = [
     }
   },
   {
+    name: 'apagar_pc',
+    description: 'Apaga o reinicia la compu en 30 segundos (pide confirmación)',
+    confirm: true,
+    confirmText: ({ modo }) =>
+      modo === 'reiniciar' ? '¿Reinicio la compu? Guardá lo que estés haciendo.' : '¿Apago la compu? Guardá lo que estés haciendo.',
+    run: async ({ modo }) => {
+      await shutdown(modo === 'reiniciar' ? 'reiniciar' : 'apagar')
+      const what = modo === 'reiniciar' ? 'se reinicia' : 'se apaga'
+      return { text: `La compu ${what} en 30 segundos. Si te arrepentís, decime «cancelá el apagado».`, face: 'sad' }
+    }
+  },
+  {
+    name: 'cancelar_apagado',
+    description: 'Cancela un apagado o reinicio pendiente',
+    run: async () => {
+      try {
+        await shutdown('cancelar')
+      } catch {
+        return { text: 'No había ningún apagado pendiente.', face: 'happy' }
+      }
+      return { text: '¡Listo, cancelado! La compu sigue prendida.', face: 'happy' }
+    }
+  },
+  {
     name: 'captura',
     description: 'Abre la herramienta de recorte de Windows',
     run: async () => {
@@ -58,7 +82,7 @@ export const systemActions = [
           `La compu está usando ${cpu}% de CPU y ${ram}% de memoria (${fmt(usedGb)} de ${fmt(totalGb)} GB). ` +
           `Está prendida hace ${uptimeText(os.uptime())}.` +
           (busy ? ' Está bastante exigida: si anda lenta, cerrá lo que no uses.' : ''),
-        face: busy ? 'confused' : 'happy'
+        face: busy ? 'surprised' : 'happy'
       }
     }
   }

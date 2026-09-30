@@ -20,7 +20,7 @@ export const mediaActions = [
       const key = { siguiente: KEYS.next, anterior: KEYS.previous, pausa: KEYS.playPause }[control]
       await pressKey(key ?? KEYS.playPause)
       const text = { siguiente: 'Siguiente tema.', anterior: 'Tema anterior.', pausa: 'Listo: pausa o play.' }[control]
-      return { text: text ?? 'Listo.', face: 'happy' }
+      return { text: text ?? 'Listo.', face: 'music' }
     }
   }
 ]
