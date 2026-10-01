@@ -43,12 +43,12 @@ export function parseEmotion(text) {
   return { face: FACES[key] ?? null, text: text.slice(m[0].length).trim() }
 }
 
-// Qué IA usar según config.json. La clave dice de dónde es: sk-ant- (Claude), AIza (Gemini), gsk_ (Groq).
+// Qué IA usar según config.json. La clave dice de dónde es: sk-ant- (Claude), AIza o AQ. (Gemini), gsk_ (Groq).
 export function pickProvider(cfg, env = process.env) {
   if (cfg.ia === false) return null
-  const key = cfg.claveIA || null
+  const key = cfg.claveIA?.trim() || null
   let name = cfg.proveedorIA
-  if (!name && key) name = key.startsWith('AIza') ? 'gemini' : key.startsWith('gsk_') ? 'groq' : 'claude'
+  if (!name && key) name = /^(AIza|AQ\.)/.test(key) ? 'gemini' : key.startsWith('gsk_') ? 'groq' : 'claude'
   if (!name && env.ANTHROPIC_API_KEY) name = 'claude'
   if (!name) return null
   if (name === 'claude') {

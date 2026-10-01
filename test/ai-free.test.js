@@ -47,13 +47,15 @@ function setup(script, config) {
 test('reconoce la IA por la clave', () => {
   const env = {}
   assert.equal(pickProvider({ claveIA: 'AIzaSyPrueba' }, env).name, 'gemini')
+  assert.equal(pickProvider({ claveIA: 'AQ.Ab8Prueba' }, env).name, 'gemini') // las claves nuevas de AI Studio
+  assert.equal(pickProvider({ claveIA: ' AIzaSyPrueba ' }, env).apiKey, 'AIzaSyPrueba') // sin espacios de más
   assert.equal(pickProvider({ claveIA: 'gsk_prueba' }, env).name, 'groq')
   assert.equal(pickProvider({ claveIA: 'sk-ant-prueba' }, env).name, 'claude')
   assert.equal(pickProvider({ proveedorIA: 'ollama' }, env).name, 'ollama') // en la compu: sin clave
   assert.equal(pickProvider({ proveedorIA: 'gemini' }, env), null) // Gemini sin clave no anda
   assert.equal(pickProvider({}, env), null)
   assert.equal(pickProvider({ claveIA: 'AIzaSyPrueba', ia: false }, env), null)
-  assert.equal(pickProvider({ claveIA: 'AIzaSyPrueba' }, env).model, 'gemini-flash-latest')
+  assert.equal(pickProvider({ claveIA: 'AIzaSyPrueba' }, env).model, 'gemini-flash-lite-latest')
   assert.equal(pickProvider({ claveIA: 'AIzaSyPrueba', modeloIA: 'gemini-2.5-flash' }, env).model, 'gemini-2.5-flash')
 })
 
@@ -79,7 +81,7 @@ test('con Gemini conversa, usa herramientas y devuelve lo que Gemini necesita', 
   const [first, second] = calls
   assert.match(first.url, /generativelanguage\.googleapis\.com\/v1beta\/openai\/chat\/completions$/)
   assert.equal(first.headers.authorization, 'Bearer AIzaSyPrueba')
-  assert.equal(first.body.model, 'gemini-flash-latest')
+  assert.equal(first.body.model, 'gemini-flash-lite-latest')
   assert.equal(first.body.messages[0].role, 'system')
   assert.match(first.body.messages[1].content, /<contexto>\nAhora: martes 18:00\.\n<\/contexto>\n\nte cuento/)
   const [, , assistant, tool] = second.body.messages
@@ -114,15 +116,19 @@ test('puede jugar y leer el mail con Groq', async () => {
   assert.match(tool.content, /Asunto: Reunión/)
 })
 
+test('si se acaba el límite gratis de un modelo, prueba con el otro', async () => {
+  const { ai, calls } = setup([{ status: 429, body: { error: { message: 'Quota exceeded' } } }, reply('[feliz] ¡Hola!')], { claveIA: 'AIzaSyPrueba' })
+  assert.equal((await ai.chat('hola', 'ctx')).text, '¡Hola!')
+  assert.deepEqual(calls.map((c) => c.body.model), ['gemini-flash-lite-latest', 'gemini-flash-latest'])
+})
+
 test('si falla, la charla queda como estaba y el error se explica', async () => {
-  const { ai, calls } = setup(
-    [{ status: 429, body: { error: { message: 'Resource exhausted' } } }, reply('[feliz] ¡Hola!')],
-    { claveIA: 'AIzaSyPrueba' }
-  )
+  const exhausted = { status: 429, body: { error: { message: 'Resource exhausted' } } }
+  const { ai, calls } = setup([exhausted, exhausted, reply('[feliz] ¡Hola!')], { claveIA: 'AIzaSyPrueba' })
   const err = await ai.chat('hola', 'ctx').catch((e) => e)
   assert.match(aiErrorText(err), /límite de uso gratis/)
   await ai.chat('hola de nuevo', 'ctx')
-  assert.equal(calls[1].body.messages.length, 2) // system + el mensaje nuevo, sin restos del que falló
+  assert.equal(calls[2].body.messages.length, 2) // system + el mensaje nuevo, sin restos del que falló
 })
 
 test('explica los errores de las IA gratis', () => {

@@ -73,14 +73,14 @@ Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es 
 
 | IA | Costo | Clave | Dónde se saca |
 |---|---|---|---|
-| **Gemini** (Google) — recomendada | Gratis, con límite de pedidos por minuto y por día | empieza con `AIza` | https://aistudio.google.com → *Get API key* |
+| **Gemini** (Google) — recomendada | Gratis, con límite de pedidos por minuto y por día | empieza con `AQ.` o `AIza` | https://aistudio.google.com/apikey → *Create API key* |
 | **Groq** | Gratis, con límites más chicos | empieza con `gsk_` | https://console.groq.com → *API Keys* |
 | **Claude** (Anthropic) | Pago por uso | empieza con `sk-ant-` | https://console.anthropic.com → *API Keys* |
 | **Ollama** (en tu compu) | Gratis, sin internet | no lleva | https://ollama.com (necesita una compu potente) |
 
 ### Activarla con Gemini (gratis)
 
-1. Entrá a https://aistudio.google.com con tu cuenta de Google, tocá **Get API key** → **Create API key** y copiala.
+1. Entrá a https://aistudio.google.com/apikey con tu cuenta de Google, tocá **Create API key** y copiala. (No hace falta el *Playground* ni pagar nada: si te ofrece un plan pago, cerralo.)
 2. Abrí Pixie una vez (`npm run dev`) para que cree su configuración y cerralo desde su ícono → **Salir**.
 3. Apretá **Win + R**, escribí `notepad %APPDATA%\Pixie\config.json` y Enter. Agregá la clave al final (ojo con la coma de la línea de antes):
 
@@ -90,7 +90,7 @@ Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es 
      "lugar": null,
      "atajo": "Control+Space",
      "apps": [],
-     "claveIA": "AIza..."
+     "claveIA": "AQ...."
    }
    ```
 
@@ -106,7 +106,7 @@ Instalá Ollama desde https://ollama.com, bajá el modelo con `ollama pull qwen2
 
 | Clave | Qué hace |
 |---|---|
-| `modeloIA` | Cambia el modelo. Por defecto: `gemini-flash-latest` (Gemini), `llama-3.3-70b-versatile` (Groq), `claude-opus-5-5` (Claude), `qwen2.5:7b` (Ollama) |
+| `modeloIA` | Cambia el modelo. Por defecto: `gemini-flash-lite-latest` (Gemini, responde en un segundo; si se acaba su límite gratis o está saturado, Pixie prueba con `gemini-flash-latest`), `llama-3.3-70b-versatile` (Groq), `claude-opus-5-5` (Claude), `qwen2.5:7b` (Ollama) |
 | `proveedorIA` | Fuerza la IA: `gemini`, `groq`, `claude` u `ollama` |
 | `urlIA` | Para usar otro servicio compatible con el formato de OpenAI (por ejemplo LM Studio) |
 | `esfuerzoIA` | Solo Claude: cuánto piensa antes de responder (`low`, `medium` o `high`) |

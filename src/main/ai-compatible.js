@@ -4,7 +4,8 @@
 import { AI_TOOLS } from './ai-tools.js'
 
 export const PROVIDERS = {
-  gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-flash-latest', timeout: 60000 },
+  // Flash-Lite responde en un segundo; si se acaba su límite gratis o está saturado, prueba con Flash
+  gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-flash-lite-latest', fallback: 'gemini-flash-latest', timeout: 60000 },
   groq: { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', timeout: 60000 },
   ollama: { url: 'http://127.0.0.1:11434/v1/chat/completions', model: 'qwen2.5:7b', timeout: 180000, local: true }
 }
@@ -52,6 +53,17 @@ function errorMessage(body) {
 
 export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch }) {
   async function post(body) {
+    try {
+      return await send(body)
+    } catch (err) {
+      // Límite gratis agotado (429) o servicio saturado (503): cada modelo tiene su propio límite
+      const busy = err instanceof AIHttpError && (err.status === 429 || err.status === 503)
+      if (busy && preset.fallback && body.model !== preset.fallback) return send({ ...body, model: preset.fallback })
+      throw err
+    }
+  }
+
+  async function send(body) {
     const headers = { 'content-type': 'application/json' }
     if (apiKey) headers.authorization = `Bearer ${apiKey}`
     let res
@@ -68,7 +80,7 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
       } catch {
         // sin cuerpo
       }
-      throw new AIHttpError(res.status, msg, { model, local: preset.local })
+      throw new AIHttpError(res.status, msg, { model: body.model, local: preset.local })
     }
     return res.json()
   }
