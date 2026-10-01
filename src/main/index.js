@@ -76,9 +76,11 @@ async function ask(text) {
     try {
       return await ai.chat(input, mind.contextText())
     } catch (err) {
+      const line = `IA (${ai.provider()}): ${err.status ? `${err.status} ` : ''}${err.message}`
+      console.error(line)
+      logAction(line)
       const msg = aiErrorText(err)
       if (msg) return { text: msg, face: 'confused' }
-      logAction(`IA sin conexión, sigo con reglas: ${err.message}`)
     }
   }
 

@@ -59,7 +59,7 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-Con la IA activada, cada mensaje que va a la IA viaja a la API de Claude junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. La clave queda solo en tu compu, en `config.json`.
+Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, en `config.json`.
 
 ## Pong
 
@@ -67,28 +67,52 @@ Pedile jugar y sus ojos y su boca se transforman en un Pong. Pixie maneja la pal
 
 ## Con IA: entiende cualquier cosa
 
-Sin IA, Pixie entiende con reglas: rápido, gratis y sin internet, pero con frases que conoce. Con una clave de la API de Claude entiende **cualquier cosa** que le escribas: le podés contar cosas, preguntarle lo que sea y pedirle cosas a tu manera («el jueves rindo física, agendalo y recordame estudiar mañana a las 6»). Usa sus mismas acciones como herramientas, sabe qué estás haciendo, qué tenés agendado y lo que le contaste, y guarda solo lo importante de lo que le contás.
+Sin IA, Pixie entiende con reglas: rápido, gratis y sin internet, pero con frases que conoce. Con IA entiende **cualquier cosa** que le escribas: le podés contar cosas, preguntarle lo que sea y pedirle cosas a tu manera («el jueves rindo física, agendalo y recordame estudiar mañana a las 6»). Usa sus mismas acciones como herramientas, sabe qué estás haciendo, qué tenés agendado y lo que le contaste, y guarda solo lo importante de lo que le contás.
 
-Para activarla:
+Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es por cómo empieza la clave:
 
-1. Creá una clave en la consola de Anthropic (https://console.anthropic.com), en *API Keys*. La cuenta necesita crédito cargado.
-2. En el ícono de Pixie → «Abrir config.json», agregá la clave y guardá:
+| IA | Costo | Clave | Dónde se saca |
+|---|---|---|---|
+| **Gemini** (Google) — recomendada | Gratis, con límite de pedidos por minuto y por día | empieza con `AIza` | https://aistudio.google.com → *Get API key* |
+| **Groq** | Gratis, con límites más chicos | empieza con `gsk_` | https://console.groq.com → *API Keys* |
+| **Claude** (Anthropic) | Pago por uso | empieza con `sk-ant-` | https://console.anthropic.com → *API Keys* |
+| **Ollama** (en tu compu) | Gratis, sin internet | no lleva | https://ollama.com (necesita una compu potente) |
+
+### Activarla con Gemini (gratis)
+
+1. Entrá a https://aistudio.google.com con tu cuenta de Google, tocá **Get API key** → **Create API key** y copiala.
+2. Abrí Pixie una vez (`npm run dev`) para que cree su configuración y cerralo desde su ícono → **Salir**.
+3. Apretá **Win + R**, escribí `notepad %APPDATA%\Pixie\config.json` y Enter. Agregá la clave al final (ojo con la coma de la línea de antes):
 
    ```json
-   "claveIA": "sk-ant-..."
+   {
+     "ciudad": "Buenos Aires",
+     "lugar": null,
+     "atajo": "Control+Space",
+     "apps": [],
+     "claveIA": "AIza..."
+   }
    ```
 
-   También sirve la variable de entorno `ANTHROPIC_API_KEY`.
+4. Guardá y abrí Pixie de nuevo. Para probar: «¿qué es un agujero negro?». Con IA te lo explica; sin IA abre Google.
 
-Opcionales en `config.json`:
+Si `config.json` queda mal escrito, Pixie lo avisa en la terminal y guarda lo que tenías en `config.roto.json`, en la misma carpeta.
+
+### Ollama: IA en tu propia compu
+
+Instalá Ollama desde https://ollama.com, bajá el modelo con `ollama pull qwen2.5:7b` (unos 5 GB) y poné en `config.json` `"proveedorIA": "ollama"` (sin clave). Anda sin internet y nada sale de la compu, pero necesita al menos 8 GB de RAM libres y sin placa de video responde lento. En compus más justas probá `"modeloIA": "llama3.2:3b"`.
+
+### Otras opciones de config.json
 
 | Clave | Qué hace |
 |---|---|
-| `modeloIA` | El modelo de Claude a usar (por defecto `claude-opus-5-5`) |
-| `esfuerzoIA` | Cuánto piensa antes de responder: `low` (por defecto, más rápido y barato), `medium` o `high` |
+| `modeloIA` | Cambia el modelo. Por defecto: `gemini-flash-latest` (Gemini), `llama-3.3-70b-versatile` (Groq), `claude-opus-5-5` (Claude), `qwen2.5:7b` (Ollama) |
+| `proveedorIA` | Fuerza la IA: `gemini`, `groq`, `claude` u `ollama` |
+| `urlIA` | Para usar otro servicio compatible con el formato de OpenAI (por ejemplo LM Studio) |
+| `esfuerzoIA` | Solo Claude: cuánto piensa antes de responder (`low`, `medium` o `high`) |
 | `ia` | `false` para apagar la IA sin borrar la clave |
 
-Cómo se usa para no gastar de más: las órdenes cortas que las reglas ya entienden («abrí Spotify», «subí el volumen») no pasan por la IA y no cuestan nada. Van a la IA la charla, las preguntas, las frases largas y lo que las reglas no entienden. Cada uno de esos mensajes gasta un poco del crédito de la cuenta. Si no hay internet o la clave no anda, Pixie sigue con las reglas. Si el modelo se niega a responder algo, la API prueba sola con otro modelo.
+Las órdenes cortas que las reglas ya entienden («abrí Spotify», «subí el volumen») no pasan por la IA: son instantáneas y no gastan el límite gratis. Van a la IA la charla, las preguntas, las frases largas y lo que las reglas no entienden. Si no hay internet o la IA falla, Pixie sigue con las reglas, y el error queda escrito en la terminal y en `historial.txt`.
 
 Las acciones riesgosas (apagar, bloquear, cerrar apps) siempre te piden confirmación con botones, aunque las pida la IA.
 
@@ -142,7 +166,8 @@ src/
   main/            ← Node.js: la parte que tiene permisos sobre Windows
     index.js       ← arranque, atajo global y conexión con la interfaz
     brain.js       ← entiende las frases con reglas flexibles (sin internet)
-    ai.js          ← el cerebro con IA (Claude): conversa y usa las acciones como herramientas
+    ai.js          ← el cerebro con IA: conversa y usa las acciones como herramientas
+    ai-compatible.js ← cómo hablar con Gemini, Groq y Ollama (Claude va por su propia librería)
     ai-tools.js    ← las acciones que la IA puede usar
     browser.js     ← la conexión con la extensión de Chrome
     content.js     ← chistes y datos curiosos
@@ -195,7 +220,7 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 Lo nuevo de la versión 0.4 que todavía no se probó en una PC con Windows:
 
-- **La IA:** que responda con una clave real, que use las acciones («poné un timer de 5 minutos y contame un chiste») y que guarde lo que le contás («mi perro se llama Toby» y después «¿cómo se llama mi perro?»).
+- **La IA:** que responda con una clave real de Gemini (gratis), que use las acciones («poné un timer de 5 minutos y contame un chiste») y que guarde lo que le contás («mi perro se llama Toby» y después «¿cómo se llama mi perro?»).
 - **La extensión:** que se conecte con Pixie, los botones de YouTube (like, suscribirse, anuncios, subtítulos) y el resumen de un mail de Gmail. YouTube y Gmail cambian su página seguido: si algo no anda, pásenme qué pedido fue y qué contestó Pixie.
 - **Pong:** que la ventana se agrande bien y que se juegue cómodo con el mouse y las flechas.
 - **Hablar primero:** agendar algo para dentro de 5 minutos y ver que 2 horas después pregunte cómo te fue.

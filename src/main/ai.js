@@ -1,9 +1,12 @@
-// Cerebro con IA: cuando hay una clave de API de Claude en config.json, Pixie
-// entiende cualquier cosa, conversa y usa sus acciones como herramientas.
+// Cerebro con IA: cuando hay una clave de IA en config.json, Pixie entiende
+// cualquier cosa, conversa y usa sus acciones como herramientas.
+// Sirve Claude (pago) o una opción gratis: Gemini, Groq u Ollama en la compu.
 // Sin clave (o sin internet) sigue funcionando con las reglas de brain.js.
 import Anthropic from '@anthropic-ai/sdk'
 import { AI_TOOLS } from './ai-tools.js'
 import { actions, runAction } from './actions/index.js'
+import { pageForAI } from './actions/browser.js'
+import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver } from './ai-compatible.js'
 
 const DEFAULT_MODEL = 'claude-opus-5-5'
 // Modelos que aceptan el reintento automático en otro modelo si se niegan a responder
@@ -40,18 +43,84 @@ export function parseEmotion(text) {
   return { face: FACES[key] ?? null, text: text.slice(m[0].length).trim() }
 }
 
-export function createAI({ getConfig, ctx, clientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 1, timeout: 45000 }) }) {
+// Qué IA usar según config.json. La clave dice de dónde es: sk-ant- (Claude), AIza (Gemini), gsk_ (Groq).
+export function pickProvider(cfg, env = process.env) {
+  if (cfg.ia === false) return null
+  const key = cfg.claveIA || null
+  let name = cfg.proveedorIA
+  if (!name && key) name = key.startsWith('AIza') ? 'gemini' : key.startsWith('gsk_') ? 'groq' : 'claude'
+  if (!name && env.ANTHROPIC_API_KEY) name = 'claude'
+  if (!name) return null
+  if (name === 'claude') {
+    const apiKey = key || env.ANTHROPIC_API_KEY
+    return apiKey ? { name, apiKey, model: cfg.modeloIA || DEFAULT_MODEL } : null
+  }
+  const preset = PROVIDERS[name] ?? (cfg.urlIA ? { url: cfg.urlIA, model: cfg.modeloIA, timeout: 120000 } : null)
+  if (!preset) return null
+  if (!preset.local && !key && !cfg.urlIA) return null
+  return {
+    name,
+    apiKey: key,
+    model: cfg.modeloIA || preset.model,
+    preset: cfg.urlIA ? { ...preset, url: cfg.urlIA } : preset
+  }
+}
+
+function createClaudeDriver({ getClient, model, effort }) {
+  return {
+    user: (text) => ({ role: 'user', content: text }),
+
+    async step(history, { tools = true } = {}) {
+      const params = {
+        model,
+        max_tokens: 16000,
+        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: history,
+        output_config: { effort }
+      }
+      if (tools) params.tools = AI_TOOLS
+      if (FALLBACK_MODELS.has(model)) {
+        params.betas = ['server-side-fallback-2026-07-01']
+        params.fallbacks = 'default'
+      }
+      const response = await getClient().beta.messages.create(params)
+      const toolCalls = response.content.filter((b) => b.type === 'tool_use').map((b) => ({ id: b.id, name: b.name, input: b.input }))
+      const stop =
+        response.stop_reason === 'refusal' ? 'refusal'
+          : response.stop_reason === 'pause_turn' ? 'pause'
+            : response.stop_reason === 'tool_use' && toolCalls.length ? 'tool'
+              : 'end'
+      return {
+        assistant: [{ role: 'assistant', content: response.content }],
+        toolCalls,
+        text: response.content.filter((b) => b.type === 'text').map((b) => b.text).join(' '),
+        stop
+      }
+    },
+
+    results: (results) => [
+      { role: 'user', content: results.map((r) => ({ type: 'tool_result', tool_use_id: r.id, content: r.content, ...(r.isError ? { is_error: true } : {}) })) }
+    ]
+  }
+}
+
+export function createAI({
+  getConfig,
+  ctx,
+  clientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 1, timeout: 45000 }),
+  fetchImpl = (...args) => fetch(...args)
+}) {
   let client = null
   let clientKey = null
   let messages = []
+  let messagesFor = null // de qué IA es la charla guardada (cada una tiene su formato)
   let lastAt = 0
   let notes = [] // cosas que pasaron fuera de la charla (avisos, confirmaciones)
 
-  const apiKey = () => getConfig().claveIA || process.env.ANTHROPIC_API_KEY || null
-  const enabled = () => Boolean(apiKey()) && getConfig().ia !== false
+  const provider = () => pickProvider(getConfig())
+  const enabled = () => provider() !== null
 
-  function getClient() {
-    const key = apiKey()
+  function getClient(key) {
     if (!client || key !== clientKey) {
       client = clientFactory(key)
       clientKey = key
@@ -59,100 +128,98 @@ export function createAI({ getConfig, ctx, clientFactory = (apiKey) => new Anthr
     return client
   }
 
-  function request(msgs, { tools = true } = {}) {
-    const cfg = getConfig()
-    const model = cfg.modeloIA || DEFAULT_MODEL
-    const params = {
-      model,
-      max_tokens: 16000,
-      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: msgs,
-      output_config: { effort: cfg.esfuerzoIA || 'low' }
-    }
-    if (tools) params.tools = AI_TOOLS
-    if (FALLBACK_MODELS.has(model)) {
-      params.betas = ['server-side-fallback-2026-07-01']
-      params.fallbacks = 'default'
-    }
-    return getClient().beta.messages.create(params)
+  function driverFor(p) {
+    if (p.name === 'claude') return createClaudeDriver({ getClient: () => getClient(p.apiKey), model: p.model, effort: getConfig().esfuerzoIA || 'low' })
+    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl })
   }
 
   // Ejecuta una herramienta pedida por la IA. Devuelve { content, game?, confirm?, isError? }
-  async function runTool(block) {
-    const input = block.input && typeof block.input === 'object' ? block.input : {}
-    if (block.name === 'leer_pagina') {
+  async function runTool({ name, input, bad }) {
+    if (bad) return { content: 'Los datos de la herramienta llegaron mal formados. Probá de nuevo.', isError: true }
+    const params = input && typeof input === 'object' ? input : {}
+    if (name === 'leer_pagina') {
       try {
-        return { content: await ctx.readPage(input.que === 'mail' ? 'mail' : 'pagina') }
+        return { content: pageForAI(await ctx.readPage(params.que === 'mail' ? 'mail' : 'pagina')) }
       } catch (err) {
         return { content: err.message, isError: true }
       }
     }
-    const action = actions[block.name]
-    if (!action) return { content: `No existe la herramienta ${block.name}.`, isError: true }
+    const action = actions[name]
+    if (!action) return { content: `No existe la herramienta ${name}.`, isError: true }
     if (action.confirm) {
-      ctx.setPending({ action: block.name, params: input })
-      return { content: `Pixie le mostró al usuario botones Sí/No: «${action.confirmText(input, ctx)}». Todavía no se hizo.`, confirm: true }
+      ctx.setPending({ action: name, params })
+      return { content: `Pixie le mostró al usuario botones Sí/No: «${action.confirmText(params, ctx)}». Todavía no se hizo.`, confirm: true }
     }
-    const result = await runAction(block.name, input, ctx)
-    return { content: result.text, game: result.game }
+    const result = await runAction(name, params, ctx)
+    return { content: String(result.text ?? 'Listo.'), game: result.game }
   }
 
   // Un mensaje del usuario → respuesta de Pixie { text, face, confirm?, game? }
   async function chat(text, contextText) {
+    const p = provider()
+    if (!p) throw new Error('No hay IA configurada')
+    const d = driverFor(p)
     const now = Date.now()
-    if (now - lastAt > NEW_CONVERSATION_AFTER_MS || messages.length > MAX_MESSAGES) messages = []
+    const key = `${p.name}:${p.model}`
+    if (key !== messagesFor || now - lastAt > NEW_CONVERSATION_AFTER_MS || messages.length > MAX_MESSAGES) messages = []
+    messagesFor = key
     lastAt = now
     const extra = notes.length ? `\nPasó hace un rato: ${notes.join(' ')}` : ''
     notes = []
-    messages.push({ role: 'user', content: `<contexto>\n${contextText}${extra}\n</contexto>\n\n${text}` })
+    const before = messages.length
+    messages.push(d.user(`<contexto>\n${contextText}${extra}\n</contexto>\n\n${text}`))
 
     let confirm = false
     let game
-    for (let step = 0; step < MAX_STEPS; step++) {
-      const response = await request(messages)
-      messages.push({ role: 'assistant', content: response.content })
+    try {
+      for (let step = 0; step < MAX_STEPS; step++) {
+        const r = await d.step(messages)
+        messages.push(...r.assistant)
 
-      if (response.stop_reason === 'refusal') {
-        return { text: 'Prefiero no responder eso. ¿Te ayudo con otra cosa?', face: 'confused' }
-      }
-      if (response.stop_reason === 'pause_turn') continue
+        if (r.stop === 'refusal') return { text: 'Prefiero no responder eso. ¿Te ayudo con otra cosa?', face: 'confused' }
+        if (r.stop === 'pause') continue
 
-      const toolUses = response.content.filter((b) => b.type === 'tool_use')
-      if (response.stop_reason === 'tool_use' && toolUses.length) {
-        const results = []
-        for (const block of toolUses) {
-          const r = await runTool(block)
-          if (r.confirm) confirm = true
-          if (r.game) game = r.game
-          results.push({ type: 'tool_result', tool_use_id: block.id, content: r.content, ...(r.isError ? { is_error: true } : {}) })
+        if (r.stop === 'tool') {
+          const results = []
+          for (const call of r.toolCalls) {
+            const res = await runTool(call)
+            if (res.confirm) confirm = true
+            if (res.game) game = res.game
+            results.push({ id: call.id, content: res.content, isError: res.isError })
+          }
+          messages.push(...d.results(results))
+          continue
         }
-        messages.push({ role: 'user', content: results })
-        continue
-      }
 
-      // Si cortó a mitad de pedir una herramienta, la charla queda incompleta: se empieza otra
-      if (toolUses.length) messages = []
-      const said = response.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ')
-      const { face, text: clean } = parseEmotion(said)
-      return { text: clean || 'Listo.', face: face ?? 'happy', confirm, game }
+        // Si cortó a mitad de pedir una herramienta, la charla queda incompleta: se empieza otra
+        if (r.toolCalls.length) messages = []
+        const { face, text: clean } = parseEmotion(r.text)
+        return { text: clean || 'Listo.', face: face ?? 'happy', confirm, game }
+      }
+    } catch (err) {
+      messages = messages.slice(0, before) // la charla vuelve a como estaba
+      throw err
     }
     return { text: 'Me enredé con eso. ¿Me lo pedís de otra forma?', face: 'confused', confirm, game }
   }
 
   // Resumen de un texto largo (un mail o una página), sin tocar la conversación
   async function summarize(kind, content) {
+    const p = provider()
+    if (!p) return null
+    const d = driverFor(p)
     const what = kind === 'mail' ? 'este mail' : 'esta página'
-    const response = await request(
-      [{ role: 'user', content: `Resumí ${what} en 2 o 3 oraciones cortas para leer en voz alta, en español rioplatense. Si pide algo o tiene una fecha, decilo.\n\n<texto>\n${content}\n</texto>` }],
+    const r = await d.step(
+      [d.user(`Resumí ${what} en 2 o 3 oraciones cortas para leer en voz alta, en español rioplatense. Si pide algo o tiene una fecha, decilo.\n\n<texto>\n${content}\n</texto>`)],
       { tools: false }
     )
-    if (response.stop_reason === 'refusal') return null
-    const said = response.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ')
-    return parseEmotion(said).text
+    if (r.stop === 'refusal') return null
+    return parseEmotion(r.text).text
   }
 
   return {
     enabled,
+    provider: () => provider()?.name ?? null,
     chat,
     summarize,
     note: (text) => notes.push(text),
@@ -162,8 +229,17 @@ export function createAI({ getConfig, ctx, clientFactory = (apiKey) => new Anthr
   }
 }
 
-// Mensaje claro según el error de la API
+// Mensaje claro según el error de la IA. null = seguir con las reglas sin decir nada.
 export function aiErrorText(err) {
+  if (err instanceof AIConnectionError) return null
+  if (err instanceof AIHttpError) {
+    if (err.status === 401 || err.status === 403 || /api.?key/i.test(err.message)) return 'La clave de IA no funciona. Revisala en config.json.'
+    if (err.status === 404 && err.local) return `No tengo el modelo «${err.model}» en Ollama. Bajalo con «ollama pull ${err.model}».`
+    if (err.status === 404) return `No encontré el modelo de IA «${err.model}». Revisá modeloIA en config.json.`
+    if (err.status === 429) return 'Llegué al límite de uso gratis de la IA por ahora. Probá en un rato.'
+    if (/tool_use_failed|failed to call a function/i.test(err.message)) return null // el modelo se trabó: siguen las reglas
+    return `La IA tuvo un problema (${err.status}). Probá de nuevo.`
+  }
   if (err instanceof Anthropic.AuthenticationError) return 'La clave de IA no funciona. Revisala en config.json.'
   if (err instanceof Anthropic.PermissionDeniedError) return 'La clave de IA no tiene permiso para usar ese modelo.'
   if (err instanceof Anthropic.RateLimitError) return 'Me llegaron muchos pedidos juntos. Probá en un ratito.'
