@@ -168,6 +168,7 @@ export function aiErrorText(err) {
   if (err instanceof Anthropic.PermissionDeniedError) return 'La clave de IA no tiene permiso para usar ese modelo.'
   if (err instanceof Anthropic.RateLimitError) return 'Me llegaron muchos pedidos juntos. Probá en un ratito.'
   if (err instanceof Anthropic.APIConnectionError) return null // sin internet: se usan las reglas
+  if (err instanceof Anthropic.APIError && /credit balance/i.test(err.message)) return 'La cuenta de IA se quedó sin crédito. Cargá saldo en la consola de Anthropic.'
   if (err instanceof Anthropic.APIError) return `La IA tuvo un problema (${err.status ?? 'sin código'}). Probá de nuevo.`
   return null
 }

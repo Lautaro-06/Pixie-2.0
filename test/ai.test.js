@@ -148,3 +148,12 @@ test('lee la etiqueta de emoción', () => {
   assert.deepEqual(parseEmotion('Sin etiqueta'), { face: null, text: 'Sin etiqueta' })
   assert.deepEqual(parseEmotion('[inventada] Hola'), { face: null, text: 'Hola' })
 })
+
+test('explica los errores de la clave y del crédito', async () => {
+  const { aiErrorText } = await import('../src/main/ai.js')
+  const Anthropic = (await import('@anthropic-ai/sdk')).default
+  const noCredit = Anthropic.APIError.generate(400, { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } }, undefined, new Headers())
+  assert.match(aiErrorText(noCredit), /sin crédito/)
+  const badKey = Anthropic.APIError.generate(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, undefined, new Headers())
+  assert.match(aiErrorText(badKey), /clave de IA no funciona/)
+})
