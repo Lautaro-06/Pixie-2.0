@@ -138,6 +138,14 @@ export const infoActions = [
     })
   },
   {
+    name: 'estado_ia',
+    description: 'Dice si la IA está activada y cuál usa',
+    run: (_params, ctx) => {
+      const text = ctx.ai?.status() ?? 'Todavía estoy arrancando la IA.'
+      return { text, face: ctx.ai?.enabled() ? 'happy' : 'confused' }
+    }
+  },
+  {
     name: 'jugar',
     description: 'Juega al Pong contra Pixie: sus ojos y su boca se vuelven el juego',
     run: () => ({

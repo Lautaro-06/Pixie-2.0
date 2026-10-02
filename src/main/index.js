@@ -1,11 +1,11 @@
 import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer } from 'electron'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction } from './actions/index.js'
-import { loadConfig, getConfig, saveConfig, logAction } from './config.js'
+import { loadConfig, getConfig, saveConfig, logAction, watchConfig } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createTray } from './tray.js'
 import { createMind } from './mind.js'
-import { createAI, aiErrorText } from './ai.js'
+import { createAI, aiErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
 import { createPhone } from './phone.js'
@@ -275,7 +275,7 @@ if (!app.requestSingleInstanceLock()) {
       media,
       // "¿Qué ves en mi pantalla?": una foto de la pantalla para la IA (no se guarda)
       lookAtScreen: async (pregunta) => {
-        if (!ai.enabled()) throw new FriendlyError('Para mirar tu pantalla necesito la IA activada (Gemini es gratis: el README explica cómo).')
+        if (!ai.enabled()) throw new FriendlyError(`Para mirar tu pantalla necesito la IA. ${ai.status()}`)
         const image = await captureScreen()
         try {
           return await ai.look(image, pregunta)
@@ -311,6 +311,13 @@ if (!app.requestSingleInstanceLock()) {
     followCursor()
     createTray({ onTalk: openBar, shortcutLabel })
     mind.start()
+    console.log(`Pixie ${app.getVersion()} · ${ai.status()}`)
+    // Si editás config.json con Pixie abierto, lo lee solo
+    watchConfig((cfg) => {
+      const msg = `config.json cambió · ${describeAI(cfg).text}`
+      console.log(msg)
+      logAction(msg)
+    })
 
     if (restored.some((r) => r.file === 'memoria.json')) {
       const from = restored.find((r) => r.file === 'memoria.json').from

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createAI, pickProvider, aiErrorText } from '../src/main/ai.js'
+import { createAI, pickProvider, aiErrorText, describeAI } from '../src/main/ai.js'
 import { COMPATIBLE_TOOLS, cleanText, AIHttpError, AIConnectionError } from '../src/main/ai-compatible.js'
 import { createMemory } from '../src/main/memory.js'
 
@@ -138,4 +138,11 @@ test('explica los errores de las IA gratis', () => {
   assert.equal(aiErrorText(new AIConnectionError('sin internet')), null) // siguen las reglas
   assert.equal(aiErrorText(new AIHttpError(400, 'tool_use_failed')), null)
   assert.equal(cleanText('## Hola **vos**'), 'Hola vos')
+})
+
+test('explica por qué no hay IA', () => {
+  assert.match(describeAI({}, {}).text, /No encuentro la clave de IA en config.json/)
+  assert.match(describeAI({ claveIA: 'AQ.x', ia: false }, {}).text, /apagada/)
+  assert.match(describeAI({ proveedorIA: 'gemini' }, {}).text, /falta la clave/)
+  assert.equal(describeAI({ claveIA: 'AQ.x' }, {}).text, 'Estoy usando la IA de Gemini (gemini-flash-lite-latest).')
 })

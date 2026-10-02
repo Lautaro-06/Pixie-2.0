@@ -41,6 +41,7 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «tomé agua», «ya me estiré», «¿cuánta agua tomé hoy?» | Registro de salud |
 | «¿qué canción es esta?» | Te dice qué está sonando (Spotify, YouTube…) |
 | «hacé un respaldo» | Guarda una copia de su memoria en la nube |
+| «estado de la IA» | Dice si la IA está activada y cuál usa |
 
 ## Pixie se acuerda, se da cuenta y habla primero
 
@@ -102,7 +103,7 @@ Pixie te puede escribir por WhatsApp, **solo a tu número**, usando [CallMeBot](
    "whatsapp": { "telefono": "+5491112345678", "apikey": "123456" }
    ```
 
-4. Reiniciá Pixie y decile «probá el WhatsApp».
+4. Guardá (Pixie lo lee solo, no hace falta reiniciarlo) y decile «probá el WhatsApp».
 
 Con eso, si no estás frente a la compu, los recordatorios y los timers te llegan al celular (como mucho uno por minuto). Para que no lo haga: `"avisosAlCelular": false`.
 
@@ -130,7 +131,7 @@ Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es 
 ### Activarla con Gemini (gratis)
 
 1. Entrá a https://aistudio.google.com/apikey con tu cuenta de Google, tocá **Create API key** y copiala. (No hace falta el *Playground* ni pagar nada: si te ofrece un plan pago, cerralo.)
-2. Abrí Pixie una vez (`npm run dev`) para que cree su configuración y cerralo desde su ícono → **Salir**.
+2. Abrí Pixie (`npm run dev`) para que cree su configuración.
 3. Apretá **Win + R**, escribí `notepad %APPDATA%\Pixie\config.json` y Enter. Agregá la clave al final (ojo con la coma de la línea de antes):
 
    ```json
@@ -143,9 +144,9 @@ Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es 
    }
    ```
 
-4. Guardá y abrí Pixie de nuevo. Para probar: «¿qué es un agujero negro?». Con IA te lo explica; sin IA abre Google.
+4. Guardá: Pixie lo lee solo en un par de segundos. Para probar: «estado de la IA» o «¿qué es un agujero negro?» (con IA te lo explica; sin IA abre Google).
 
-Si `config.json` queda mal escrito, Pixie lo avisa en la terminal y guarda lo que tenías en `config.roto.json`, en la misma carpeta.
+Si `config.json` queda mal escrito (por ejemplo, falta una coma), Pixie lo avisa en la terminal y no lo toca: lo arreglás, guardás y lo lee solo. Por las dudas deja una copia en `config.roto.json`.
 
 ### Ollama: IA en tu propia compu
 
@@ -261,7 +262,7 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 ]
 ```
 
-`tipo` puede ser `ruta` (un archivo), `uri` (un protocolo como `spotify:`) o `start` (un programa que Windows ya conoce, como `notepad.exe`). `proceso` es opcional y sirve para poder cerrarla. Reiniciá Pixie después de guardar.
+`tipo` puede ser `ruta` (un archivo), `uri` (un protocolo como `spotify:`) o `start` (un programa que Windows ya conoce, como `notepad.exe`). `proceso` es opcional y sirve para poder cerrarla.
 
 ## Sumar una acción
 

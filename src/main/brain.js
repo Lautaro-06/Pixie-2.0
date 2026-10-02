@@ -369,6 +369,8 @@ const RULES = [
     return e && e.dist === undefined ? null : intent('jugar')
   },
 
+  (t) => (/\b(estado de la ia|tenes (la )?ia|estas (usando|con) (la )?ia|que ia (usas|tenes)|la ia (anda|funciona|esta activada))\b/.test(t) ? intent('estado_ia') : null),
+
   // Saludos y charla
   (t) => (/^(buen dia|buenos dias|buenas tardes|buenas noches)\b/.test(t) ? intent('buen_dia') : null),
   (t) => (/\b(quien sos|quien eres|que sos|que eres|como te llamas|tu nombre|presentate|quien te (hizo|creo|programo)|cuantos anos tenes|que edad tenes)\b/.test(t) ? chat('quien_sos') : null),

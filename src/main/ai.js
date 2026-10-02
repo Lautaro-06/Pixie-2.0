@@ -105,6 +105,16 @@ function createClaudeDriver({ getClient, model, effort }) {
   }
 }
 
+// Cómo está la IA, en palabras: para la terminal y para «estado de la IA»
+export function describeAI(cfg, env = process.env) {
+  if (cfg.ia === false) return { on: false, text: 'La IA está apagada en config.json ("ia": false).' }
+  const p = pickProvider(cfg, env)
+  const names = { gemini: 'Gemini', groq: 'Groq', claude: 'Claude', ollama: 'Ollama' }
+  if (p) return { on: true, text: `Estoy usando la IA de ${names[p.name] ?? p.name} (${p.model}).` }
+  if (cfg.proveedorIA) return { on: false, text: `En config.json dice "proveedorIA": "${cfg.proveedorIA}", pero falta la clave ("claveIA").` }
+  return { on: false, text: 'No encuentro la clave de IA en config.json ("claveIA"). Abrilo desde mi ícono → Abrir config.json.' }
+}
+
 export function createAI({
   getConfig,
   ctx,
@@ -221,7 +231,7 @@ export function createAI({
   // Mira una captura de la pantalla y responde. La imagen no queda en la charla ni se guarda.
   async function look(imageBase64, question) {
     const p = provider()
-    if (!p) throw new FriendlyError('Para mirar tu pantalla necesito la IA activada (Gemini es gratis: el README explica cómo).')
+    if (!p) throw new FriendlyError(`Para mirar tu pantalla necesito la IA. ${describeAI(getConfig()).text}`)
     if (p.name !== 'gemini' && p.name !== 'claude') throw new FriendlyError('Para mirar tu pantalla necesito la IA de Gemini o de Claude.')
     const prompt =
       'Esta es una captura de la pantalla del usuario. La carita de píxeles en una esquina sos vos: ignorala. ' +
@@ -240,7 +250,7 @@ export function createAI({
   // Pasa a texto lo que dijiste por el micrófono (un WAV). Devuelve '' si no se escuchó nada.
   async function transcribe(wav) {
     const p = provider()
-    if (!p) throw new FriendlyError('Para hablarme por voz necesito la IA activada (Gemini es gratis: el README explica cómo).')
+    if (!p) throw new FriendlyError(`Para entenderte por voz necesito la IA. ${describeAI(getConfig()).text}`)
     if (p.name === 'groq') return whisperTranscribe({ apiKey: p.apiKey, wav, fetchImpl })
     if (p.name !== 'gemini') throw new FriendlyError('Para hablarme por voz necesito la IA de Gemini o de Groq.')
     const content = [
@@ -255,6 +265,7 @@ export function createAI({
   return {
     enabled,
     provider: () => provider()?.name ?? null,
+    status: () => describeAI(getConfig()).text,
     chat,
     summarize,
     look,
