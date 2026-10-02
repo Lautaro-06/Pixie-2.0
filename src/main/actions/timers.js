@@ -51,6 +51,7 @@ export const timerActions = [
             ? `¡Tiempo! Te aviso: ${etiqueta}.`
             : `¡Terminó el timer de ${durationText(segundos)}!`
         ctx.notify('Pixie', text)
+        ctx.phoneIfAway?.(text)
         ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
         ctx.log(`timer terminado: ${etiqueta ?? durationText(segundos)}`)
       }, segundos * 1000)

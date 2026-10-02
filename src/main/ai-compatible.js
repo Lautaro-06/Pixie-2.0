@@ -21,6 +21,28 @@ export class AIHttpError extends Error {
 
 export class AIConnectionError extends Error {}
 
+// Groq transcribe audio con Whisper (gratis): otro endpoint, mismo formato de errores
+export async function whisperTranscribe({ apiKey, wav, fetchImpl = fetch }) {
+  const form = new FormData()
+  form.append('file', new Blob([wav], { type: 'audio/wav' }), 'voz.wav')
+  form.append('model', 'whisper-large-v3-turbo')
+  form.append('language', 'es')
+  let res
+  try {
+    res = await fetchImpl('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(30000)
+    })
+  } catch (err) {
+    throw new AIConnectionError(`No me pude conectar con la IA: ${err.message}`)
+  }
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new AIHttpError(res.status, errorMessage(body), { model: 'whisper-large-v3-turbo' })
+  return String(body.text ?? '').trim()
+}
+
 // Gemini no acepta additionalProperties ni objetos sin propiedades: se limpian
 function cleanSchema(schema) {
   const { additionalProperties, ...rest } = schema
@@ -88,8 +110,8 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
   return {
     user: (text) => ({ role: 'user', content: text }),
 
-    async step(history, { tools = true } = {}) {
-      const body = { model, messages: [{ role: 'system', content: system }, ...history] }
+    async step(history, { tools = true, persona = true } = {}) {
+      const body = { model, messages: persona ? [{ role: 'system', content: system }, ...history] : history }
       if (tools) body.tools = COMPATIBLE_TOOLS
       const res = await post(body)
       const choice = res.choices?.[0] ?? {}

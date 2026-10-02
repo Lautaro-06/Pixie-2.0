@@ -1,4 +1,4 @@
-import { app, ipcMain, globalShortcut, Notification, screen } from 'electron'
+import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer } from 'electron'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction } from './actions/index.js'
 import { loadConfig, getConfig, saveConfig, logAction } from './config.js'
@@ -7,13 +7,26 @@ import { createTray } from './tray.js'
 import { createMind } from './mind.js'
 import { createAI, aiErrorText } from './ai.js'
 import { createBrowserBridge } from './browser.js'
+import { createBackup } from './backup.js'
+import { createPhone } from './phone.js'
+import { FriendlyError } from './windows.js'
+import { createTTS } from './tts.js'
+import { createMediaSession } from './media-session.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
+const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
+const MAX_AUDIO_BYTES = 3 * 1024 * 1024
 let activeShortcut = null
+let voiceShortcut = null
 let pending = null // acción esperando que la persona confirme
 let mind = null
 let ai = null
 let browser = null
+let backup = null
+let phone = null
+let tts = null
+let media = null
+const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
 
 // Lo que conviene mandarle a la IA aunque las reglas lo entiendan: charla y preguntas
 const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar_memoria'])
@@ -39,6 +52,36 @@ const ctx = {
 function openBar() {
   showAndFocus()
   sendEvent({ type: 'open' })
+}
+
+// Atajo para hablarle por voz: abre la barra y empieza a escuchar
+function listen() {
+  showAndFocus()
+  sendEvent({ type: 'listen' })
+}
+
+function registerVoiceShortcut() {
+  for (const accel of [getConfig().atajoVoz, ...VOICE_SHORTCUTS]) {
+    try {
+      if (accel && accel !== activeShortcut && globalShortcut.register(accel, listen)) {
+        voiceShortcut = accel
+        return
+      }
+    } catch {
+      // atajo inválido: probamos el siguiente
+    }
+  }
+}
+
+// Captura de la pantalla donde está el mouse (como mucho 1600 px de ancho, en JPG)
+async function captureScreen() {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const width = Math.min(1600, Math.round(display.size.width * display.scaleFactor))
+  const height = Math.round((width * display.size.height) / display.size.width)
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } })
+  const source = sources.find((s) => s.display_id === String(display.id)) ?? sources[0]
+  if (!source || source.thumbnail.isEmpty()) throw new FriendlyError('No pude sacarle una foto a la pantalla.')
+  return source.thumbnail.toJPEG(75).toString('base64')
 }
 
 function registerShortcut() {
@@ -100,7 +143,7 @@ async function ask(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     const action = actions[it.action]
     if (action?.confirm) {
       pending = it
@@ -166,11 +209,39 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     app.setAppUserModelId(app.isPackaged ? 'com.pixie.asistente' : process.execPath)
+    // En una compu nueva, recupera la memoria del respaldo antes de arrancar
+    backup = createBackup({ dataDir: app.getPath('userData'), getConfig })
+    const restored = backup.restoreIfMissing()
     loadConfig()
 
     ipcMain.handle('pixie:ask', (_e, text) => ask(text))
     ipcMain.handle('pixie:confirm', (_e, yes) => confirm(Boolean(yes)))
+    // Lo que dijiste por el micrófono → texto
+    ipcMain.handle('pixie:transcribe', async (_e, audio) => {
+      const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio ?? [])
+      if (!bytes.length || bytes.length > MAX_AUDIO_BYTES) return { error: 'El audio quedó vacío o muy largo.' }
+      try {
+        return { text: await ai.transcribe(bytes) }
+      } catch (err) {
+        logAction(`voz: ${err.status ? `${err.status} ` : ''}${err.message}`)
+        return { error: aiErrorText(err) ?? 'No me pude conectar para entenderte. ¿Hay internet?' }
+      }
+    })
+    // Voz natural: el audio va llegando en pedacitos a la interfaz
+    ipcMain.handle('pixie:voice', (e, { id, text, face } = {}) =>
+      tts.stream(id, String(text ?? ''), face, (chunk) => {
+        if (!e.sender.isDestroyed()) e.sender.send('pixie:event', { type: 'voz', id, chunk })
+      })
+    )
+    ipcMain.on('pixie:voice-stop', (_e, id) => tts?.stop(id))
+    // Mientras Pixie habla, pausa la música (salvo que se la acabes de pedir)
+    ipcMain.on('pixie:speaking', (_e, on) => {
+      if (on && Date.now() - (ctx.mediaTouchedAt ?? 0) < 10000) return
+      media?.speaking(Boolean(on))
+    })
     ipcMain.handle('pixie:info', () => ({
+      naturalVoice: Boolean(tts?.available()),
+      voiceShortcut: voiceShortcut?.replace('Control', 'Ctrl').replace('Space', 'Espacio') ?? null,
       shortcut: shortcutLabel(),
       version: app.getVersion(),
       feeling: mind?.feeling(),
@@ -196,7 +267,30 @@ if (!app.requestSingleInstanceLock()) {
     })
     browser = createBrowserBridge({ log: logAction })
     ai = createAI({ getConfig, ctx })
+    phone = createPhone({ getConfig, log: logAction })
+    tts = createTTS({ getConfig, log: logAction })
+    media = createMediaSession({ getConfig, log: logAction })
     Object.assign(ctx, {
+      phone,
+      media,
+      // "¿Qué ves en mi pantalla?": una foto de la pantalla para la IA (no se guarda)
+      lookAtScreen: async (pregunta) => {
+        if (!ai.enabled()) throw new FriendlyError('Para mirar tu pantalla necesito la IA activada (Gemini es gratis: el README explica cómo).')
+        const image = await captureScreen()
+        try {
+          return await ai.look(image, pregunta)
+        } catch (err) {
+          logAction(`pantalla: ${err.status ? `${err.status} ` : ''}${err.message}`)
+          throw new FriendlyError(aiErrorText(err) ?? 'No me pude conectar con la IA para mirar la pantalla.')
+        }
+      },
+      // Si no estás frente a la compu, los avisos importantes te llegan al celular
+      phoneIfAway: (text) => {
+        const snap = mind.snapshot()
+        const away = snap && (snap.bloqueada || snap.inactivoSeg >= 300)
+        if (!away || getConfig().avisosAlCelular === false || !phone.configured()) return
+        phone.send(`Pixie: ${text}`, { auto: true }).catch((err) => logAction(`whatsapp automático: ${err.message}`))
+      },
       ai,
       browser,
       readPage: (que) => browser.request('leer', { que }),
@@ -204,6 +298,7 @@ if (!app.requestSingleInstanceLock()) {
         pending = intent
       },
       memory: mind.memory,
+      backup,
       awareness: mind.snapshot,
       setQuiet: mind.setQuiet,
       feeling: mind.feeling,
@@ -212,9 +307,17 @@ if (!app.requestSingleInstanceLock()) {
 
     createPixieWindow()
     registerShortcut()
+    registerVoiceShortcut()
     followCursor()
     createTray({ onTalk: openBar, shortcutLabel })
     mind.start()
+
+    if (restored.some((r) => r.file === 'memoria.json')) {
+      const from = restored.find((r) => r.file === 'memoria.json').from
+      setTimeout(() => mind.say({ kind: 'respaldo', text: `¡Recuperé mis recuerdos del respaldo en ${from}!`, face: 'love' }), 5000)
+    }
+    setTimeout(() => backup.backup(), 60 * 1000)
+    setInterval(() => backup.backup(), BACKUP_EVERY_MS)
   })
 
   // Pixie no navega a otras páginas ni abre ventanas nuevas.
@@ -228,6 +331,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
     mind?.stop()
+    media?.stop()
+    backup?.backup()
     browser?.close()
   })
 }

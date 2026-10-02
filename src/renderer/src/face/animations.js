@@ -79,6 +79,13 @@ export const REACTIONS = {
   surprised: [1000, (t) => ({ eyes: 'wide', mouth: 'o', dy: t < 150 ? -2 : 0 })],
   alarm: [2600, (t) => ({ eyes: 'wide', mouth: 'o', extra: 'exclaim', dx: t < 2000 ? shake(t) : 0, dy: t < 2000 ? (Math.floor(t / 160) % 2 ? -1 : 0) : 0 })],
   music: [2600, (t) => ({ eyes: 'happy', mouth: 'smile', extra: 'notes', extraT: loop(t, 1300), dy: Math.floor(t / 300) % 2 ? -1 : 0 })],
+  // Al arrancar: ojos cerrados, se abren grandes y sonríe
+  boot: [1700, (t) => ({
+    ...keyframes(t, [[0, { openL: 0, openR: 0 }], [350, { openL: 0, openR: 0 }], [600, { openL: 1, openR: 1 }]]),
+    eyes: t < 1000 ? 'wide' : 'happy',
+    mouth: t < 600 ? 'none' : t < 1000 ? 'o' : 'smile',
+    dy: t > 1000 && t < 1300 ? -1 : 0
+  })],
   wake: [900, (t) => keyframes(t, [[0, { openL: 0.1, openR: 0.1, eyes: 'wide' }], [200, { openL: 1, openR: 1, eyes: 'wide' }], [900, { openL: 1, openR: 1, eyes: 'normal' }]])],
   // Según cómo se siente
   yawn: [1800, (t) => ({

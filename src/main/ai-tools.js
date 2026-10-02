@@ -108,6 +108,35 @@ export const AI_TOOLS = [
     )
   },
   {
+    name: 'registrar_agua',
+    description: 'Anota que el usuario tomó agua (para su registro de salud).',
+    input_schema: obj({ vasos: int('Cuántos vasos (por defecto 1)', 1, 10) })
+  },
+  { name: 'registrar_pausa', description: 'Anota que el usuario hizo una pausa para estirarse.', input_schema: obj() },
+  { name: 'ver_salud', description: 'Cuánta agua tomó y cuántas pausas hizo hoy el usuario.', input_schema: obj() },
+  { name: 'respaldar', description: 'Guarda una copia de la memoria de Pixie en la nube (OneDrive) o en la compu.', input_schema: obj() },
+  {
+    name: 'brillo',
+    description: 'Cambia el brillo de la pantalla: subir o bajar un poco, poner un valor (0-100) o ver cuánto está.',
+    input_schema: obj({ cambio: oneOf(['subir', 'bajar', 'poner', 'ver']), valor: int('Para poner: el porcentaje', 0, 100) }, ['cambio'])
+  },
+  {
+    name: 'bluetooth',
+    description: 'Prende o apaga el Bluetooth, o abre su configuración.',
+    input_schema: obj({ estado: oneOf(['prender', 'apagar', 'abrir']) }, ['estado'])
+  },
+  {
+    name: 'whatsapp',
+    description: 'Le manda un WhatsApp al celular del usuario (solo a su propio número). Para mandarle sus pendientes o su agenda, poné "pendientes" o "agenda" como texto.',
+    input_schema: obj({ texto: str('El mensaje') }, ['texto'])
+  },
+  { name: 'que_suena', description: 'Dice qué canción o video está sonando en la compu (Spotify, YouTube, etc.).', input_schema: obj() },
+  {
+    name: 'ver_pantalla',
+    description: 'Saca una foto de la pantalla del usuario y la analiza para ayudarlo (errores, ejercicios, lo que esté viendo). Usala cuando diga "esto", "acá" o pida ayuda con lo que tiene abierto.',
+    input_schema: obj({ pregunta: str('Qué quiere saber el usuario sobre su pantalla') }, ['pregunta'])
+  },
+  {
     name: 'leer_pagina',
     description: 'Lee el mail abierto en Gmail o el texto de la página abierta en Chrome, para resumirlo o responder preguntas sobre eso.',
     input_schema: obj({ que: oneOf(['mail', 'pagina']) }, ['que'])

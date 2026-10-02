@@ -22,6 +22,19 @@ public static class PixieWin {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 }
 "@
+# Windows anota qué apps están usando el micrófono (LastUsedTimeStop = 0 mientras lo usan)
+function Get-MicInUse {
+  $base = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone'
+  $keys = @()
+  try { $keys += Get-ChildItem "$base\NonPackaged" -ErrorAction Stop } catch {}
+  try { $keys += Get-ChildItem $base -ErrorAction Stop | Where-Object { $_.PSChildName -ne 'NonPackaged' } } catch {}
+  foreach ($k in $keys) {
+    if ($k.PSChildName -match 'pixie|electron') { continue }
+    $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+    if ($p -and $p.LastUsedTimeStart -and ($p.LastUsedTimeStop -eq 0)) { return $true }
+  }
+  return $false
+}
 $i = 0
 while ($true) {
   try {
@@ -43,7 +56,9 @@ while ($true) {
         if ($b) { $bat = @{ nivel = [int]$b.EstimatedChargeRemaining; cargando = ($b.BatteryStatus -eq 2) } }
       } catch {}
     }
-    $o = @{ titulo = $sb.ToString(); proceso = $name; pantallaCompleta = $full; bateria = $bat }
+    $mic = $false
+    try { $mic = Get-MicInUse } catch {}
+    $o = @{ titulo = $sb.ToString(); proceso = $name; pantallaCompleta = $full; bateria = $bat; microfono = $mic }
     [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress))
     [Console]::Out.Flush()
   } catch {}
@@ -62,7 +77,8 @@ export function createAwareness() {
     inactivoSeg: 0,
     bloqueada: false,
     online: true,
-    bateria: null // { nivel, cargando }
+    bateria: null, // { nivel, cargando }
+    microfono: false // otra app está usando el micrófono (una llamada)
   }
   let watcher = null
   let restarts = 0
@@ -76,6 +92,7 @@ export function createAwareness() {
       return
     }
     if (o.bateria) state.bateria = { nivel: o.bateria.nivel, cargando: Boolean(o.bateria.cargando) }
+    state.microfono = Boolean(o.microfono)
     if (OWN_PROCESS.test(o.proceso ?? '')) return // hablarle a Pixie no cambia lo que estabas haciendo
     const act = categorize({ titulo: o.titulo, proceso: o.proceso, pantallaCompleta: o.pantallaCompleta })
     state.pantallaCompleta = Boolean(act) && Boolean(o.pantallaCompleta)
@@ -129,6 +146,10 @@ export function createAwareness() {
       restarts = 99
       watcher?.kill()
     },
-    snapshot: () => ({ ...state, enActividadSeg: Math.round((Date.now() - state.desde) / 1000) })
+    snapshot: () => ({
+      ...state,
+      enActividadSeg: Math.round((Date.now() - state.desde) / 1000),
+      enReunion: state.microfono || state.actividad?.categoria === 'reunion'
+    })
   }
 }

@@ -2,7 +2,7 @@
 
 Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pantalla con su cara animada: lo llamás con **Ctrl+Espacio**, le escribís lo que necesitás y lo hace en tu compu.
 
-## Qué hace (versión 0.4)
+## Qué hace (versión 0.5)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -33,6 +33,14 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «juguemos», «jugamos al pong», «revancha» | Pong contra Pixie: su cara se vuelve el juego |
 | «dale like», «suscribime», «saltá el anuncio», «poné subtítulos», «adelantá 30 segundos», «velocidad 1,5», «siguiente video», «¿qué estoy viendo?» | YouTube en Chrome (con la extensión) |
 | «resumime este mail», «¿de qué trata esta página?» | Resume el mail abierto en Gmail o la página que estás viendo (con la extensión) |
+| El micrófono de la barra o **Ctrl+Alt+Espacio** | Le hablás por voz (con IA de Gemini o Groq) |
+| «¿qué ves en mi pantalla?», «ayudame con esto», «explicame este error» | Mira tu pantalla y te ayuda (con IA de Gemini o Claude) |
+| «mandame por WhatsApp que compre pan», «mandame mis pendientes por WhatsApp» | Te escribe al celular (ver [WhatsApp](#whatsapp-al-celular)) |
+| «subí el brillo», «brillo al 40», «la pantalla está muy oscura» | Brillo de la pantalla (en notebooks) |
+| «prendé el Bluetooth», «apagá el Bluetooth» | Bluetooth |
+| «tomé agua», «ya me estiré», «¿cuánta agua tomé hoy?» | Registro de salud |
+| «¿qué canción es esta?» | Te dice qué está sonando (Spotify, YouTube…) |
+| «hacé un respaldo» | Guarda una copia de su memoria en la nube |
 
 ## Pixie se acuerda, se da cuenta y habla primero
 
@@ -49,7 +57,9 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 - Te saluda cuando volvés, avisa si se corta internet o queda poca batería, y a la madrugada te sugiere ir a dormir.
 - Después de algo que tenías agendado, te pregunta cómo te fue («Hoy tenías la prueba de historia. ¿Cómo te fue?») y se acuerda de lo que le contestes.
 - Si hace más de una hora y media que no charlan, te habla de algo: te invita a un Pong, te cuenta un chiste o un dato curioso, te recuerda un pendiente o te pregunta si tomaste agua. Como mucho 4 veces por día, entre las 10 y las 22, y nunca si estás estudiando, jugando o en un Pomodoro.
-- En pantalla completa (juegos, videos, presentaciones) o en modo no molestar se queda callado. Solo los recordatorios y la batería muy baja avisan igual, sin voz.
+- Cada dos horas sin anotar un vaso de agua te pregunta si tomaste (se apaga con `"recordatoriosSalud": false`).
+- En pantalla completa (juegos, videos, presentaciones), **en una reunión o llamada** (Zoom, Meet, Teams o cualquier app usando el micrófono) o en modo no molestar se queda callado. Solo los recordatorios y la batería muy baja avisan igual, sin voz.
+- Si no estás frente a la compu (bloqueada o 5 minutos sin tocarla), los recordatorios y los timers te llegan por WhatsApp.
 
 Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas haciendo.
 
@@ -59,7 +69,46 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. Lo que decís por el micrófono solo se graba mientras el botón está rojo, y el audio va a la IA para pasarlo a texto. Los WhatsApp pasan por CallMeBot, un servicio gratuito de terceros.
+
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, en `config.json`.
+
+## Voz
+
+**Hablarle.** Tocá el micrófono de la barra o apretá **Ctrl+Alt+Espacio** desde cualquier app, decí lo que necesitás y quedate callado: Pixie entiende que terminaste, lo pasa a texto y lo hace. Necesita la IA de Gemini (o Groq). Si el micrófono no anda, revisá en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.
+
+**Su voz.** Con Gemini, Pixie habla con una voz natural, con acento argentino y un tono que cambia según cómo está (contenta, triste, sorprendida…). Empieza a hablar en menos de un segundo porque el audio llega en pedacitos mientras se genera. El plan gratis alcanza para unas 100 frases por día; las frases repetidas no gastan. Cuando se acaba, o sin internet, usa la voz de Windows.
+
+**Se escucha aunque haya música.** Mientras habla, pausa lo que esté sonando (Spotify, YouTube, cualquier app que responda a las teclas multimedia) y después lo sigue. No lo hace si la frase es muy corta ni si le acabás de pedir música.
+
+**Sonidos.** Hace bips de robotito según la emoción, y al arrancar aparece con un salto y abre los ojos. Los sonidos y la voz se apagan desde el pie de la barra.
+
+| config.json | Qué hace |
+|---|---|
+| `vozNatural` | `false` para usar siempre la voz de Windows |
+| `vozIA` | La voz de Gemini (por defecto `Leda`; otras: `Kore`, `Puck`, `Aoede`, `Zephyr`) |
+| `pausarMusicaAlHablar` | `false` para que no pause la música |
+| `atajoVoz` | Otro atajo para hablarle (por defecto `Control+Alt+Space`) |
+
+## WhatsApp al celular
+
+Pixie te puede escribir por WhatsApp, **solo a tu número**, usando [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) (gratis para uso personal). Se activa una vez:
+
+1. Agendá en el celular el número **+34 684 77 00 05** (CallMeBot).
+2. Mandale por WhatsApp: `I allow callmebot to send me messages`
+3. Te responde con tu **apikey**. Ponela en `config.json` junto con tu número (con código de país):
+
+   ```json
+   "whatsapp": { "telefono": "+5491112345678", "apikey": "123456" }
+   ```
+
+4. Reiniciá Pixie y decile «probá el WhatsApp».
+
+Con eso, si no estás frente a la compu, los recordatorios y los timers te llegan al celular (como mucho uno por minuto). Para que no lo haga: `"avisosAlCelular": false`.
+
+## Respaldo en la nube
+
+Cada 6 horas y al cerrarse, Pixie guarda una copia de su memoria en la compu (`%APPDATA%\Pixie\respaldos`) y en **OneDrive** (carpeta `Pixie`), que Windows sube a la nube solo. Guarda los últimos 7 días y nunca copia las claves. Si se rompe la compu, en la nueva Pixie recupera sus recuerdos al arrancar. Para usar otra carpeta (por ejemplo Google Drive): `"carpetaRespaldo": "G:\\Mi unidad\\Pixie"`.
 
 ## Pong
 
@@ -171,6 +220,10 @@ src/
     ai-tools.js    ← las acciones que la IA puede usar
     browser.js     ← la conexión con la extensión de Chrome
     content.js     ← chistes y datos curiosos
+    tts.js         ← la voz natural (Gemini, en streaming)
+    media-session.js ← la música que suena en Windows (pausar mientras habla, qué canción es)
+    phone.js       ← los WhatsApp al celular
+    backup.js      ← el respaldo en OneDrive
     calc.js        ← la calculadora
     dates.js       ← entiende fechas y horas («el martes a las 6 de la tarde»)
     memory.js      ← la memoria: nombre, datos, pendientes, agenda y uso
@@ -218,7 +271,17 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
-Lo nuevo de la versión 0.4 que todavía no se probó en una PC con Windows:
+Lo nuevo de la versión 0.5. Probado acá con Gemini de verdad: la voz natural, pasar la voz a texto y mirar una captura de pantalla. Falta probar en una PC con Windows:
+
+- **Micrófono:** que pida permiso y te escuche (el botón del micrófono y Ctrl+Alt+Espacio).
+- **Pausar la música** mientras habla, y «¿qué canción es esta?» con Spotify abierto.
+- **Brillo** (en una notebook) y **Bluetooth**.
+- **Mirar la pantalla:** abrí algo con un error y decile «explicame este error».
+- **Modo reunión:** entrar a un Meet o Zoom y ver que no hable solo.
+- **WhatsApp:** activarlo y decirle «probá el WhatsApp».
+- **Respaldo:** «hacé un respaldo» y fijarse que aparezca la carpeta Pixie en OneDrive.
+
+De la versión 0.4:
 
 - **La IA:** que responda con una clave real de Gemini (gratis), que use las acciones («poné un timer de 5 minutos y contame un chiste») y que guarde lo que le contás («mi perro se llama Toby» y después «¿cómo se llama mi perro?»).
 - **La extensión:** que se conecte con Pixie, los botones de YouTube (like, suscribirse, anuncios, subtítulos) y el resumen de un mail de Gmail. YouTube y Gmail cambian su página seguido: si algo no anda, pásenme qué pedido fue y qué contestó Pixie.
@@ -227,7 +290,10 @@ Lo nuevo de la versión 0.4 que todavía no se probó en una PC con Windows:
 
 ## Próximos pasos
 
-- Hablarle con la voz.
+- Llamarlo diciendo «Pixie, ¿estás ahí?» (sin tocar nada).
+- Charla fluida por voz, sin esperar a que termine cada frase.
+- Plugins para que cualquiera le sume herramientas.
+- Cambiar el fondo de pantalla según el clima o el ánimo.
 - Más juegos en la cara de Pixie.
 
 ## Equipo

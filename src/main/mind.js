@@ -36,7 +36,10 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
   let question = null // la última pregunta que hizo por su cuenta, esperando respuesta
   const timers = []
 
-  const isQuiet = () => awareness.snapshot().pantallaCompleta || Date.now() < quietUntil
+  const isQuiet = () => {
+    const snap = awareness.snapshot()
+    return snap.pantallaCompleta || snap.enReunion || Date.now() < quietUntil
+  }
 
   function shareFeeling() {
     const f = feeling(memory.getMood(), new Date())
@@ -52,6 +55,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     const quiet = isQuiet()
     if (n.urgent) {
       notify('Pixie', n.text)
+      ctx.phoneIfAway?.(n.text)
       showWindow?.() // aunque lo hayas escondido, los recordatorios aparecen
     }
     if (n.pregunta) question = { ...n.pregunta, hasta: Date.now() + QUESTION_MS }
@@ -68,7 +72,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     }
     const { notices, presence } = initiative.tick(
       now,
-      { ...snap, silencioHasta: quietUntil, pomodoro: isPomodoroRunning() },
+      { ...snap, silencioHasta: quietUntil, pomodoro: isPomodoroRunning(), salud: ctx.getConfig().recordatoriosSalud !== false },
       memory
     )
     if (presence) sendEvent({ type: 'presence', away: presence === 'ausente' })
@@ -78,6 +82,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
 
   return {
     memory,
+    // Para que otras partes de Pixie digan algo por su cuenta
+    say: (notice) => deliver(notice).catch((err) => console.error(err)),
     start() {
       awareness.start()
       timers.push(setTimeout(tick, 3000), setInterval(tick, TICK_MS), setInterval(() => memory.save(), 60000))
@@ -106,6 +112,9 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
         const cat = CATEGORY_NAMES[snap.actividad.categoria] ?? snap.actividad.categoria
         lines.push(`Está usando ${snap.actividad.app} (${cat}) hace ${durationText(snap.enActividadSeg)}.`)
       }
+      if (snap?.enReunion) lines.push('Está en una reunión o llamada: respondé corto.')
+      const health = memory.getHealth(now)
+      if (health.agua || health.pausas) lines.push(`Hoy tomó ${health.agua} vasos de agua e hizo ${health.pausas} pausas.`)
       lines.push(`Cómo se siente Pixie: ${feeling(memory.getMood(), now)}.`)
       const facts = memory.listFacts().slice(-15).map((f) => f.texto)
       if (facts.length) lines.push(`Lo que contó: ${facts.join('; ')}.`)

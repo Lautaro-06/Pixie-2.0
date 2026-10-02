@@ -6,7 +6,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AI_TOOLS } from './ai-tools.js'
 import { actions, runAction } from './actions/index.js'
 import { pageForAI } from './actions/browser.js'
-import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver } from './ai-compatible.js'
+import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver, whisperTranscribe } from './ai-compatible.js'
+import { FriendlyError } from './windows.js'
 
 const DEFAULT_MODEL = 'claude-opus-5-5'
 // Modelos que aceptan el reintento automático en otro modelo si se niegan a responder
@@ -217,11 +218,47 @@ export function createAI({
     return parseEmotion(r.text).text
   }
 
+  // Mira una captura de la pantalla y responde. La imagen no queda en la charla ni se guarda.
+  async function look(imageBase64, question) {
+    const p = provider()
+    if (!p) throw new FriendlyError('Para mirar tu pantalla necesito la IA activada (Gemini es gratis: el README explica cómo).')
+    if (p.name !== 'gemini' && p.name !== 'claude') throw new FriendlyError('Para mirar tu pantalla necesito la IA de Gemini o de Claude.')
+    const prompt =
+      'Esta es una captura de la pantalla del usuario. La carita de píxeles en una esquina sos vos: ignorala. ' +
+      (question ? `Te pregunta: «${question}». ` : 'Contale en pocas palabras qué está haciendo y ofrecé una ayuda concreta. ') +
+      'Respondé en 1 a 3 oraciones, en español rioplatense, empezando con tu etiqueta de emoción.'
+    const content =
+      p.name === 'claude'
+        ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } }, { type: 'text', text: prompt }]
+        : [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }]
+    const r = await driverFor(p).step([{ role: 'user', content }], { tools: false })
+    if (r.stop === 'refusal') return { text: 'Prefiero no comentar lo que hay en tu pantalla.', face: 'confused' }
+    const { face, text } = parseEmotion(r.text)
+    return { text: text || 'No llegué a ver bien. ¿Me lo pedís de nuevo?', face: face ?? 'happy' }
+  }
+
+  // Pasa a texto lo que dijiste por el micrófono (un WAV). Devuelve '' si no se escuchó nada.
+  async function transcribe(wav) {
+    const p = provider()
+    if (!p) throw new FriendlyError('Para hablarme por voz necesito la IA activada (Gemini es gratis: el README explica cómo).')
+    if (p.name === 'groq') return whisperTranscribe({ apiKey: p.apiKey, wav, fetchImpl })
+    if (p.name !== 'gemini') throw new FriendlyError('Para hablarme por voz necesito la IA de Gemini o de Groq.')
+    const content = [
+      { type: 'text', text: 'Transcribí exactamente lo que dice este audio, en español. Respondé solo con la transcripción, sin comillas ni nada más. Si no hay voz o no se entiende, respondé [nada].' },
+      { type: 'input_audio', input_audio: { data: Buffer.from(wav).toString('base64'), format: 'wav' } }
+    ]
+    const r = await driverFor(p).step([{ role: 'user', content }], { tools: false, persona: false })
+    const text = r.text.replace(/^["«]|["»]$/g, '').trim()
+    return /^\[?nada\]?\.?$/i.test(text) ? '' : text
+  }
+
   return {
     enabled,
     provider: () => provider()?.name ?? null,
     chat,
     summarize,
+    look,
+    transcribe,
     note: (text) => notes.push(text),
     reset: () => {
       messages = []
@@ -231,6 +268,7 @@ export function createAI({
 
 // Mensaje claro según el error de la IA. null = seguir con las reglas sin decir nada.
 export function aiErrorText(err) {
+  if (err instanceof FriendlyError) return err.message
   if (err instanceof AIConnectionError) return null
   if (err instanceof AIHttpError) {
     if (err.status === 401 || err.status === 403 || /api.?key/i.test(err.message)) return 'La clave de IA no funciona. Revisala en config.json.'

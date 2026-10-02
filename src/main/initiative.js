@@ -13,7 +13,8 @@ export const TIMES = {
   saludoAlVolver: 10 * MIN, // saluda si estuviste afuera al menos esto
   sinInternet: 30 * 1000,
   charla: 90 * MIN, // habla de algo por su cuenta si no charlaron en este rato
-  charlaTrasVolver: 15 * MIN // pero no apenas te sentás
+  charlaTrasVolver: 15 * MIN, // pero no apenas te sentás
+  agua: 2 * 60 * MIN // recuerda tomar agua si no anotaste un vaso en este rato
 }
 const CHARLAS_POR_DIA = 4
 // No interrumpe si estás concentrado
@@ -36,8 +37,7 @@ function smallTalk(snap, memory, now, rng, last) {
   const options = [
     () => ({ tipo: 'pong', text: pick(['Me estoy aburriendo un poco… ¿jugamos un Pong?', '¿Un Pong rápido? Te doy ventaja… mentira.']), face: 'happy', suggestions: ['¡dale, juguemos!', 'ahora no'] }),
     () => ({ tipo: 'dato', text: `Me acordé de un dato curioso: ${pick(FACTS)}`, face: 'surprised', suggestions: ['otro dato curioso', 'contame un chiste'] }),
-    () => ({ tipo: 'chiste', text: `Se me ocurrió un chiste: ${pick(JOKES)}`, face: 'wink', suggestions: ['jajaja', 'otro chiste'] }),
-    () => ({ tipo: 'agua', text: '¿Tomaste agua hace poco? Yo no puedo, pero vos sí.', face: 'wink' })
+    () => ({ tipo: 'chiste', text: `Se me ocurrió un chiste: ${pick(JOKES)}`, face: 'wink', suggestions: ['jajaja', 'otro chiste'] })
   ]
   const todos = memory.listTodos()
   if (todos.length) {
@@ -59,6 +59,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     ultimaCharla: 0,
     ultimoTipo: null,
     charlas: { dia: null, n: 0 },
+    ultimoAvisoAgua: 0,
     activoDesde: null,
     ausenteDesde: null,
     racha: { categoria: null, desde: 0, avisada: false },
@@ -68,14 +69,15 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     offlineAvisado: false
   }
 
-  // snap: { inactivoSeg, bloqueada, online, bateria, pantallaCompleta, actividad, silencioHasta, pomodoro }
+  // snap: { inactivoSeg, bloqueada, online, bateria, pantallaCompleta, enReunion, actividad, silencioHasta, pomodoro, salud }
   // memory: la memoria de Pixie. Devuelve { notices, presence }.
   function tick(now, snap, memory) {
     const t = now.getTime()
     s.inicio ??= t
     const notices = []
     let presence = null
-    const quiet = Boolean(snap.pantallaCompleta) || (snap.silencioHasta ?? 0) > t
+    // En pantalla completa, en una reunión o llamada, o en "no molestar": callado
+    const quiet = Boolean(snap.pantallaCompleta) || Boolean(snap.enReunion) || (snap.silencioHasta ?? 0) > t
     const say = (notice) => {
       if (notice.urgent || !quiet) notices.push(notice)
     }
@@ -119,7 +121,8 @@ export function createInitiative(times = TIMES, rng = Math.random) {
         say({
           kind: 'pausa',
           text: `Llevás ${Math.round(times.pausaCada / MIN)} minutos seguidos en la compu. Estirate un poco y tomá agua.`,
-          face: 'happy'
+          face: 'happy',
+          suggestions: ['ya me estiré', 'tomé agua']
         })
       }
 
@@ -192,6 +195,15 @@ export function createInitiative(times = TIMES, rng = Math.random) {
           suggestions: ['¡Re bien!', 'Más o menos', 'Mal'],
           pregunta: { tipo: 'como_fue', evento: evento.texto }
         })
+      } else if (wantsWater(now, snap, memory)) {
+        s.ultimoAvisoAgua = t
+        const vasos = memory.getHealth(now).agua
+        notices.push({
+          kind: 'agua',
+          text: `¿Tomaste agua? ${vasos ? `Hoy van ${vasos} ${vasos === 1 ? 'vaso' : 'vasos'}.` : 'Hoy todavía no anotaste ningún vaso.'}`,
+          face: 'happy',
+          suggestions: ['tomé agua', 'ahora no']
+        })
       } else if (wantsToChat(now, snap, memory)) {
         const hoy = dayKey(now)
         if (s.charlas.dia !== hoy) s.charlas = { dia: hoy, n: 0 }
@@ -204,6 +216,17 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     }
 
     return { notices, presence }
+  }
+
+  // ¿Hace mucho que no tomás agua? De día, si estás en la compu hace un rato
+  function wantsWater(now, snap, memory) {
+    if (snap.salud === false) return false
+    const t = now.getTime()
+    const h = now.getHours()
+    if (h < 9 || h >= 22 || snap.pomodoro) return false
+    if (!s.activoDesde || t - s.activoDesde < 20 * MIN) return false
+    const lastWater = memory.lastWater()?.getTime() ?? 0
+    return t - Math.max(s.inicio, lastWater, s.ultimoAvisoAgua) >= times.agua
   }
 
   // ¿Tiene sentido hablar de algo ahora? Pocas veces por día, de día y sin cortarte la concentración.

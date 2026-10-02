@@ -11,7 +11,7 @@ const memory = () => createMemory(join(mkdtempSync(join(tmpdir(), 'pixie-')), 'm
 const base = { inactivoSeg: 0, bloqueada: false, online: true, bateria: null, pantallaCompleta: false, actividad: null, pomodoro: false }
 const at = (h, m = 0) => new Date(2026, 8, 30, h, m)
 const kinds = (r) => r.notices.map((n) => n.kind)
-const noBreaks = { ...TIMES, pausaCada: Infinity } // para probar horas enteras sin la pausa activa
+const noBreaks = { ...TIMES, pausaCada: Infinity, agua: Infinity } // para probar horas enteras sin la pausa activa ni el agua
 const onlyFollowUps = { ...noBreaks, charla: Infinity }
 
 test('saluda con el resumen la primera vez del día, una sola vez', () => {
@@ -185,4 +185,27 @@ test('si tenés pendientes, a veces te los recuerda', () => {
   ini.tick(at(10), base, mem)
   const r = ini.tick(at(11, 30), base, mem)
   assert.equal(r.notices[0].text, 'Te quedó pendiente «comprar cartuchos». ¿Le damos ahora?')
+})
+
+test('en una reunión o llamada se queda callado (salvo recordatorios)', () => {
+  const mem = memory()
+  const ini = createInitiative()
+  assert.deepEqual(kinds(ini.tick(at(9), { ...base, enReunion: true }, mem)), []) // el resumen espera
+  mem.addEvent({ texto: 'dentista', cuando: at(10), conHora: true })
+  assert.deepEqual(kinds(ini.tick(at(9, 45), { ...base, enReunion: true }, mem)), ['recordatorio'])
+  assert.deepEqual(kinds(ini.tick(at(9, 50), base, mem)), ['resumen'])
+})
+
+test('si hace dos horas que no anotás agua, te lo recuerda (y no insiste)', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(10))
+  const ini = createInitiative({ ...TIMES, pausaCada: Infinity, charla: Infinity })
+  ini.tick(at(10), base, mem)
+  mem.addWater(at(10, 30))
+  assert.deepEqual(kinds(ini.tick(at(12, 29), base, mem)), [])
+  const r = ini.tick(at(12, 30), base, mem)
+  assert.deepEqual(r.notices.map((n) => n.text), ['¿Tomaste agua? Hoy van 1 vaso.'])
+  assert.deepEqual(r.notices[0].suggestions, ['tomé agua', 'ahora no'])
+  assert.deepEqual(kinds(ini.tick(at(13), base, mem)), [])
+  assert.deepEqual(kinds(ini.tick(at(15), { ...base, salud: false }, mem)), []) // se puede apagar
 })

@@ -5,7 +5,10 @@ import { shell } from 'electron'
 
 export const isWindows = process.platform === 'win32'
 
-export class OnlyWindowsError extends Error {
+// Errores con un mensaje pensado para mostrarle a la persona
+export class FriendlyError extends Error {}
+
+export class OnlyWindowsError extends FriendlyError {
   constructor() {
     super('Esta acción por ahora solo funciona en Windows.')
   }
@@ -69,6 +72,56 @@ export function closeProcess(processName) {
 export function lockScreen() {
   if (!isWindows) throw new OnlyWindowsError()
   return run('rundll32.exe', ['user32.dll,LockWorkStation'])
+}
+
+// Brillo de la pantalla (0 a 100). Anda en notebooks; los monitores externos casi nunca lo permiten.
+export async function getBrightness() {
+  let out
+  try {
+    out = await powershell('(Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness -ErrorAction Stop | Select-Object -First 1).CurrentBrightness')
+  } catch (err) {
+    if (err instanceof OnlyWindowsError) throw err
+    throw new FriendlyError('Tu pantalla no deja cambiar el brillo desde Windows (pasa con los monitores externos).')
+  }
+  const level = parseInt(out, 10)
+  if (Number.isNaN(level)) throw new FriendlyError('Tu pantalla no deja cambiar el brillo desde Windows (pasa con los monitores externos).')
+  return level
+}
+
+export async function setBrightness(level) {
+  const n = Math.max(0, Math.min(100, Math.round(Number(level))))
+  if (Number.isNaN(n)) throw new Error('Brillo inválido')
+  try {
+    await powershell(
+      `Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods -ErrorAction Stop | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{ Timeout = [uint32]0; Brightness = [byte]${n} } | Out-Null`
+    )
+  } catch (err) {
+    if (err instanceof OnlyWindowsError) throw err
+    throw new FriendlyError('Tu pantalla no deja cambiar el brillo desde Windows (pasa con los monitores externos).')
+  }
+  return n
+}
+
+// Prende o apaga el Bluetooth con la misma API que usa el panel rápido de Windows.
+const BLUETOOTH_SCRIPT = (state) => `
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+function Await($op, $type) { $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op)); $t.Wait(-1) | Out-Null; $t.Result }
+[Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType = WindowsRuntime] | Out-Null
+[Windows.Devices.Radios.RadioAccessStatus, Windows.System.Devices, ContentType = WindowsRuntime] | Out-Null
+Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus]) | Out-Null
+$radios = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
+$bt = $radios | Where-Object { $_.Kind -eq 'Bluetooth' } | Select-Object -First 1
+if (-not $bt) { 'sin-bluetooth'; exit }
+[Windows.Devices.Radios.RadioState, Windows.System.Devices, ContentType = WindowsRuntime] | Out-Null
+$r = Await ($bt.SetStateAsync('${state}')) ([Windows.Devices.Radios.RadioAccessStatus])
+"$r"
+`
+
+export async function setBluetooth(on) {
+  const out = String(await powershell(BLUETOOTH_SCRIPT(on ? 'On' : 'Off'))).trim()
+  if (out.includes('sin-bluetooth')) throw new FriendlyError('Esta compu no tiene Bluetooth (o está desactivado en el administrador de dispositivos).')
+  if (!/Allowed/i.test(out)) throw new Error(`Bluetooth: ${out}`)
 }
 
 // Apagar o reiniciar con 30 segundos de margen, o cancelar lo pendiente.

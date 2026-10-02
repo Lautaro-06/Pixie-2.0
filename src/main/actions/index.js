@@ -10,7 +10,9 @@ import { timerActions } from './timers.js'
 import { weatherActions } from './weather.js'
 import { memoryActions, contextActions } from './memory.js'
 import { browserActions } from './browser.js'
-import { OnlyWindowsError } from '../windows.js'
+import { healthActions } from './health.js'
+import { deviceActions } from './devices.js'
+import { FriendlyError } from '../windows.js'
 import { BrowserError } from '../browser.js'
 
 const ALL = [
@@ -22,21 +24,27 @@ const ALL = [
   ...weatherActions,
   ...memoryActions,
   ...contextActions,
-  ...browserActions
+  ...browserActions,
+  ...healthActions,
+  ...deviceActions
 ]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
 
+// Si recién tocaste la música, Pixie no la pausa para hablar
+const MEDIA_ACTIONS = new Set(['musica', 'youtube', 'volumen', 'que_suena'])
+
 export async function runAction(name, params, ctx) {
   const action = actions[name]
   if (!action) return { text: 'Eso todavía no lo sé hacer.', face: 'confused' }
+  if (MEDIA_ACTIONS.has(name) || (name === 'buscar' && params?.sitio === 'youtube')) ctx.mediaTouchedAt = Date.now()
   try {
     const result = await action.run(params ?? {}, ctx)
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → ${result.text}`)
     return result
   } catch (err) {
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → error: ${err.message}`)
-    if (err instanceof OnlyWindowsError || err instanceof BrowserError) return { text: err.message, face: 'confused' }
+    if (err instanceof FriendlyError || err instanceof BrowserError) return { text: err.message, face: 'confused' }
     console.error(err)
     return { text: 'Algo salió mal al hacerlo. Probá de nuevo.', face: 'confused' }
   }

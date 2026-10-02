@@ -7,11 +7,15 @@ export const CATEGORY_NAMES = {
   musica: 'música',
   mensajes: 'mensajes',
   juego: 'juegos',
+  reunion: 'reuniones y llamadas',
   web: 'navegar',
   otros: 'otras cosas'
 }
 
 const BY_TITLE = [
+  [/zoom meeting|reuni[oó]n de zoom|zoom webinar/i, 'reunion', 'Zoom'],
+  [/^meet\s*[-–]\s|google meet/i, 'reunion', 'Google Meet'],
+  [/(reuni[oó]n|meeting|llamada|call)\b.*microsoft teams/i, 'reunion', 'Teams'],
   [/youtube/i, 'video', 'YouTube'],
   [/netflix/i, 'video', 'Netflix'],
   [/twitch/i, 'video', 'Twitch'],

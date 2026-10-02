@@ -12,6 +12,7 @@ const EMPTY = () => ({
   agenda: [], // { id, texto, cuando, conHora, avisos: [{ clave, at }], enviados: [] }
   uso: {}, // { 'AAAA-MM-DD': { total, categorias: {}, apps: {} } }
   animo: { valor: 65, ultimoContacto: null },
+  salud: {}, // { 'AAAA-MM-DD': { agua, pausas } } y ultimaAgua
   hechos: {} // cosas que Pixie ya hizo hoy: { resumen: 'AAAA-MM-DD', ... }
 })
 
@@ -103,6 +104,15 @@ export function createMemory(file) {
     }
   }
 
+  function healthDay(date) {
+    const key = dayKey(date)
+    data.salud[key] ??= { agua: 0, pausas: 0 }
+    // Guarda solo las últimas dos semanas
+    const days = Object.keys(data.salud).filter((k) => /^\d{4}-/.test(k)).sort()
+    for (const k of days.slice(0, Math.max(0, days.length - 14))) delete data.salud[k]
+    return data.salud[key]
+  }
+
   return {
     get data() {
       return data
@@ -134,7 +144,7 @@ export function createMemory(file) {
       return item
     },
     forgetAll() {
-      const keep = { uso: data.uso, animo: data.animo }
+      const keep = { uso: data.uso, animo: data.animo, salud: data.salud }
       data = { ...EMPTY(), ...keep }
       save()
     },
@@ -239,6 +249,23 @@ export function createMemory(file) {
       for (const k of keys.slice(0, Math.max(0, keys.length - 14))) delete data.uso[k]
     },
     getUsage: (date) => data.uso[dayKey(date)] ?? { total: 0, categorias: {}, apps: {} },
+
+    // Salud: vasos de agua y pausas de cada día
+    addWater(date = new Date(), vasos = 1) {
+      const day = healthDay(date)
+      day.agua += vasos
+      data.salud.ultimaAgua = date.toISOString()
+      save()
+      return day
+    },
+    addBreak(date = new Date()) {
+      const day = healthDay(date)
+      day.pausas += 1
+      save()
+      return day
+    },
+    getHealth: (date = new Date()) => ({ agua: 0, pausas: 0, ...data.salud[dayKey(date)] }),
+    lastWater: () => (data.salud.ultimaAgua ? new Date(data.salud.ultimaAgua) : null),
 
     // Estado de ánimo de Pixie
     getMood: () => ({ ...data.animo }),

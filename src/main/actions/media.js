@@ -1,4 +1,5 @@
 import { pressKey, KEYS } from '../windows.js'
+import { appName } from '../media-session.js'
 
 export const mediaActions = [
   {
@@ -21,6 +22,17 @@ export const mediaActions = [
       await pressKey(key ?? KEYS.playPause)
       const text = { siguiente: 'Siguiente tema.', anterior: 'Tema anterior.', pausa: 'Listo: pausa o play.' }[control]
       return { text: text ?? 'Listo.', face: 'music' }
+    }
+  },
+  {
+    name: 'que_suena',
+    description: 'Dice qué canción o video está sonando',
+    run: async (_params, ctx) => {
+      const now = ctx.media ? await ctx.media.info() : null
+      if (!now) return { text: 'No escucho nada sonando ahora.', face: 'confused' }
+      const who = now.artista ? ` de ${now.artista}` : ''
+      const paused = now.estado === 'Paused' ? ' (está en pausa)' : ''
+      return { text: `Está sonando «${now.titulo}»${who}, en ${appName(now.app)}${paused}.`, face: 'music' }
     }
   }
 ]

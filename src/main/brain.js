@@ -11,7 +11,8 @@ import { parseWhen, withoutSpans } from './dates.js'
 const SLANG = {
   q: 'que', k: 'que', xq: 'por que', pq: 'por que', porq: 'por que', tmb: 'tambien', tb: 'tambien',
   vol: 'volumen', min: 'minutos', mins: 'minutos', seg: 'segundos', segs: 'segundos',
-  hr: 'hora', hrs: 'horas', hs: 'horas', porfa: '', porfis: '', plis: '', pls: '', please: '', xfa: ''
+  hr: 'hora', hrs: 'horas', hs: 'horas', porfa: '', porfis: '', plis: '', pls: '', please: '', xfa: '',
+  wpp: 'whatsapp', wsp: 'whatsapp', whats: 'whatsapp', guasap: 'whatsapp', wasap: 'whatsapp', blutu: 'bluetooth', bluetu: 'bluetooth'
 }
 
 const FILLERS = [
@@ -212,6 +213,28 @@ function cleanEventText(s) {
 }
 
 const RULES = [
+  // Mirar la pantalla: "¿qué ves en mi pantalla?", "ayudame con esto", "explicame este error"
+  (t) => {
+    const screen =
+      /\b(que ves|que hay|mira|lee|lees|lei|leeme|analiza|revisa|fijate)\b.*\b(pantalla|esto)\b/.test(t) ||
+      /\b(ayudame|explicame|resolveme|que significa|que dice)\b.*\b(esto|aca|este (error|ejercicio|codigo|problema|mensaje)|lo que (tengo|estoy viendo|hay) en (la )?pantalla)\b/.test(t) ||
+      /^que (es|dice) (esto|aca)$/.test(t)
+    return screen ? intent('ver_pantalla', { pregunta: t }) : null
+  },
+  // WhatsApp a tu celular: "mandame por whatsapp que compre pan"
+  (t) => {
+    if (!/\bwhatsapp\b|\bmensaje al celu(lar)?\b/.test(t)) return null
+    if (!/\b(manda|mandame|mandar|mandarme|envia|enviame|enviar|pasame|proba|probar|escribime)\b/.test(t)) return null
+    const texto = t
+      .replace(/\b(manda|mandame|mandar|mandarme|envia|enviame|enviar|pasame|proba|probar|escribime)\b/g, ' ')
+      .replace(/\b(por|al|un|una|el|mi)?\s*(whatsapp|mensaje al celu(lar)?|celu(lar)?)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^((que|diciendo|con|de)\s+)+/, '')
+    return intent('whatsapp', { texto })
+  },
+
+
   // Configuración
   (t) => {
     const m = t.match(/^(?:mi ciudad es|estoy en|vivo en|soy de|cambia(?:r)? (?:la )?ciudad a|usa la ciudad)\s+(.+)$/)
@@ -238,6 +261,18 @@ const RULES = [
     return intent('no_molestar', { minutos: d ? Math.round(d.seconds / 60) : 60 })
   },
   (t) => (/\b(ya (podes )?hablar|desactiva(r)? (el )?no molestar|volve a hablar|ya (podes )?molestar)\b/.test(t) ? intent('molestar') : null),
+
+  // Salud y respaldo
+  (t) => {
+    if (!/\b(tome|acabo de tomar|me tome)\b.*\b(agua|vasos?|botellas?)\b/.test(t)) return null
+    if (/\b(recorda|recordame|avisame|acordame)\b/.test(t)) return null
+    const n = t.match(/\b(un|una|dos|tres|cuatro|cinco|\d+)\s+(vasos?|botellas?)\b/)
+    const count = { un: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5 }
+    return intent('registrar_agua', { vasos: n ? (count[n[1]] ?? parseInt(n[1], 10)) : 1 })
+  },
+  (t) => (/^(ya )?(me estire|estire|hice (la |una )?pausa|me levante un rato|camine un poco)$/.test(t) ? intent('registrar_pausa') : null),
+  (t) => (/\b(cuanta agua (tome|llevo|van)|cuantos vasos|como vengo con (la salud|el agua)|registro de salud|como esta mi salud)\b/.test(t) ? intent('ver_salud') : null),
+  (t) => (/\b(hace(me)? (un )?respaldo|respalda(r|me|te)?|backup|guarda(r)? una copia)\b/.test(t) ? intent('respaldar') : null),
 
   // Pendientes
   (t) => (/^(vacia|limpia)\b.*\b(lista|pendientes)\b|^(borra|borrame|elimina)\b.*\b(todos los pendientes|toda la lista)\b/.test(t) ? intent('limpiar_pendientes') : null),
@@ -369,6 +404,26 @@ const RULES = [
   (t) => (/\b(apaga|apagar|apagues|apagame)\b.*\b(compu|pc|computadora|todo)\b/.test(t) ? intent('apagar_pc', { modo: 'apagar' }) : null),
   (t) => (/\b(reinicia|reiniciar|reinicies|reiniciame)\b.*\b(compu|pc|computadora)\b/.test(t) ? intent('apagar_pc', { modo: 'reiniciar' }) : null),
   (t) => (/\b(captura|capturas|screenshot|recorte|recorta|foto (a|de) la pantalla)\b/.test(t) ? intent('captura') : null),
+
+  // Brillo y Bluetooth (antes que el volumen: "subile el brillo")
+  (t) => {
+    if (!/\bbrillo\b|\bpantalla\b.*\b(oscura|clara|brillante)\b|\bencandila\b/.test(t)) return null
+    if (/\b(maximo|tope|todo)\b/.test(t)) return intent('brillo', { cambio: 'poner', valor: 100 })
+    if (/\bminimo\b/.test(t)) return intent('brillo', { cambio: 'poner', valor: 10 })
+    const n = t.match(/\b(?:al|en|a)\s+(\d{1,3})\b/)
+    if (n) return intent('brillo', { cambio: 'poner', valor: Math.min(100, parseInt(n[1], 10)) })
+    const up = /\b(subi|sube|subir|subile|subime|aumenta|mas|oscura)\b/.test(t)
+    const down = /\b(baja|bajar|bajale|bajame|menos|brillante|clara|encandila)\b/.test(t)
+    if (up === down) return intent('brillo', { cambio: 'ver' })
+    return intent('brillo', { cambio: up ? 'subir' : 'bajar' })
+  },
+  (t) => {
+    if (!/\bbluetooth\b/.test(t)) return null
+    if (/\b(apaga|apagar|apagame|desactiva|desactivar|desconecta)\b/.test(t)) return intent('bluetooth', { estado: 'apagar' })
+    if (/\b(prende|prender|prendeme|activa|activar|encende|encender|pone|conecta)\b/.test(t)) return intent('bluetooth', { estado: 'prender' })
+    return intent('bluetooth', { estado: 'abrir' })
+  },
+  (t) => (/\b(que (cancion|tema|tema musical) es (esta|este)|que (esta sonando|suena|estoy escuchando)|como se llama (esta cancion|este tema)|quien canta( esto| esta cancion)?)\b/.test(t) ? intent('que_suena') : null),
 
   // Volumen
   (t) => (/\b(silencia|silenciar|silencio|mutea|mutear|mute|desmutea|sin sonido|sin volumen)\b/.test(t) ? intent('volumen', { cambio: 'silenciar' }) : null),

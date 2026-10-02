@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('pixie', {
   setMode: (mode) => ipcRenderer.send('pixie:mode', mode),
   hide: () => ipcRenderer.send('pixie:hide'),
   gameResult: (result) => ipcRenderer.send('pixie:game-result', result),
+  voice: (request) => ipcRenderer.invoke('pixie:voice', request),
+  voiceStop: (id) => ipcRenderer.send('pixie:voice-stop', id),
+  speaking: (on) => ipcRenderer.send('pixie:speaking', Boolean(on)),
+  transcribe: (wav) => ipcRenderer.invoke('pixie:transcribe', wav instanceof Uint8Array ? wav : new Uint8Array(wav)),
   onEvent: (callback) => {
     const handler = (_event, data) => callback(data)
     ipcRenderer.on('pixie:event', handler)
