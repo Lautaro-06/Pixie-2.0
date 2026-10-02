@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Face from './face/Face.jsx'
 import PongGame from './games/PongGame.jsx'
 import { api, isPreview } from './api.js'
-import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady, setNaturalVoice } from './voice.js'
+import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady, setNaturalVoice, isSpeaking } from './voice.js'
 import { playSound, hasSound } from './sounds.js'
 import { listen } from './audio.js'
 
@@ -19,6 +19,7 @@ const STARTERS = ['buen día', '¿qué tengo esta semana?', 'anotá comprar cart
 const SLEEP_AFTER_MS = 2 * 60 * 1000 // se duerme si no lo usás un rato
 const SLEEP_WHEN_TIRED_MS = 45 * 1000
 const WAKE_DISTANCE = 140 // se despierta si acercás el mouse
+const COLLAPSE_AFTER_BLUR_MS = 10 * 1000 // si usás otra ventana, se achica cuando termina y pasa este rato
 
 function loadPref(key) {
   try {
@@ -67,6 +68,12 @@ export default function App() {
   const gameRef = useRef(null)
   const noticeTimer = useRef(null)
   const recording = useRef(null)
+  const busyRef = useRef(false)
+  const listeningRef = useRef(false)
+  const replyRef = useRef(null)
+  busyRef.current = busy
+  listeningRef.current = listening
+  replyRef.current = reply
   const startListeningRef = useRef(() => {})
 
   const soundsRef = useRef(soundsOn)
@@ -123,6 +130,18 @@ export default function App() {
     setExpanded(true)
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [wake])
+
+  // Se achica pero sigue hablando; la última respuesta queda en el globito de arriba
+  const minimize = useCallback(() => {
+    lastActivity.current = Date.now()
+    setExpanded(false)
+    const last = replyRef.current
+    if (last?.text) {
+      setNotice({ text: last.text, suggestions: last.confirm ? ['sí', 'no'] : last.suggestions })
+      clearTimeout(noticeTimer.current)
+      noticeTimer.current = setTimeout(() => setNotice(null), Math.max(8000, last.text.length * 90))
+    }
+  }, [])
 
   const close = useCallback(() => {
     lastActivity.current = Date.now()
@@ -225,13 +244,28 @@ export default function App() {
     gameRef.current = game
   }, [game])
 
-  // Si hacés clic en otra ventana, Pixie se achica.
+  // Si hacés clic en otra ventana, Pixie no se calla: termina lo que está haciendo
+  // (pensar, escuchar o hablar) y recién un rato después se achica.
   useEffect(() => {
     if (isPreview) return
-    const onBlur = () => setTimeout(() => !document.hasFocus() && !gameRef.current && close(), 150)
-    window.addEventListener('blur', onBlur)
-    return () => window.removeEventListener('blur', onBlur)
-  }, [close])
+    let timer = null
+    const later = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (document.hasFocus() || gameRef.current || !expandedRef.current) return
+        if (busyRef.current || listeningRef.current || isSpeaking()) return later()
+        minimize()
+      }, COLLAPSE_AFTER_BLUR_MS)
+    }
+    const onFocus = () => clearTimeout(timer)
+    window.addEventListener('blur', later)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('blur', later)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [minimize])
 
   const mood = busy ? 'thinking' : expanded ? 'listening' : asleep ? 'sleeping' : 'idle'
 
@@ -359,6 +393,9 @@ export default function App() {
     <div className={`pixie ${expanded ? 'is-expanded' : 'is-compact'}${booting ? ' is-booting' : ''}`} onKeyDown={onKeyDown}>
       {expanded && (
         <section className="panel" aria-label="Hablar con Pixie">
+          <button type="button" className="close" aria-label="Achicar (sigue hablando)" title="Achicar" onClick={minimize}>
+            ×
+          </button>
           <div className="bubble" aria-live="polite">
             {youSaid && !listening && <p className="said">«{youSaid}»</p>}
             {listening ? (

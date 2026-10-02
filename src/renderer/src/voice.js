@@ -109,6 +109,12 @@ api.onEvent((event) => {
   if (event.type === 'voz') playChunk(event.id, event.chunk)
 })
 
+// ¿Está hablando ahora (o por empezar)?
+export function isSpeaking() {
+  const system = 'speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+  return system || sources.length > 0 || !streamDone
+}
+
 export function speak(text, face) {
   stopSpeaking()
   if (!text) return

@@ -199,7 +199,7 @@ npm run dev
 
 `npm install` también descarga Electron (unos 100 MB). Si en algún momento aparece el error `Electron uninstall`, corré `npx install-electron` y después de nuevo `npm run dev`.
 
-Aparece la cara de Pixie abajo a la derecha y un ícono al lado del reloj de Windows. Apretá **Ctrl+Espacio** (o tocá el botón debajo de la cara, o el ícono) y escribile. La cara se puede arrastrar a cualquier lugar de la pantalla.
+Aparece la cara de Pixie abajo a la derecha y un ícono al lado del reloj de Windows. Apretá **Ctrl+Espacio** (o tocá el botón debajo de la cara, o el ícono) y escribile. La cara se puede arrastrar a cualquier lugar de la pantalla. Si hacés clic en otra ventana, Pixie no se calla: termina de pensar, escuchar o hablar, y 10 segundos después se achica dejando la respuesta en el globito. La **×** la achica sin callarla; **Esc** la cierra y la calla.
 
 Otros comandos:
 

@@ -123,7 +123,8 @@ button, input { font: inherit; color: inherit; }
   cursor: pointer;
 }
 .notice p { margin: 0; font-size: 15px; }
-.notice .close {
+.notice .close,
+.panel > .close {
   position: absolute;
   top: 6px;
   right: 8px;
@@ -134,7 +135,11 @@ button, input { font: inherit; color: inherit; }
   line-height: 1;
   cursor: pointer;
 }
-.notice .close:hover { color: var(--accent); }
+.notice .close:hover,
+.panel > .close:hover { color: var(--accent); }
+.panel { position: relative; }
+.panel > .close { top: 4px; right: 8px; cursor: pointer; z-index: 1; }
+.panel .bubble { padding-right: 18px; }
 
 /* Panel para escribirle */
 .panel {
