@@ -12,7 +12,7 @@ import { memoryActions, contextActions } from './memory.js'
 import { browserActions } from './browser.js'
 import { healthActions } from './health.js'
 import { deviceActions } from './devices.js'
-import { FriendlyError } from '../windows.js'
+import { FriendlyError, BlockedError } from '../windows.js'
 import { BrowserError } from '../browser.js'
 
 const ALL = [
@@ -43,6 +43,10 @@ export async function runAction(name, params, ctx) {
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → ${result.text}`)
     return result
   } catch (err) {
+    if (err instanceof BlockedError) {
+      ctx.log(`BLOQUEADO (${err.categoria}): ${name} ${JSON.stringify(params ?? {})}`)
+      return { text: err.message, face: 'angry', blocked: err.categoria }
+    }
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → error: ${err.message}`)
     if (err instanceof FriendlyError || err instanceof BrowserError) return { text: err.message, face: 'confused' }
     console.error(err)

@@ -74,6 +74,20 @@ La pantalla solo se mira cuando se lo pedís: la foto va a la IA para respondert
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, en `config.json`.
 
+## Filtro de contenido
+
+A Pixie la puede usar cualquiera (por ejemplo en una feria), así que **nunca abre ni busca contenido para adultos, gore ni cosas ilegales** (comprar drogas o armas, documentos falsos, dark web). El filtro está en las acciones mismas, así que vale igual si lo pide una persona o la IA:
+
+- **Sitios:** una lista de páginas conocidas de esos tipos, más palabras en el nombre del sitio («porn», «xxx», `.onion`…).
+- **Búsquedas:** frases como «videos porno», «gente muriendo» o «dónde compro droga». Está pensado para no bloquear tareas del colegio: «educación sexual», «efectos de la cocaína» o «armas de la Segunda Guerra» pasan.
+- **Google** siempre abre con la búsqueda segura activada.
+- **La IA** tiene la instrucción de no mostrar, describir ni buscar ese contenido.
+- Cada intento bloqueado queda anotado en `historial.txt` (`BLOQUEADO`), para que el equipo lo pueda revisar.
+
+No se puede apagar desde el chat. Para bloquear más sitios: `"sitiosBloqueados": ["sitio1.com", "sitio2.com"]` en `config.json`.
+
+Ningún filtro es perfecto: para una compu que va a usar el público, conviene sumar también el control parental de Windows (Microsoft Family Safety) o un DNS con filtro como el de [Cloudflare para familias](https://one.one.one.one/family/) (1.1.1.3), que bloquea en todo el navegador, no solo en lo que abre Pixie.
+
 ## Voz
 
 **Hablarle.** Tocá el micrófono de la barra o apretá **Ctrl+Alt+Espacio** desde cualquier app, decí lo que necesitás y quedate callado: Pixie entiende que terminaste, lo pasa a texto y lo hace. Necesita la IA de Gemini (o Groq). Si el micrófono no anda, revisá en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.
@@ -229,6 +243,7 @@ src/
     media-session.js ← la música que suena en Windows (pausar mientras habla, qué canción es)
     phone.js       ← los WhatsApp al celular
     backup.js      ← el respaldo en OneDrive
+    safety.js      ← el filtro de contenido (adultos, gore, ilegal)
     calc.js        ← la calculadora
     dates.js       ← entiende fechas y horas («el martes a las 6 de la tarde»)
     memory.js      ← la memoria: nombre, datos, pendientes, agenda y uso

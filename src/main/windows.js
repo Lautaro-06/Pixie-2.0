@@ -2,11 +2,20 @@
 // solo valores que vienen del catálogo, de la configuración o números validados.
 import { execFile } from 'node:child_process'
 import { shell } from 'electron'
+import { checkUrl, blockedMessage } from './safety.js'
 
 export const isWindows = process.platform === 'win32'
 
 // Errores con un mensaje pensado para mostrarle a la persona
 export class FriendlyError extends Error {}
+
+// Un sitio bloqueado por el filtro de contenido
+export class BlockedError extends FriendlyError {
+  constructor(categoria) {
+    super(blockedMessage(categoria))
+    this.categoria = categoria
+  }
+}
 
 export class OnlyWindowsError extends FriendlyError {
   constructor() {
@@ -55,6 +64,9 @@ export async function launch(target) {
     if (!isWindows) throw new OnlyWindowsError()
     await run('cmd.exe', ['/d', '/c', 'start', '', target.valor])
   } else if (target.tipo === 'uri') {
+    // Última barrera: ninguna página bloqueada se abre, venga de donde venga
+    const blocked = /^https?:/i.test(target.valor) ? checkUrl(target.valor) : null
+    if (blocked) throw new BlockedError(blocked)
     await shell.openExternal(target.valor)
   } else if (target.tipo === 'ruta') {
     const error = await shell.openPath(target.valor)
