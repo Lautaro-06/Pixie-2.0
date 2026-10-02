@@ -10,7 +10,7 @@ import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
 import { createPhone } from './phone.js'
 import { FriendlyError } from './windows.js'
-import { createTTS } from './tts.js'
+import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
@@ -229,8 +229,8 @@ if (!app.requestSingleInstanceLock()) {
     })
     // Voz natural: el audio va llegando en pedacitos a la interfaz
     ipcMain.handle('pixie:voice', (e, { id, text, face } = {}) =>
-      tts.stream(id, String(text ?? ''), face, (chunk) => {
-        if (!e.sender.isDestroyed()) e.sender.send('pixie:event', { type: 'voz', id, chunk })
+      tts.stream(id, String(text ?? ''), face, (chunk, rate) => {
+        if (!e.sender.isDestroyed()) e.sender.send('pixie:event', { type: 'voz', id, chunk, rate })
       })
     )
     ipcMain.on('pixie:voice-stop', (_e, id) => tts?.stop(id))
@@ -268,11 +268,21 @@ if (!app.requestSingleInstanceLock()) {
     browser = createBrowserBridge({ log: logAction })
     ai = createAI({ getConfig, ctx })
     phone = createPhone({ getConfig, log: logAction })
-    tts = createTTS({ getConfig, log: logAction })
+    tts = createVoices({
+      getConfig,
+      saveConfig,
+      dataDir: app.getPath('userData'),
+      log: (line) => {
+        console.log(line)
+        logAction(line)
+      },
+      announce: (text, face) => mind.say({ kind: 'voz', text, face })
+    })
     media = createMediaSession({ getConfig, log: logAction })
     Object.assign(ctx, {
       phone,
       media,
+      voice: tts,
       // "¿Qué ves en mi pantalla?": una foto de la pantalla para la IA (no se guarda)
       lookAtScreen: async (pregunta) => {
         if (!ai.enabled()) throw new FriendlyError(`Para mirar tu pantalla necesito la IA. ${ai.status()}`)

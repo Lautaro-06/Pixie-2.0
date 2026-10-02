@@ -68,8 +68,33 @@ export function level(samples) {
 
 // Empieza a escuchar. Termina sola cuando dejás de hablar (o con stop()).
 // Devuelve { done: Promise<{ wav, heard }>, stop(), cancel() }
+// Los micrófonos de auriculares Bluetooth pasan los auriculares a "manos libres"
+// y todo el sonido de la compu queda como de llamada. Si hay otro micrófono, se usa ese.
+export function isHandsFree(label) {
+  return /hands-?free|manos libres|AG Audio|bluetooth/i.test(label ?? '')
+}
+
+export function pickMicrophone(devices) {
+  const mics = devices.filter((d) => d.kind === 'audioinput')
+  const preferred = mics.find((d) => d.deviceId === 'default') ?? mics[0]
+  if (!preferred || !isHandsFree(preferred.label)) return null
+  const other = mics.find((d) => !['default', 'communications'].includes(d.deviceId) && !isHandsFree(d.label))
+  return other?.deviceId ?? null
+}
+
+async function microphoneId() {
+  try {
+    return pickMicrophone(await navigator.mediaDevices.enumerateDevices())
+  } catch {
+    return null
+  }
+}
+
 export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 15000, waitMs = 6000 } = {}) {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+  const deviceId = await microphoneId()
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }
+  })
   const ctx = new AudioContext()
   const source = ctx.createMediaStreamSource(stream)
   const proc = ctx.createScriptProcessor(4096, 1, 1)

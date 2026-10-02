@@ -78,7 +78,11 @@ Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con e
 
 **Hablarle.** Tocá el micrófono de la barra o apretá **Ctrl+Alt+Espacio** desde cualquier app, decí lo que necesitás y quedate callado: Pixie entiende que terminaste, lo pasa a texto y lo hace. Necesita la IA de Gemini (o Groq). Si el micrófono no anda, revisá en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.
 
-**Su voz.** Con Gemini, Pixie habla con una voz natural, con acento argentino y un tono que cambia según cómo está (contenta, triste, sorprendida…). Empieza a hablar en menos de un segundo porque el audio llega en pedacitos mientras se genera. El plan gratis alcanza para unas 100 frases por día; las frases repetidas no gastan. Cuando se acaba, o sin internet, usa la voz de Windows.
+**Su voz.** De entrada usa la voz de Windows. Para que hable con una **voz natural con acento argentino**, decile «instalá la voz natural»: baja una sola vez unos 135 MB ([Piper](https://github.com/rhasspy/piper) con la voz [Daniela](https://huggingface.co/rhasspy/piper-voices), de Argentina) y desde ahí habla con esa voz, **en la compu, sin internet y sin límite**. Habla un poco más rápido o más lento según cómo está. «¿qué voz usás?» te dice cuál está usando y «usá la voz de Windows» vuelve a la de siempre.
+
+También puede usar la voz de Gemini («usá la voz de Gemini»), pero el plan gratis da **solo 10 frases por día**; después vuelve sola a la de Windows.
+
+**Auriculares Bluetooth.** Cuando una app usa el micrófono de unos auriculares Bluetooth, Windows los pasa a "manos libres" y todo el sonido queda como de llamada. Por eso, al escucharte, Pixie usa otro micrófono si hay (el de la notebook, por ejemplo).
 
 **Se escucha aunque haya música.** Mientras habla, pausa lo que esté sonando (Spotify, YouTube, cualquier app que responda a las teclas multimedia) y después lo sigue. No lo hace si la frase es muy corta ni si le acabás de pedir música.
 
@@ -86,8 +90,8 @@ Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con e
 
 | config.json | Qué hace |
 |---|---|
-| `vozNatural` | `false` para usar siempre la voz de Windows |
-| `vozIA` | La voz de Gemini (por defecto `Leda`; otras: `Kore`, `Puck`, `Aoede`, `Zephyr`) |
+| `vozNatural` | `true` (la natural de la compu si está instalada), `false` (siempre la de Windows) o `"gemini"` |
+| `vozIA` | Solo para la voz de Gemini: cuál (por defecto `Leda`; otras: `Kore`, `Puck`, `Aoede`, `Zephyr`) |
 | `pausarMusicaAlHablar` | `false` para que no pause la música |
 | `atajoVoz` | Otro atajo para hablarle (por defecto `Control+Alt+Space`) |
 
@@ -272,9 +276,10 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
-Lo nuevo de la versión 0.5. Probado acá con Gemini de verdad: la voz natural, pasar la voz a texto y mirar una captura de pantalla. Falta probar en una PC con Windows:
+Lo nuevo de la versión 0.5. Probado acá con Gemini de verdad: pasar la voz a texto y mirar una captura de pantalla. Falta probar en una PC con Windows:
 
 - **Micrófono:** que pida permiso y te escuche (el botón del micrófono y Ctrl+Alt+Espacio).
+- **Voz natural:** «instalá la voz natural», esperar el aviso de que terminó y escuchar cómo habla.
 - **Pausar la música** mientras habla, y «¿qué canción es esta?» con Spotify abierto.
 - **Brillo** (en una notebook) y **Bluetooth**.
 - **Mirar la pantalla:** abrí algo con un error y decile «explicame este error».

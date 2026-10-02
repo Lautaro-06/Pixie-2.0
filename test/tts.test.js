@@ -17,7 +17,7 @@ function sseResponse(chunks, status = 200) {
   }
 }
 
-function setup({ config = { claveIA: 'AQ.prueba' }, responses } = {}) {
+function setup({ config = { claveIA: 'AQ.prueba', vozNatural: 'gemini' }, responses } = {}) {
   const calls = []
   const fetchImpl = async (url, init) => {
     calls.push({ url, init, body: JSON.parse(init.body) })
@@ -50,17 +50,18 @@ test('las frases repetidas no gastan el límite', async () => {
 })
 
 test('si se acaba el límite gratis, deja la voz de Windows por un rato', async () => {
-  const { tts, calls } = setup({ responses: [{ ok: false, status: 429 }] })
+  const { tts, calls } = setup({ responses: [{ ok: false, status: 429, text: async () => '"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"' }] })
   assert.deepEqual(await tts.stream(1, 'Hola', 'happy', () => {}), { ok: false })
   assert.equal(tts.available(), false)
   assert.deepEqual(await tts.stream(2, 'Hola de nuevo', 'happy', () => {}), { ok: false })
   assert.equal(calls.length, 1)
 })
 
-test('sin Gemini (o con la voz natural apagada) usa la de Windows', async () => {
-  assert.equal(setup({ config: { claveIA: 'sk-ant-x' }, responses: [] }).tts.available(), false)
+test('la voz de Gemini solo se usa si la pedís (son 10 frases por día)', async () => {
+  assert.equal(setup({ config: { claveIA: 'sk-ant-x', vozNatural: 'gemini' }, responses: [] }).tts.available(), false)
   assert.equal(setup({ config: { claveIA: 'AQ.x', vozNatural: false }, responses: [] }).tts.available(), false)
-  assert.equal(setup({ config: { claveIA: 'AQ.x' }, responses: [] }).tts.available(), true)
+  assert.equal(setup({ config: { claveIA: 'AQ.x' }, responses: [] }).tts.available(), false)
+  assert.equal(setup({ config: { claveIA: 'AQ.x', vozNatural: 'gemini' }, responses: [] }).tts.available(), true)
 })
 
 test('arma el pedido con el tono de la emoción', () => {

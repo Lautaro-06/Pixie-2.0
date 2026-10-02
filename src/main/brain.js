@@ -427,6 +427,17 @@ const RULES = [
   },
   (t) => (/\b(que (cancion|tema|tema musical) es (esta|este)|que (esta sonando|suena|estoy escuchando)|como se llama (esta cancion|este tema)|quien canta( esto| esta cancion)?)\b/.test(t) ? intent('que_suena') : null),
 
+  // La voz de Pixie
+  (t) => {
+    if (!/\bvoz\b|\b(como )?hablas\b/.test(t)) return null
+    if (/\b(instala|instalar|instalate|descarga|descargar|descargate|baja|bajar|bajate)\b.*\bvoz\b/.test(t)) return intent('voz', { accion: 'instalar' })
+    if (/\bvoz (de windows|normal|de antes|robot|robotica|de siempre)\b/.test(t)) return intent('voz', { accion: 'windows' })
+    if (/\bvoz (de gemini|de google)\b/.test(t)) return intent('voz', { accion: 'gemini' })
+    if (/\bvoz natural\b/.test(t)) return intent('voz', { accion: 'natural' })
+    if (/\b(que voz|tu voz|estado de (la|tu) voz|voz (rara|mal|fea|horrible|robotica)|hablas (raro|mal|feo))\b/.test(t)) return intent('voz', { accion: 'estado' })
+    return null
+  },
+
   // Volumen
   (t) => (/\b(silencia|silenciar|silencio|mutea|mutear|mute|desmutea|sin sonido|sin volumen)\b/.test(t) ? intent('volumen', { cambio: 'silenciar' }) : null),
   (t) => {

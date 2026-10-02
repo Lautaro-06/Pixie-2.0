@@ -1,10 +1,10 @@
-// Voz de Pixie. Si hay IA de Gemini usa una voz natural que llega en pedacitos
-// (empieza a hablar enseguida); si no, o si se acabó el límite gratis, usa las
-// voces de Windows. Mientras habla, avisa para pausar la música que esté sonando.
+// Voz de Pixie. Si está instalada la voz natural (o la de Gemini), el audio llega
+// en pedacitos desde la app; si no, usa las voces de Windows. Mientras habla,
+// avisa para pausar la música que esté sonando.
 import { api } from './api.js'
 import { pcmToFloat } from './audio.js'
 
-const RATE = 24000 // la voz natural llega como PCM de 16 bits a 24 kHz
+const DEFAULT_RATE = 24000 // la voz natural llega como PCM de 16 bits (22 o 24 kHz)
 const PAUSE_MUSIC_FROM = 35 // frases cortas no pausan la música
 
 let current = 0 // número de la frase que se está diciendo
@@ -21,7 +21,9 @@ let speakingNow = false
 function spanishVoice() {
   if (!('speechSynthesis' in window)) return null
   const voices = window.speechSynthesis.getVoices()
+  const spanish = (v) => v.lang?.toLowerCase().startsWith('es')
   return (
+    voices.find((v) => spanish(v) && /natural|online/i.test(v.name)) ??
     voices.find((v) => /^es-(AR|419|MX|US)/i.test(v.lang)) ??
     voices.find((v) => v.lang?.toLowerCase().startsWith('es')) ??
     null
@@ -49,34 +51,24 @@ function setSpeaking(on) {
   api.speaking?.(on)
 }
 
-// El tono cambia según cómo está: más agudo si está contento o sorprendido, más grave si está triste.
-const TONE = {
-  happy: { pitch: 1.15, rate: 1.08 },
-  love: { pitch: 1.1, rate: 1 },
-  laugh: { pitch: 1.2, rate: 1.12 },
-  wink: { pitch: 1.1, rate: 1.05 },
-  surprised: { pitch: 1.25, rate: 1.1 },
-  sad: { pitch: 0.85, rate: 0.92 },
-  angry: { pitch: 0.9, rate: 1.1 },
-  confused: { pitch: 1.05, rate: 0.98 },
-  alarm: { pitch: 1.2, rate: 1.12 }
-}
+// Según cómo está habla un poco más rápido o más lento. El tono no se toca:
+// en las voces de Windows suena distorsionado.
+const SPEED = { happy: 1.08, laugh: 1.1, surprised: 1.08, alarm: 1.1, sad: 0.97, love: 1.02 }
 
 function systemSpeak(text, face, id) {
   const voice = spanishVoice()
   if (!voice || id !== current) return
   const utterance = new SpeechSynthesisUtterance(text.replace(/[«»]/g, ''))
-  const tone = TONE[face] ?? { pitch: 1.05, rate: 1.05 }
   utterance.voice = voice
   utterance.lang = voice.lang
-  utterance.rate = tone.rate
-  utterance.pitch = tone.pitch
+  utterance.rate = SPEED[face] ?? 1.05
+  utterance.pitch = 1
   utterance.onstart = () => id === current && setSpeaking(true)
   utterance.onend = utterance.onerror = () => id === current && setSpeaking(false)
   window.speechSynthesis.speak(utterance)
 }
 
-function playChunk(id, chunk) {
+function playChunk(id, chunk, rate = DEFAULT_RATE) {
   if (id !== current) return
   const { samples, carry } = pcmToFloat(chunk, leftover)
   leftover = carry
@@ -84,7 +76,7 @@ function playChunk(id, chunk) {
   try {
     ctx ??= new AudioContext()
     if (ctx.state === 'suspended') ctx.resume()
-    const buffer = ctx.createBuffer(1, samples.length, RATE)
+    const buffer = ctx.createBuffer(1, samples.length, rate)
     buffer.getChannelData(0).set(samples)
     const src = ctx.createBufferSource()
     src.buffer = buffer
@@ -106,7 +98,7 @@ function playChunk(id, chunk) {
 }
 
 api.onEvent((event) => {
-  if (event.type === 'voz') playChunk(event.id, event.chunk)
+  if (event.type === 'voz') playChunk(event.id, event.chunk, event.rate)
 })
 
 // ¿Está hablando ahora (o por empezar)?
@@ -120,7 +112,8 @@ export function speak(text, face) {
   if (!text) return
   const id = ++current
   pauseMusic = text.length > PAUSE_MUSIC_FROM
-  if (!natural) return systemSpeak(text, face, id)
+  // La app decide si hay voz natural (si no, contesta enseguida y se usa la de Windows)
+  if (!api.voice) return systemSpeak(text, face, id)
   streamDone = false
   received = 0
   api

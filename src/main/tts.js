@@ -1,12 +1,14 @@
-// Voz natural de Pixie con Gemini (gratis, unas 100 frases por día). El audio
-// llega en pedacitos mientras se genera, así empieza a hablar en menos de un
-// segundo. Si se acaba el límite o no hay internet, la interfaz usa la voz de Windows.
+// Voz de Gemini (solo si la pedís con "vozNatural": "gemini"). El audio llega en
+// pedacitos mientras se genera. Ojo: el plan gratis da solo 10 frases por día;
+// cuando se acaban, la interfaz usa la voz de Windows. La voz natural de todos los
+// días es la de la compu (piper.js).
 import { pickProvider } from './ai.js'
 
 const URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 const DEFAULT_MODEL = 'gemini-3.1-flash-tts-preview'
 const DEFAULT_VOICE = 'Leda'
-const PAUSE_AFTER_LIMIT_MS = 60 * 60 * 1000
+const PAUSE_AFTER_MINUTE_LIMIT_MS = 60 * 1000
+const PAUSE_AFTER_DAY_LIMIT_MS = 6 * 60 * 60 * 1000
 const CACHE_SIZE = 40
 const MAX_CHARS = 500
 
@@ -53,7 +55,7 @@ export function createTTS({ getConfig, fetchImpl = (...a) => fetch(...a), log = 
   function settings() {
     const cfg = getConfig()
     const p = pickProvider(cfg)
-    if (p?.name !== 'gemini' || cfg.vozNatural === false || Date.now() < pausedUntil) return null
+    if (p?.name !== 'gemini' || cfg.vozNatural !== 'gemini' || Date.now() < pausedUntil) return null
     return { apiKey: p.apiKey, model: cfg.modeloVoz || DEFAULT_MODEL, voice: cfg.vozIA || DEFAULT_VOICE }
   }
 
@@ -86,8 +88,11 @@ export function createTTS({ getConfig, fetchImpl = (...a) => fetch(...a), log = 
         signal: controller.signal
       })
       if (res.status === 429) {
-        pausedUntil = Date.now() + PAUSE_AFTER_LIMIT_MS
-        log('voz natural: se terminó el límite gratis, uso la voz de Windows por una hora')
+        // ¿Se acabó lo del día o lo del minuto?
+        const detail = await res.text().catch(() => '')
+        const perDay = /PerDay/i.test(detail)
+        pausedUntil = Date.now() + (perDay ? PAUSE_AFTER_DAY_LIMIT_MS : PAUSE_AFTER_MINUTE_LIMIT_MS)
+        log(`voz de Gemini: se terminó el límite gratis ${perDay ? 'del día' : 'por minuto'}, uso la voz de Windows`)
         return { ok: false }
       }
       if (!res.ok) {

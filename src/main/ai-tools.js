@@ -130,6 +130,11 @@ export const AI_TOOLS = [
     description: 'Le manda un WhatsApp al celular del usuario (solo a su propio número). Para mandarle sus pendientes o su agenda, poné "pendientes" o "agenda" como texto.',
     input_schema: obj({ texto: str('El mensaje') }, ['texto'])
   },
+  {
+    name: 'voz',
+    description: 'La voz de Pixie: decir cuál usa, instalar la voz natural (argentina, sin internet), o cambiar a la de Windows o a la de Gemini.',
+    input_schema: obj({ accion: oneOf(['estado', 'instalar', 'natural', 'windows', 'gemini']) }, ['accion'])
+  },
   { name: 'que_suena', description: 'Dice qué canción o video está sonando en la compu (Spotify, YouTube, etc.).', input_schema: obj() },
   {
     name: 'ver_pantalla',
