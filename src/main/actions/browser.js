@@ -1,5 +1,9 @@
-// Acciones en el navegador: YouTube y resumir el mail o la página abierta.
-// Necesitan la extensión "Pixie para Chrome" (carpeta extension/).
+// Acciones en el navegador: poner videos y temas, YouTube y resumir el mail o la
+// página abierta. Casi todas necesitan la extensión "Pixie para Chrome" (carpeta
+// extension/); poner un tema anda también sin ella.
+import { launch, BlockedError } from '../windows.js'
+import { checkQuery } from '../safety.js'
+import { findVideo } from '../youtube-search.js'
 
 const FACE_BY_ACTION = { like: 'love', suscribir: 'happy', dislike: 'sad', que_veo: 'happy' }
 
@@ -22,7 +26,59 @@ export function pageForAI(page) {
   return `${head}${note}\n\n${page.text}`
 }
 
+// Lo que contesta Pixie cuando pone un video
+function nowPlaying(v, playing = true) {
+  const what = `«${v.title || 'el video'}»${v.channel ? ` de ${v.channel}` : ''}`
+  return playing ? `Poniendo ${what}.` : `Te dejé ${what}. Si no arranca solo, tocá play.`
+}
+
 export const browserActions = [
+  {
+    name: 'reproducir',
+    description: 'Busca y reproduce enseguida un tema o video en YouTube',
+    run: async ({ consulta }, ctx) => {
+      const q = String(consulta ?? '').trim()
+      if (!q) return { text: '¿Qué querés que ponga?', face: 'confused' }
+      const blocked = checkQuery(q)
+      if (blocked) throw new BlockedError(blocked)
+      // Con la extensión: lo pone en tu pestaña de YouTube y se fija que suene
+      if (ctx.browser?.connected()) {
+        try {
+          const r = await ctx.browser.request('reproducir', { consulta: q }, 30000)
+          const bad = checkQuery(r.title)
+          if (bad) {
+            await ctx.browser.request('youtube', { accion: 'pausa' }).catch(() => {})
+            throw new BlockedError(bad)
+          }
+          return { text: nowPlaying(r, r.playing), face: 'music' }
+        } catch (err) {
+          if (err instanceof BlockedError) throw err
+          ctx.log(`reproducir con la extensión: ${err.message}`)
+        }
+      }
+      // Sin la extensión: busca el video y lo abre directo
+      const video = await findVideo(q, ctx.fetch).catch(() => null)
+      if (video && !checkQuery(video.title)) {
+        await launch({ tipo: 'uri', valor: `https://www.youtube.com/watch?v=${video.videoId}` })
+        return { text: nowPlaying(video), face: 'music' }
+      }
+      await launch({ tipo: 'uri', valor: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` })
+      return { text: `Te abrí la búsqueda de «${q}» en YouTube: tocá el que quieras.`, face: 'music' }
+    }
+  },
+  {
+    name: 'youtube_click',
+    description: 'Pone el video número N de la lista de YouTube que tenés abierta',
+    run: async ({ n }, ctx) => {
+      const r = await ctx.browser.request('youtube_click', { n: Number(n) || 1 }, 20000)
+      const bad = checkQuery(r.title)
+      if (bad) {
+        await ctx.browser.request('youtube', { accion: 'pausa' }).catch(() => {})
+        throw new BlockedError(bad)
+      }
+      return { text: nowPlaying(r, r.playing), face: 'music' }
+    }
+  },
   {
     name: 'youtube',
     description: 'Interactúa con el video de YouTube abierto en Chrome',

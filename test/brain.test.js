@@ -39,10 +39,10 @@ const CASES = [
   // Búsquedas
   ['buscá recetas de pizza', 'buscar', { sitio: 'google', consulta: 'recetas de pizza' }],
   ['googleá el mundial 86', 'buscar', { sitio: 'google', consulta: 'el mundial 86' }],
-  ['poné lofi para estudiar en youtube', 'buscar', { sitio: 'youtube', consulta: 'lofi para estudiar' }],
+  ['poné lofi para estudiar en youtube', 'reproducir', { consulta: 'lofi para estudiar' }],
   ['buscá en youtube tutoriales de react', 'buscar', { sitio: 'youtube', consulta: 'tutoriales de react' }],
-  ['poné videos de gatos', 'buscar', { sitio: 'youtube', consulta: 'gatos' }],
-  ['poneme música de Duki', 'buscar', { sitio: 'youtube', consulta: 'música de duki' }],
+  ['poné videos de gatos', 'reproducir', { consulta: 'gatos' }],
+  ['poneme música de Duki', 'reproducir', { consulta: 'música de duki' }],
   ['¿qué es la fotosíntesis?', 'buscar', { sitio: 'google', consulta: 'que es la fotosintesis' }],
   ['¿quién fue San Martín?', 'buscar', { sitio: 'google', consulta: 'quien fue san martin' }],
   ['¿dónde queda Tucumán?', 'buscar', { sitio: 'maps', consulta: 'tucuman' }],

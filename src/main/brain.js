@@ -443,6 +443,8 @@ const RULES = [
   (t) => {
     if (/\b(volumen al (maximo|tope|100)|a todo volumen|maximo volumen)\b/.test(t)) return intent('volumen', { cambio: 'subir', pasos: 50 })
     if (/\b(volumen al minimo|minimo volumen)\b/.test(t)) return intent('volumen', { cambio: 'bajar', pasos: 50 })
+    const level = t.match(/\bvolumen (?:al|en|a) (\d{1,3})\b/)
+    if (level) return intent('volumen', { cambio: 'poner', valor: Math.min(100, parseInt(level[1], 10)) })
     const volWord = VOLUME_WORDS.test(t)
     const up = (volWord && /\b(subi|sube|subir|subas|subile|subime|aumenta|aumentar|mas|arriba|alto|fuerte)\b/.test(t)) ||
       /\b(subilo|subile|mas fuerte|mas alto|no (se )?escucho|no se escucha|no escucho nada|no oigo|se escucha (muy |re )?bajo)\b/.test(t)
@@ -486,16 +488,42 @@ const RULES = [
     return intent('resumir', { que: /\b(mail|correo|email|mensaje|gmail)\b/.test(t) ? 'mail' : 'pagina' })
   },
 
+  // Poner un video de la lista: "poné el segundo", "abrí el primer video"
+  (t) => {
+    const m = t.match(/^(?:pone(?:me)?|abri(?:me)?|reproduci|toca|elegi|mira|dale (?:play )?a|(?:hace )?click? en)\s+(?:el |la )?(primer|primero|primera|segundo|segunda|tercer|tercero|tercera|cuarto|cuarta|quinto|quinta|[1-9])(?:\s+(?:video|tema|resultado|cancion|de la lista|de arriba))?$/)
+    if (!m) return null
+    const n = { primer: 1, primero: 1, primera: 1, segundo: 2, segunda: 2, tercer: 3, tercero: 3, tercera: 3, cuarto: 4, cuarta: 4, quinto: 5, quinta: 5 }[m[1]] ?? parseInt(m[1], 10)
+    return intent('youtube_click', { n })
+  },
+
+  // Poner un tema o un video: "poné goteo de duki", "quiero escuchar a los redondos"
+  (t, ctx) => {
+    const m =
+      t.match(/^(?:pone(?:me)?|pon|pongas|reproduci(?:me)?|toca(?:me)?|quiero escuchar|quiero ver|escuchar|dale play a|mandale)\s+(.+?)(?:\s+en (?:youtube|yt))?$/) ||
+      t.match(/^(?:youtube|yt)\s+(.+)$/)
+    if (!m) return null
+    let q = m[1].replace(/^(?:a |al |el tema |la cancion |el video )/, '')
+    // Cosas de la compu, no temas: "poné el volumen…", "poné una alarma…"
+    if (/\b(volumen|brillo|timer|temporizador|alarma|recordatorio|pomodoro|no molestar|modo|wifi|bluetooth|pantalla completa|subtitulos|velocidad|anterior|siguiente|que sigue|de antes)\b/.test(q)) return null
+    // "poné música" o "poné un tema" a secas: play/pausa de lo que estaba sonando
+    if (/^(la |algo de |un poco de )?(musica|algo|play|pausa|un tema|el tema|temas|un video|el video|videos?|cancion|una cancion|canciones|playlist|la playlist)$/.test(q)) return null
+    const music = q.match(/^(?:musica|temas?|canciones?)\s+de\s+(.+)$/)
+    if (music) q = `música de ${music[1]}`
+    const videos = q.match(/^(?:un |unos )?videos? de\s+(.+)$/)
+    if (videos) q = videos[1]
+    // "poné Spotify" abre la app; "poné goteo" lo pone en YouTube
+    const e = findEntity(q, ctx.index)
+    if (e && e.dist === undefined && e.tipo !== 'carpeta') return intent('abrir', { objetivo: e.alias })
+    return intent('reproducir', { consulta: q })
+  },
+
   // Búsquedas
   (t) => {
     const m =
-      t.match(/^(?:busca(?:me)?|buscar|busques|pone(?:me)?|pongas|reproduci(?:me)?|mira|ver|quiero ver|quiero escuchar|escuchar|mostrame)\s+(.+?)\s+en (?:youtube|yt)$/) ||
-      t.match(/^(?:youtube|yt)\s+(.+)$/) ||
+      t.match(/^(?:busca(?:me)?|buscar|busques|mira|ver|mostrame)\s+(.+?)\s+en (?:youtube|yt)$/) ||
       t.match(/\ben (?:youtube|yt)\s+(.+)$/) ||
-      t.match(/^(?:pone(?:me)?|pongas|mostrame|quiero ver)\s+(?:un |unos )?videos? de\s+(.+)$/)
-    if (m) return intent('buscar', { sitio: 'youtube', consulta: m[1] })
-    const music = t.match(/^(?:pone(?:me)?|pongas|quiero escuchar|reproduci(?:me)?)\s+(?:musica|temas?|canciones?)\s+de\s+(.+)$/)
-    return music ? intent('buscar', { sitio: 'youtube', consulta: `música de ${music[1]}` }) : null
+      t.match(/^(?:mostrame)\s+(?:un |unos )?videos? de\s+(.+)$/)
+    return m ? intent('buscar', { sitio: 'youtube', consulta: m[1] }) : null
   },
   (t) => {
     const m = t.match(/^(?:donde queda|donde esta|como llego a|como ir a|mapa de|ubicacion de)\s+(.+)$/)

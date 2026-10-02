@@ -32,7 +32,7 @@ const ALL = [
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
 
 // Si recién tocaste la música, Pixie no la pausa para hablar
-const MEDIA_ACTIONS = new Set(['musica', 'youtube', 'volumen', 'que_suena'])
+const MEDIA_ACTIONS = new Set(['musica', 'youtube', 'volumen', 'que_suena', 'reproducir', 'youtube_click'])
 
 export async function runAction(name, params, ctx) {
   const action = actions[name]

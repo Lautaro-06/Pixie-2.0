@@ -64,7 +64,75 @@ async function run(tabId, func, args = []) {
   return res?.result
 }
 
+const YOUTUBE = /^https:\/\/(www\.|m\.)?youtube\.com\//
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// Espera a que la pestaña termine de cargar (o un máximo)
+function loaded(tabId, timeout = 15000) {
+  return new Promise((resolve) => {
+    const done = () => {
+      chrome.tabs.onUpdated.removeListener(listener)
+      clearTimeout(timer)
+      resolve()
+    }
+    const listener = (id, info) => id === tabId && info.status === 'complete' && done()
+    const timer = setTimeout(done, timeout)
+    chrome.tabs.onUpdated.addListener(listener)
+  })
+}
+
+// Repite una función en la página hasta que devuelva algo (YouTube carga de a poco)
+async function poll(tabId, func, args = [], tries = 25, every = 400) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await run(tabId, func, args)
+      if (r) return r
+    } catch {
+      // la página todavía está cambiando
+    }
+    await sleep(every)
+  }
+  return null
+}
+
+// Usa la pestaña de YouTube que ya tenés (si hay) en vez de abrir otra
+async function youtubeTab(url) {
+  const tab = await findTab((u) => YOUTUBE.test(u), true)
+  if (!tab) return chrome.tabs.create({ url, active: true })
+  await chrome.windows.update(tab.windowId, { focused: true })
+  return chrome.tabs.update(tab.id, { url, active: true })
+}
+
+// Abre el video y se asegura de que suene
+async function play(tabId, videoId) {
+  await chrome.tabs.update(tabId, { url: `https://www.youtube.com/watch?v=${videoId}` })
+  await loaded(tabId)
+  return poll(tabId, ensurePlaying, [], 15, 500)
+}
+
 async function handle(cmd, args) {
+  // "poné goteo de duki": busca, elige el primer video y lo reproduce
+  if (cmd === 'reproducir') {
+    const q = String(args.consulta ?? '').slice(0, 200)
+    const tab = await youtubeTab(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=EgIQAQ%253D%253D`)
+    await loaded(tab.id)
+    const videos = await poll(tab.id, listVideos)
+    if (!videos?.length) throw new Error(`No encontré videos de «${q}».`)
+    const first = videos[0]
+    const playing = await play(tab.id, first.videoId)
+    return { ok: true, title: first.title, channel: first.channel, playing: Boolean(playing) }
+  }
+  // "poné el segundo": el video número N de la lista que estás viendo
+  if (cmd === 'youtube_click') {
+    const tab = await findTab((u) => YOUTUBE.test(u), true)
+    if (!tab) throw new Error('No tenés YouTube abierto en Chrome.')
+    const videos = await poll(tab.id, listVideos, [], 5)
+    const n = Math.max(1, Math.round(Number(args.n) || 1))
+    const video = videos?.[n - 1]
+    if (!video) throw new Error(videos?.length ? `En la lista hay ${videos.length} videos.` : 'No veo videos en la página de YouTube.')
+    const playing = await play(tab.id, video.videoId)
+    return { ok: true, title: video.title, channel: video.channel, playing: Boolean(playing) }
+  }
   if (cmd === 'youtube') {
     const tab = await findTab((url) => /^https:\/\/(www\.|m\.)?youtube\.com\/(watch|shorts)/.test(url), true)
     if (!tab) throw new Error('No encontré un video de YouTube abierto en Chrome.')
@@ -176,6 +244,45 @@ function youtubeAction(accion, valor) {
     default:
       return { ok: false, text: 'Eso todavía no lo sé hacer en YouTube.' }
   }
+}
+
+// Los videos de la página de YouTube abierta (búsqueda, inicio o sugeridos), sin Shorts ni anuncios
+function listVideos() {
+  const cards = document.querySelectorAll(
+    'ytd-video-renderer, ytd-rich-item-renderer, ytd-compact-video-renderer, yt-lockup-view-model'
+  )
+  const out = []
+  const seen = new Set()
+  for (const card of cards) {
+    if (card.offsetParent === null) continue
+    if (card.closest('ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-ad-slot-renderer')) continue
+    const link = [...card.querySelectorAll('a[href*="watch?v="]')][0]
+    const id = link?.getAttribute('href')?.match(/[?&]v=([\w-]{11})/)?.[1]
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const title =
+      card.querySelector('#video-title')?.textContent?.trim() ||
+      card.querySelector('h3, [title]')?.getAttribute('title') ||
+      card.querySelector('h3')?.textContent?.trim() ||
+      ''
+    const channel = card.querySelector('ytd-channel-name a, #channel-name a, ytd-channel-name #text')?.textContent?.trim() || ''
+    out.push({ videoId: id, title, channel })
+    if (out.length >= 10) break
+  }
+  return out.length ? out : null
+}
+
+// Si el video quedó en pausa (Chrome a veces no deja que arranque solo), le da play
+function ensurePlaying() {
+  const video = document.querySelector('video.html5-main-video') || document.querySelector('video')
+  if (!video) return null
+  if (document.querySelector('#movie_player.ad-showing')) return 'anuncio'
+  if (video.paused) {
+    video.muted = false
+    video.play().catch(() => document.querySelector('.ytp-play-button')?.click())
+    return null
+  }
+  return 'sonando'
 }
 
 function readGmail() {

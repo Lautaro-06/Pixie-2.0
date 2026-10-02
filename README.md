@@ -14,9 +14,10 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «abrí YouTube», «quiero ver Netflix», «spotify», «abrime descargas» | Abre sitios, apps y carpetas |
 | «cerrá Spotify y Discord» | Cierra apps (pregunta antes) |
 | «buscá recetas de pizza», «¿qué es la fotosíntesis?» | Busca en Google |
-| «poné videos de gatos», «poneme música de Duki» | Busca en YouTube |
+| «poné goteo de Duki», «quiero escuchar a Los Redondos», «poné videos de gatos» | **Lo reproduce de una** en YouTube (el primer video, sin Shorts) |
+| «poné el segundo», «abrí el primer video» | Pone el video número N de la lista de YouTube que tenés abierta (con la extensión) |
 | «¿dónde queda Tucumán?» | Busca en Google Maps |
-| «subí el volumen», «más fuerte», «no se escucha», «silenciá» | Volumen |
+| «subí el volumen», «volumen al 50», «más fuerte», «silenciá» | Volumen |
 | «poné música», «pasá de tema», «otra canción» | Controla la música que esté sonando |
 | «timer de 10 minutos», «avisame en 5 minutos que saque la pizza», «pomodoro» | Timers con aviso, sonido y voz |
 | «¿cuánto es 25 por 4?», «20% de 300» | Cuentas |
@@ -194,6 +195,10 @@ Para que Pixie pueda darle like a un video o resumir un mail, instalá la extens
 
 Con Pixie abierto, la extensión se conecta sola (tarda hasta 30 segundos). Después probá con un video de YouTube abierto: «dale like» o «¿qué estoy viendo?». Para el mail, abrí uno en Gmail y decile «resumime este mail».
 
+**Poner temas.** Con la extensión, «poné goteo de Duki» busca en tu pestaña de YouTube (o abre una), elige el primer video (sin Shorts ni anuncios), lo reproduce y se fija que esté sonando; si Chrome no lo deja arrancar solo, le da play. Sin la extensión, Pixie busca el video y lo abre directo en el navegador. El filtro de contenido vale también para lo que pidas y para el título del video.
+
+**Cuando bajen una versión nueva de la extensión** (por ejemplo con `git pull`), en `chrome://extensions` tocá el botón de recargar de «Pixie para Chrome».
+
 Sin IA, el resumen es simple (de quién es, el asunto y las primeras oraciones). Con IA es un resumen de verdad y le podés hacer preguntas sobre el mail o la página.
 
 La extensión solo hace algo cuando se lo pide Pixie, y Pixie solo acepta conexiones de extensiones del navegador desde la misma compu (`127.0.0.1`, puerto 47631).
@@ -244,6 +249,7 @@ src/
     phone.js       ← los WhatsApp al celular
     backup.js      ← el respaldo en OneDrive
     safety.js      ← el filtro de contenido (adultos, gore, ilegal)
+    youtube-search.js ← encuentra el video para «poné tal tema» sin la extensión
     calc.js        ← la calculadora
     dates.js       ← entiende fechas y horas («el martes a las 6 de la tarde»)
     memory.js      ← la memoria: nombre, datos, pendientes, agenda y uso

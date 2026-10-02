@@ -24,8 +24,8 @@ export const AI_TOOLS = [
   },
   {
     name: 'volumen',
-    description: 'Sube, baja o silencia el volumen de la compu. Cada paso es 2%.',
-    input_schema: obj({ cambio: oneOf(['subir', 'bajar', 'silenciar']), pasos: int('Cantidad de pasos', 1, 50) }, ['cambio'])
+    description: 'Sube, baja o silencia el volumen de la compu (cada paso es 2%), o lo pone en un porcentaje.',
+    input_schema: obj({ cambio: oneOf(['subir', 'bajar', 'silenciar', 'poner']), pasos: int('Cantidad de pasos', 1, 50), valor: int('Para poner: el porcentaje', 0, 100) }, ['cambio'])
   },
   {
     name: 'musica',
@@ -96,6 +96,16 @@ export const AI_TOOLS = [
     input_schema: obj({ minutos: int('Minutos', 1, 480) }, ['minutos'])
   },
   { name: 'jugar', description: 'Empieza un partido de Pong contra Pixie (su cara se vuelve el juego).', input_schema: obj() },
+  {
+    name: 'reproducir',
+    description: 'Busca y reproduce enseguida un tema, artista o video en YouTube (por ejemplo "goteo de duki"). Usala cuando pidan poner o escuchar algo.',
+    input_schema: obj({ consulta: str('Qué poner: tema, artista o video') }, ['consulta'])
+  },
+  {
+    name: 'youtube_click',
+    description: 'Pone el video número N de la lista de YouTube que el usuario tiene abierta (búsqueda, inicio o sugeridos).',
+    input_schema: obj({ n: int('Número del video en la lista, empezando en 1', 1, 10) }, ['n'])
+  },
   {
     name: 'youtube',
     description: 'Interactúa con el video de YouTube que está abierto en Chrome: like, dislike, suscribirse, saltar anuncio, subtítulos, velocidad, adelantar o atrasar segundos, siguiente video, o saber qué se está viendo.',

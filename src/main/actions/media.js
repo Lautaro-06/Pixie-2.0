@@ -5,10 +5,17 @@ export const mediaActions = [
   {
     name: 'volumen',
     description: 'Sube, baja o silencia el volumen',
-    run: async ({ cambio, pasos = 5 }) => {
+    run: async ({ cambio, pasos = 5, valor }) => {
       if (cambio === 'silenciar') {
         await pressKey(KEYS.mute)
         return { text: 'Listo, silencio (o sonido de nuevo, si ya estaba silenciado).', face: 'happy' }
+      }
+      // "volumen al 50": lo baja del todo y lo sube hasta ahí (cada tecla es 2 %)
+      if (cambio === 'poner') {
+        const target = Math.max(0, Math.min(100, Math.round(Number(valor) || 0)))
+        await pressKey(KEYS.volumeDown, 50)
+        if (target > 0) await pressKey(KEYS.volumeUp, Math.round(target / 2))
+        return { text: `Volumen al ${target}%.`, face: 'happy' }
       }
       await pressKey(cambio === 'subir' ? KEYS.volumeUp : KEYS.volumeDown, pasos)
       return { text: cambio === 'subir' ? 'Subí el volumen.' : 'Bajé el volumen.', face: 'happy' }
