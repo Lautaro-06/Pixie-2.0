@@ -155,6 +155,16 @@ export const AI_TOOLS = [
     name: 'leer_pagina',
     description: 'Lee el mail abierto en Gmail o el texto de la página abierta en Chrome, para resumirlo o responder preguntas sobre eso.',
     input_schema: obj({ que: oneOf(['mail', 'pagina']) }, ['que'])
+  },
+  {
+    name: 'cambiar_atajo',
+    description: 'Dice o cambia el atajo de teclado para llamar a Pixie. Sin atajo, dice cuál usa.',
+    input_schema: obj({ atajo: str('El atajo nuevo, por ejemplo "Ctrl+Alt+P". Tiene que llevar Ctrl o Alt.') })
+  },
+  {
+    name: 'actualizar',
+    description: 'Busca una versión nueva de Pixie y, si ya está bajada, la instala y reinicia. Usala solo si el usuario pide actualizar.',
+    input_schema: obj()
   }
 ]
 

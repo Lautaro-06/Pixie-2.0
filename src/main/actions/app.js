@@ -1,6 +1,24 @@
-// Acciones sobre Pixie misma: actualizarse, decir su versión y armar el informe de diagnóstico.
+// Acciones sobre Pixie misma: actualizarse, decir su versión, su atajo y armar el informe de diagnóstico.
+import { parseShortcut, shortcutText } from '../shortcut.js'
 
 export const appActions = [
+  {
+    name: 'cambiar_atajo',
+    description: 'Dice o cambia el atajo de teclado para llamar a Pixie (por ejemplo Ctrl+Alt+P)',
+    run: ({ atajo }, ctx) => {
+      if (!atajo) return { text: `Me llamás con ${ctx.shortcutLabel()}. Para cambiarlo decime, por ejemplo, «cambiá el atajo a Ctrl+Alt+P».`, face: 'idle' }
+      const accel = parseShortcut(atajo)
+      if (!accel) {
+        return { text: 'No entendí ese atajo. Tiene que llevar Ctrl o Alt y una tecla, por ejemplo «cambiá el atajo a Ctrl+Alt+P».', face: 'confused' }
+      }
+      const r = ctx.changeShortcut?.(accel)
+      if (!r) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
+      if (!r.ok) {
+        return { text: `${shortcutText(accel)} lo está usando otro programa. Probá con otro, por ejemplo Ctrl+Alt+P.`, face: 'confused' }
+      }
+      return { text: `¡Listo! Ahora me llamás con ${shortcutText(accel)}.`, face: 'happy' }
+    }
+  },
   {
     name: 'actualizar',
     description: 'Busca una versión nueva de Pixie y, si ya está bajada, la instala y reinicia',

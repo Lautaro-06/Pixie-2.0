@@ -171,3 +171,37 @@ test('la acción diagnóstico copia el informe', async () => {
   const none = await runAction('diagnostico', {}, { log: () => {}, copyDiagnostics: () => 0 })
   assert.match(none.text, /No anoté ningún error/)
 })
+
+test('entiende atajos escritos de muchas formas', async () => {
+  const { parseShortcut, shortcutText } = await import('../src/main/shortcut.js')
+  assert.equal(parseShortcut('Ctrl+Alt+P'), 'Control+Alt+P')
+  assert.equal(parseShortcut('control alt p'), 'Control+Alt+P')
+  assert.equal(parseShortcut('alt y ctrl y p'), 'Control+Alt+P')
+  assert.equal(parseShortcut('ctrl + shift + espacio'), 'Control+Shift+Space')
+  assert.equal(parseShortcut('Alt+F9'), 'Alt+F9')
+  assert.equal(parseShortcut('windows mas j'), 'Super+J')
+  assert.equal(parseShortcut('shift+p'), null, 'sin Ctrl ni Alt se dispararía al escribir')
+  assert.equal(parseShortcut('ctrl alt'), null, 'falta la tecla')
+  assert.equal(parseShortcut('ctrl+alt+pp'), null)
+  assert.equal(shortcutText('Control+Shift+Space'), 'Ctrl+Shift+Espacio')
+})
+
+test('cambia el atajo si está libre y avisa si otro programa lo usa', async () => {
+  const action = (text) => interpretAll(text)?.map((i) => [i.action, i.params])
+  assert.deepEqual(action('cambiá el atajo a Ctrl+Alt+P'), [['cambiar_atajo', { atajo: 'ctrl+alt+p' }]])
+  assert.deepEqual(action('poné el atajo en control y alt y p'), [['cambiar_atajo', { atajo: 'control y alt y p' }]])
+  assert.deepEqual(action('¿cuál es tu atajo?'), [['cambiar_atajo', {}]])
+
+  const taken = new Set(['Control+Space'])
+  let current = 'Control+Shift+Space'
+  const ctx = {
+    log: () => {},
+    shortcutLabel: () => current.replace('Control', 'Ctrl').replace('Space', 'Espacio'),
+    changeShortcut: (accel) => (taken.has(accel) ? { ok: false } : ((current = accel), { ok: true }))
+  }
+  assert.match((await runAction('cambiar_atajo', {}, ctx)).text, /Me llamás con Ctrl\+Shift\+Espacio/)
+  assert.match((await runAction('cambiar_atajo', { atajo: 'ctrl espacio' }, ctx)).text, /Ctrl\+Espacio lo está usando otro programa/)
+  assert.match((await runAction('cambiar_atajo', { atajo: 'ctrl alt p' }, ctx)).text, /Ahora me llamás con Ctrl\+Alt\+P/)
+  assert.equal(current, 'Control+Alt+P')
+  assert.match((await runAction('cambiar_atajo', { atajo: 'p' }, ctx)).text, /No entendí ese atajo/)
+})

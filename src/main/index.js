@@ -17,6 +17,7 @@ import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
 import { createUpdater } from './updates.js'
 import { createDiagnostics } from './diagnostics.js'
+import { shortcutText } from './shortcut.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -51,7 +52,26 @@ const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar
 
 function shortcutLabel() {
   if (!activeShortcut) return 'el ícono de la barra de tareas'
-  return activeShortcut.replace('Control', 'Ctrl').replace('Space', 'Espacio')
+  return shortcutText(activeShortcut)
+}
+
+// Cambia el atajo para llamar a Pixie. Si otro programa ya lo usa, deja el que había.
+function changeShortcut(accel) {
+  if (!accel) return { ok: false }
+  if (accel === activeShortcut) return { ok: true }
+  let ok = false
+  try {
+    ok = globalShortcut.register(accel, openBar)
+  } catch {
+    ok = false
+  }
+  if (!ok) return { ok: false }
+  if (activeShortcut) globalShortcut.unregister(activeShortcut)
+  activeShortcut = accel
+  if (getConfig().atajo !== accel) saveConfig({ atajo: accel })
+  trayMenu?.refresh()
+  logAction(`atajo: ahora es ${shortcutText(accel)}`)
+  return { ok: true }
 }
 
 // Lo que las acciones pueden usar de la app.
@@ -59,6 +79,7 @@ const ctx = {
   getConfig,
   saveConfig,
   shortcutLabel,
+  changeShortcut,
   log: logAction,
   emit: sendEvent,
   reportError: (source, err) => diagnostics.record(source, err),
@@ -88,6 +109,7 @@ function diagnosticsReport() {
     `Voz: ${({ piper: 'natural (Piper)', gemini: 'Gemini' })[tts?.engine()] ?? 'la de Windows'}`,
     `Actualizaciones: ${updates?.describe() ?? 'sin arrancar'}`,
     `Arranca con Windows: ${login}`,
+    `Atajo: ${shortcutLabel()}${getConfig().atajo && getConfig().atajo !== activeShortcut ? ` (pidió ${shortcutText(getConfig().atajo)}, ocupado)` : ''}`,
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
   ])
@@ -415,11 +437,33 @@ if (!app.requestSingleInstanceLock()) {
     mind.start()
     updates.start()
     console.log(`Pixie ${app.getVersion()} · ${ai.status()}`)
-    // Si editás config.json con Pixie abierto, lo lee solo
+
+    // Si otro programa (por ejemplo Claude) ya usa el atajo, Pixie avisa cuál le quedó (una vez por caso)
+    const wanted = getConfig().atajo
+    const busy = wanted && activeShortcut !== wanted ? `${wanted}→${activeShortcut}` : null
+    if (busy && getConfig().atajoAvisado !== busy) {
+      setTimeout(() => {
+        const now = activeShortcut ? `para llamarme usá ${shortcutLabel()}` : 'para llamarme tocá mi ícono al lado del reloj'
+        mind.say({
+          kind: 'atajo',
+          text: `${shortcutText(wanted)} lo está usando otro programa, así que ${now}. Si preferís otro, decime «cambiá el atajo a Ctrl+Alt+P».`,
+          face: 'confused'
+        })
+        saveConfig({ atajoAvisado: busy })
+      }, 6000)
+    }
+
+    // Si editás config.json con Pixie abierto, lo lee solo (también un atajo nuevo)
+    let lastShortcut = getConfig().atajo
     watchConfig((cfg) => {
       const msg = `config.json cambió · ${describeAI(cfg).text}`
       console.log(msg)
       logAction(msg)
+      if (cfg.atajo === lastShortcut) return
+      lastShortcut = cfg.atajo
+      if (cfg.atajo && cfg.atajo !== activeShortcut && !changeShortcut(cfg.atajo).ok) {
+        logAction(`atajo: ${shortcutText(cfg.atajo)} lo usa otro programa, sigo con ${shortcutLabel()}`)
+      }
     })
 
     if (restored.some((r) => r.file === 'memoria.json')) {

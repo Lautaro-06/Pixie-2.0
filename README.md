@@ -14,6 +14,10 @@ Pixie se fija sola si hay una versión nueva al arrancar y cada 6 horas. La baja
 
 También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qué versión tenés?», o desde el ícono → **Buscar actualizaciones**.
 
+### Si el atajo no anda
+
+Si otro programa ya usa **Ctrl+Espacio** (por ejemplo Claude), Pixie toma otro atajo y te avisa cuál: casi siempre **Ctrl+Shift+Espacio**. Lo ves también en el primer renglón del menú de su ícono. Para elegir otro, decile «cambiá el atajo a Ctrl+Alt+P» (tiene que llevar Ctrl o Alt); si ese también está ocupado, te lo dice. «¿Cuál es tu atajo?» te dice el que tiene ahora.
+
 ### Si algo falla
 
 Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar informe de diagnóstico**) y pegá el informe con Ctrl+V donde lo quieras mandar. Trae la versión, la IA y la voz que usa y los últimos errores, **sin claves, contraseñas ni teléfonos**. Los errores también quedan en `errores.log`, en la carpeta de Pixie (ícono → **Abrir la carpeta de Pixie**).

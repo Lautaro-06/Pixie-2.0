@@ -223,6 +223,12 @@ const RULES = [
     /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
       ? intent('diagnostico')
       : null,
+  // El atajo para llamarla: "cambiá el atajo a Ctrl+Alt+P", "¿cuál es tu atajo?"
+  (t) => {
+    const m = /^(cambia(r)?|pone(r)?|usa(r)?|configura(r)?|quiero) (el |tu |mi )?atajo (a|en|por|para que sea|que sea) (?<atajo>.+)$/.exec(t)
+    if (m) return intent('cambiar_atajo', { atajo: m.groups.atajo })
+    return /\b(cual es (el|tu) atajo|que atajo (tenes|uso|usas)|con que (atajo|teclas) te (llamo|abro))\b/.test(t) ? intent('cambiar_atajo', {}) : null
+  },
   // Mirar la pantalla: "¿qué ves en mi pantalla?", "ayudame con esto", "explicame este error"
   (t) => {
     const screen =
