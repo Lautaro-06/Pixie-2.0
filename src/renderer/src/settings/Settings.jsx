@@ -1,11 +1,13 @@
 // La ventana de Ajustes: todo lo que antes había que tocar en config.json.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizard, LedScreen, WakeTrainer } from './parts.jsx'
+import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizard, LedScreen, WakeTrainer, CalendarWizard } from './parts.jsx'
 
 const SECTIONS = [
   ['general', 'General'],
   ['personalizacion', 'Personalización'],
+  ['agenda', 'Agenda'],
+  ['noticias', 'Noticias'],
   ['ia', 'Inteligencia artificial'],
   ['voz', 'Voz'],
   ['actualizaciones', 'Actualizaciones'],
@@ -65,6 +67,8 @@ export default function Settings({ section: initial = 'general' }) {
       <main className="content">
         {section === 'general' && <General s={s} change={change} />}
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
+        {section === 'agenda' && <AgendaSection s={s} setS={setS} say={say} />}
+        {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
         {section === 'ia' && <AISection s={s} change={change} reload={load} say={say} />}
         {section === 'voz' && <VoiceSection s={s} setS={setS} change={change} say={say} />}
         {section === 'actualizaciones' && <Updates s={s} setS={setS} say={say} />}
@@ -128,6 +132,127 @@ function Personalization({ s, change }) {
       <Header title="Personalización" text="Elegí qué muestro en mi pantallita cuando no me estás usando." />
       <Card note="Cuando te hablo, reacciono o me llamás, vuelve mi cara. El clima del resumen se actualiza cada media hora.">
         <StandbyPicker value={s.apariencia.pantallaReposo} onChange={(pantallaReposo) => change({ pantallaReposo })} />
+      </Card>
+    </>
+  )
+}
+
+function AgendaSection({ s, setS, say }) {
+  const list = s.agenda.calendarios
+  const hint = (c) => {
+    if (c.error) return `No lo pude leer: ${c.error}`
+    if (!c.proximos) return 'Nada en los próximos 7 días.'
+    return `${c.proximos} ${c.proximos === 1 ? 'cosa' : 'cosas'} en los próximos 7 días.`
+  }
+  return (
+    <>
+      <Header title="Agenda" text="Sumá tu Google Calendar y las materias de Classroom: te aviso antes de cada cosa y te las cuento cuando me preguntás «¿qué tengo hoy?»." />
+      {list.length > 0 && (
+        <Card title="Tus calendarios" note="El interruptor es para los avisos: 15 minutos antes de cada clase o evento, y la noche anterior y a la mañana de cada entrega.">
+          {list.map((c) => (
+            <Row key={c.id} label={c.nombre} hint={hint(c)}>
+              <div className="buttons">
+                <Toggle label={`Avisarme de ${c.nombre}`} on={c.avisos} onChange={async (v) => setS(await api.settings.calendarAlerts(c.id, v))} />
+                <button
+                  type="button"
+                  className="button danger"
+                  onClick={async () => {
+                    setS(await api.settings.removeCalendar(c.id))
+                    say(`Saqué «${c.nombre}».`)
+                  }}
+                >
+                  Quitar
+                </button>
+              </div>
+            </Row>
+          ))}
+        </Card>
+      )}
+      <Card title={list.length ? 'Sumar otro calendario' : 'Sumar un calendario'}>
+        <CalendarWizard
+          onAdded={(r) => {
+            setS(r)
+            say(r.mensaje)
+          }}
+        />
+      </Card>
+      <Card
+        title="Privacidad"
+        note="Con la dirección secreta cualquiera puede ver tu calendario: la guardo cifrada solo en esta compu (no va al respaldo) y no se la paso a nadie. Si la querés anular, en Google Calendar tocá «Restablecer» al lado de la dirección secreta."
+      />
+    </>
+  )
+}
+
+const NEWS_ALERT_OPTIONS = [
+  ['nunca', 'Nunca', 'Solo cuando me las pedís.'],
+  ['aveces', 'A veces', 'Unas 2 veces por día te cuento un titular nuevo.'],
+  ['seguido', 'Más seguido', 'Unas 4 veces por día.']
+]
+const NEWS_EXAMPLES = ['«¿Qué noticias hay?»', '«Noticias de TN»', '«Noticias sobre el dólar»', '«Más noticias»', '«Abrí la segunda»']
+
+function NewsSection({ s, change, say }) {
+  const n = s.noticias
+  const [preview, setPreview] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const setSource = (id, on) => {
+    const next = on ? [...new Set([...n.fuentes, id])] : n.fuentes.filter((f) => f !== id)
+    if (!next.length) return say('Dejá al menos un diario prendido.')
+    change({ noticiasFuentes: next })
+  }
+  return (
+    <>
+      <Header title="Noticias" text="Te cuento lo último de Infobae y TN cuando me lo pedís y, si querés, de vez en cuando por mi cuenta." />
+      <Card title="De dónde">
+        <Row label="Infobae">
+          <Toggle label="Infobae" on={n.fuentes.includes('infobae')} onChange={(v) => setSource('infobae', v)} />
+        </Row>
+        <Row label="TN">
+          <Toggle label="TN" on={n.fuentes.includes('tn')} onChange={(v) => setSource('tn', v)} />
+        </Row>
+      </Card>
+      <Card title="Por mi cuenta" note="Solo de 9 a 22, y nunca mientras estudiás, jugás o estás en una reunión. No leo titulares para adultos ni violentos.">
+        <div className="choices" role="radiogroup" aria-label="Noticias por mi cuenta">
+          {NEWS_ALERT_OPTIONS.map(([id, name, text]) => (
+            <button key={id} type="button" role="radio" aria-checked={n.avisos === id} className={`choice${n.avisos === id ? ' selected' : ''}`} onClick={() => change({ noticiasAvisos: id })}>
+              <span className="choice-title">{name}</span>
+              <span className="choice-text">{text}</span>
+            </button>
+          ))}
+        </div>
+      </Card>
+      <Card title="Lo último">
+        <button
+          type="button"
+          className="button secondary"
+          disabled={loading}
+          onClick={async () => {
+            setLoading(true)
+            setPreview(await api.settings.previewNews())
+            setLoading(false)
+          }}
+        >
+          {loading ? 'Buscando…' : 'Ver los titulares'}
+        </button>
+        {preview &&
+          (preview.ok ? (
+            <ul className="examples headlines">
+              {preview.titulares.map((t) => (
+                <li key={t.titulo}>
+                  {t.titulo} <span className="source">({t.fuente})</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="status error">{preview.mensaje}</p>
+          ))}
+      </Card>
+      <Card title="Cosas para pedirme">
+        <ul className="examples">
+          {NEWS_EXAMPLES.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
       </Card>
     </>
   )
@@ -260,7 +385,7 @@ function Updates({ s, setS, say }) {
   )
 }
 
-const EXAMPLES = ['«Poné música para estudiar»', '«Recordame la prueba del jueves»', '«¿Qué ves en mi pantalla?»', '«Cambiá el atajo a Ctrl+Alt+P»', '«Juguemos»']
+const EXAMPLES = ['«Poné música para estudiar»', '«Recordame la prueba del jueves»', '«¿Qué tengo que entregar?»', '«¿Qué noticias hay?»', '«¿Qué ves en mi pantalla?»', '«Cambiá el atajo a Ctrl+Alt+P»', '«Juguemos»']
 
 function Help({ s, say }) {
   return (

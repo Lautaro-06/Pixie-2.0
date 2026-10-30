@@ -152,6 +152,21 @@ export const AI_TOOLS = [
     input_schema: obj({ pregunta: str('Qué quiere saber el usuario sobre su pantalla') }, ['pregunta'])
   },
   {
+    name: 'noticias',
+    description: 'Lee los últimos titulares de Infobae y TN (o de uno), opcionalmente filtrados por un tema ("dólar", "River"). Usala para preguntas de actualidad. mas: true sigue con los siguientes.',
+    input_schema: obj({ fuente: oneOf(['infobae', 'tn'], 'Solo de este diario'), tema: str('Palabra para filtrar, por ejemplo "dólar"'), mas: { type: 'boolean', description: 'Seguir con las siguientes' } })
+  },
+  {
+    name: 'abrir_noticia',
+    description: 'Abre en el navegador una de las noticias que se acaban de leer (n = 1 es la primera)',
+    input_schema: obj({ n: int('Cuál de las noticias leídas', 1, 3) }, ['n'])
+  },
+  {
+    name: 'conectar_calendario',
+    description: 'Abre la sección para sumar Google Calendar o las materias de Classroom a la agenda de Pixie y explica cómo',
+    input_schema: obj()
+  },
+  {
     name: 'leer_pagina',
     description: 'Lee el mail abierto en Gmail o el texto de la página abierta en Chrome, para resumirlo o responder preguntas sobre eso.',
     input_schema: obj({ que: oneOf(['mail', 'pagina']) }, ['que'])

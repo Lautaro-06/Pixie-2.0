@@ -1,0 +1,48 @@
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+X-WR-CALNAME:Matemática 5°B
+X-WR-TIMEZONE:America/Argentina/Buenos_Aires
+BEGIN:VEVENT
+DTSTART;TZID=America/Argentina/Buenos_Aires:20261102T080000
+DTEND;TZID=America/Argentina/Buenos_Aires:20261102T094000
+RRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=10
+EXDATE;TZID=America/Argentina/Buenos_Aires:20261104T080000
+UID:clase-mate@google.com
+SUMMARY:Clase de matemática
+LOCATION:Aula 12\, primer piso
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=America/Argentina/Buenos_Aires:20261111T100000
+DTEND;TZID=America/Argentina/Buenos_Aires:20261111T114000
+RECURRENCE-ID;TZID=America/Argentina/Buenos_Aires:20261111T080000
+UID:clase-mate@google.com
+SUMMARY:Clase de matemática (cambió de horario)
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261105
+DTEND;VALUE=DATE:20261106
+UID:tarea-tp3@classroom.google.com
+SUMMARY:Entrega: TP 3 - Funciones cuadráticas y un título largo que Google 
+ parte en dos renglones
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261103T200000Z
+DTEND:20261103T210000Z
+UID:prueba-utc@google.com
+SUMMARY:Prueba de física
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261106T150000Z
+DTEND:20261106T160000Z
+UID:cancelado@google.com
+STATUS:CANCELLED
+SUMMARY:Reunión que se canceló
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20250101
+UID:viejo@google.com
+SUMMARY:Algo de hace mucho
+END:VEVENT
+END:VCALENDAR

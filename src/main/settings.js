@@ -4,8 +4,12 @@ import { describeAI, pickProvider, aiErrorText } from './ai.js'
 import { AIHttpError, AIConnectionError } from './ai-compatible.js'
 import { maskSecret } from './secrets.js'
 import { parseShortcut, shortcutText } from './shortcut.js'
+import { findCalendarUrl } from './calendars.js'
 
 export const STANDBY_MODES = ['cara', 'reloj', 'resumen']
+export const NEWS_SOURCES = ['infobae', 'tn']
+export const NEWS_ALERTS = ['nunca', 'aveces', 'seguido']
+export const GOOGLE_CALENDAR_SETTINGS_URL = 'https://calendar.google.com/calendar/r/settings'
 export const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey'
 const NAMES = { gemini: 'Gemini', groq: 'Groq', claude: 'Claude', ollama: 'Ollama' }
 const KEY = /(AIza[\w-]{30,}|AQ\.[\w.-]{20,}|gsk_[A-Za-z0-9]{20,}|sk-ant-[\w-]{20,})/
@@ -41,9 +45,13 @@ export function createSettings({
   errorCount = () => 0,
   readClipboard = () => '',
   wake = null,
+  calendars = null,
+  news = null,
   version = '0.0.0'
 }) {
   let candidate = null // la clave que se encontró copiada, sin mostrarla
+  let calendarCandidate = null // la dirección de un calendario que se encontró copiada
+  let calendarTried = null // la última que se probó (para no probarla de nuevo a cada rato)
 
   function snapshot() {
     const cfg = getConfig()
@@ -73,6 +81,11 @@ export function createSettings({
         estado: voices?.status() ?? '',
         palabra: wake?.status() ?? { grabada: false, activa: false, sensibilidad: 'normal' }
       },
+      agenda: { calendarios: calendars?.status() ?? [] },
+      noticias: {
+        fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
+        avisos: NEWS_ALERTS.includes(cfg.noticiasAvisos) ? cfg.noticiasAvisos : 'aveces'
+      },
       actualizaciones: { ...updates.status(), texto: updates.describe() },
       ayuda: { errores: errorCount() }
     }
@@ -98,6 +111,8 @@ export function createSettings({
       voices.use(true)
       voices.install()
     }
+    if (Array.isArray(patch.noticiasFuentes)) saveConfig({ noticiasFuentes: patch.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) })
+    if (NEWS_ALERTS.includes(patch.noticiasAvisos)) saveConfig({ noticiasAvisos: patch.noticiasAvisos })
     if ('palabraMagica' in patch) wake?.setActive(Boolean(patch.palabraMagica))
     if (typeof patch.sensibilidadPalabra === 'string') wake?.setSensitivity(patch.sensibilidadPalabra)
     if (typeof patch.atajo === 'string') {
@@ -163,5 +178,57 @@ export function createSettings({
     return snapshot()
   }
 
-  return { snapshot, apply, testKey, saveKey, forgetKey, clipboardKey, finishWelcome, saveWake, forgetWake }
+  // Calendarios: la dirección secreta se prueba antes de guardarla (cifrada)
+  async function addCalendar(url) {
+    const typed = typeof url === 'string' && url.trim() ? url : null
+    if (!typed) calendarTried = calendarCandidate
+    const r = await calendars.add(typed ?? calendarCandidate ?? '')
+    calendarCandidate = null
+    return { ...r, ...snapshot() }
+  }
+
+  // ¿Lo último que copiaste es la dirección de un calendario? (no se muestra: es secreta)
+  function clipboardCalendar() {
+    const url = findCalendarUrl(readClipboard())
+    if (!url || url === calendarTried || calendars.has(url)) return { encontrada: false }
+    calendarCandidate = url
+    return { encontrada: true }
+  }
+
+  function removeCalendar(id) {
+    calendars.remove(String(id))
+    return snapshot()
+  }
+
+  function calendarAlerts(id, on) {
+    calendars.setAlerts(String(id), Boolean(on))
+    return snapshot()
+  }
+
+  // Los últimos titulares, para ver cómo quedan
+  async function previewNews() {
+    try {
+      const items = await news.latest({ fuentes: snapshot().noticias.fuentes })
+      return { ok: true, titulares: items.slice(0, 5).map((it) => ({ titulo: it.titulo, fuente: it.fuente })) }
+    } catch (err) {
+      return { ok: false, mensaje: err.message }
+    }
+  }
+
+  return {
+    snapshot,
+    apply,
+    testKey,
+    saveKey,
+    forgetKey,
+    clipboardKey,
+    finishWelcome,
+    saveWake,
+    forgetWake,
+    addCalendar,
+    clipboardCalendar,
+    removeCalendar,
+    calendarAlerts,
+    previewNews
+  }
 }

@@ -7,6 +7,8 @@ let fakeSettings = {
   bienvenidaHecha: false,
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
   apariencia: { pantallaReposo: 'cara' },
+  agenda: { calendarios: [] },
+  noticias: { fuentes: ['infobae', 'tn'], avisos: 'aveces' },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
   voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.', palabra: { grabada: false, activa: false, sensibilidad: 'normal' } },
   actualizaciones: { state: 'dev', current: 'navegador', texto: 'Las actualizaciones andan en la app instalada.' },
@@ -33,7 +35,11 @@ const previewSettings = {
           ...(patch.sensibilidadPalabra ? { sensibilidad: patch.sensibilidadPalabra } : {})
         }
       },
-      ia: 'iaActiva' in patch ? { ...fakeSettings.ia, activa: patch.iaActiva } : fakeSettings.ia
+      ia: 'iaActiva' in patch ? { ...fakeSettings.ia, activa: patch.iaActiva } : fakeSettings.ia,
+      noticias: {
+        fuentes: patch.noticiasFuentes ?? fakeSettings.noticias.fuentes,
+        avisos: patch.noticiasAvisos ?? fakeSettings.noticias.avisos
+      }
     }
     return { ...fakeSettings, mensajes: patch.atajo ? [`Ahora me llamás con ${g.atajo}.`] : [] }
   },
@@ -60,6 +66,29 @@ const previewSettings = {
   testingWake: async () => {},
   wakeTemplates: async () => null,
   speak: async (text) => console.log('Pixie diría:', text),
+  addCalendar: async (url) => {
+    await wait(700)
+    if (!url) return { ok: false, mensaje: 'Copiá o pegá la dirección primero.', ...fakeSettings }
+    const cal = { id: `cal${Date.now()}`, nombre: 'Matemática 5°B', avisos: true, proximos: 3, actualizado: Date.now(), error: null }
+    fakeSettings = { ...fakeSettings, agenda: { calendarios: [...fakeSettings.agenda.calendarios, cal] } }
+    return { ok: true, mensaje: '¡Listo! Sumé «Matemática 5°B»: tiene 3 cosas en los próximos 7 días.', ...fakeSettings }
+  },
+  clipboardCalendar: async () => ({ encontrada: false }),
+  removeCalendar: async (id) => (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.filter((c) => c.id !== id) } }),
+  calendarAlerts: async (id, on) =>
+    (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.map((c) => (c.id === id ? { ...c, avisos: on } : c)) } }),
+  openGoogleCalendar: async () => window.open('https://calendar.google.com/calendar/r/settings', '_blank'),
+  previewNews: async () => (
+    await wait(600),
+    {
+      ok: true,
+      titulares: [
+        { titulo: 'Así va a estar el tiempo en Buenos Aires este fin de semana', fuente: 'Infobae' },
+        { titulo: 'Arrancó la inscripción a las becas para estudiantes secundarios', fuente: 'TN' },
+        { titulo: 'Cómo ver el eclipse de esta semana sin dañarse la vista', fuente: 'Infobae' }
+      ]
+    }
+  ),
   onView: () => () => {}
 }
 

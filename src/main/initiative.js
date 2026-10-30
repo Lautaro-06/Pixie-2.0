@@ -21,6 +21,8 @@ const CHARLAS_POR_DIA = 4
 const FOCUSED = new Set(['estudio', 'juego'])
 
 const DISTRACTIONS = new Set(['video', 'redes'])
+// Noticias por su cuenta: cuántas por día según noticiasAvisos (de 9 a 22 h, espaciadas)
+const NEWS_PER_DAY = { nunca: 0, aveces: 2, seguido: 4 }
 
 function alertText(evento, clave) {
   switch (clave) {
@@ -66,7 +68,8 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     pomodoroAvisado: false,
     bateriaAvisada: null,
     offlineDesde: null,
-    offlineAvisado: false
+    offlineAvisado: false,
+    ultimaNoticia: 0
   }
 
   // snap: { inactivoSeg, bloqueada, online, bateria, pantallaCompleta, enReunion, actividad, silencioHasta, pomodoro, salud }
@@ -204,6 +207,10 @@ export function createInitiative(times = TIMES, rng = Math.random) {
           face: 'happy',
           suggestions: ['tomé agua', 'ahora no']
         })
+      } else if (wantsNews(now, snap, memory)) {
+        s.ultimaNoticia = t
+        memory.markDone(`noticias-${newsToday(now, snap, memory) + 1}`, now)
+        notices.push({ kind: 'noticias' })
       } else if (wantsToChat(now, snap, memory)) {
         const hoy = dayKey(now)
         if (s.charlas.dia !== hoy) s.charlas = { dia: hoy, n: 0 }
@@ -227,6 +234,26 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     if (!s.activoDesde || t - s.activoDesde < 20 * MIN) return false
     const lastWater = memory.lastWater()?.getTime() ?? 0
     return t - Math.max(s.inicio, lastWater, s.ultimoAvisoAgua) >= times.agua
+  }
+
+  // Cuántas noticias contó hoy (queda anotado en la memoria, así no se repite si reiniciás la compu)
+  function newsToday(now, snap, memory) {
+    let n = 0
+    while (n < 10 && memory.doneToday(`noticias-${n + 1}`, now)) n++
+    return n
+  }
+
+  // ¿Le cuento una noticia? Si las querés, de día, sin cortarte la concentración y bien espaciadas
+  function wantsNews(now, snap, memory) {
+    const perDay = NEWS_PER_DAY[snap.noticias] ?? 0
+    if (!perDay) return false
+    const t = now.getTime()
+    const h = now.getHours()
+    if (h < 9 || h >= 22 || snap.pomodoro || snap.online === false) return false
+    if (FOCUSED.has(snap.actividad?.categoria)) return false
+    if (!s.activoDesde || t - s.activoDesde < times.charlaTrasVolver) return false
+    if (newsToday(now, snap, memory) >= perDay) return false
+    return t - s.ultimaNoticia >= (13 * 60 * MIN) / perDay
   }
 
   // ¿Tiene sentido hablar de algo ahora? Pocas veces por día, de día y sin cortarte la concentración.

@@ -210,7 +210,7 @@ export function KeyWizard({ onDone }) {
   return (
     <div className="wizard">
       {guide ? (
-        <KeyGuide onClose={() => setGuide(false)} />
+        <Guide steps={KEY_GUIDE} onClose={() => setGuide(false)} onAction={() => api.settings.openKeyPage()} actionLabel="Abrir Google AI Studio" />
       ) : (
         <>
           <ol className="steps">
@@ -261,7 +261,7 @@ export function KeyWizard({ onDone }) {
 }
 
 // La guía para quien nunca sacó una clave: un paso por vez, con palabras simples (y Pixie te la puede leer)
-const GUIDE = [
+const KEY_GUIDE = [
   {
     title: 'Vamos a sacar tu clave gratis',
     text: 'La clave es como una contraseña que me deja usar la inteligencia artificial de Google. No cuesta nada, no pide tarjeta y tarda unos dos minutos.',
@@ -291,20 +291,21 @@ const GUIDE = [
   }
 ]
 
-function KeyGuide({ onClose }) {
+// Un paso por vez, con «Leémelo en voz alta». step.action: muestra el botón que abre la página
+export function Guide({ steps, onClose, onAction, actionLabel }) {
   const [step, setStep] = useState(0)
-  const g = GUIDE[step]
-  const last = step === GUIDE.length - 1
+  const g = steps[step]
+  const last = step === steps.length - 1
   return (
     <div className="guide" aria-live="polite">
       <p className="guide-count">
-        Paso {step + 1} de {GUIDE.length}
+        Paso {step + 1} de {steps.length}
       </p>
       <h3>{g.title}</h3>
       <p className="guide-text">{g.text}</p>
       {g.action === 'abrir' && (
-        <button type="button" className="button" onClick={() => api.settings.openKeyPage()}>
-          Abrir Google AI Studio
+        <button type="button" className="button" onClick={onAction}>
+          {actionLabel}
         </button>
       )}
       {g.note && <p className="note">{g.note}</p>}
@@ -514,6 +515,117 @@ export function WakeTrainer({ palabra, change, setS, compact = false }) {
             Borrar mi voz
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Sumar un calendario (Google Calendar o una materia de Classroom) con su dirección secreta iCal
+const CALENDAR_GUIDE = [
+  {
+    title: 'Abrí Google Calendar en la compu',
+    text: 'Tocá el botón de abajo: se abre la configuración de Google Calendar en tu navegador. Si te pide, entrá con tu cuenta de Google (la misma que usás en Classroom).',
+    action: 'abrir'
+  },
+  {
+    title: 'Elegí el calendario',
+    text: 'A la izquierda, en «Configuración de mis calendarios», tocá el nombre de tu calendario. Las materias de Classroom aparecen ahí también, cada una con su nombre.'
+  },
+  {
+    title: 'Copiá la dirección secreta',
+    text: 'Bajá hasta la parte «Integrar el calendario». Buscá «Dirección secreta en formato iCal» y tocá el botoncito de copiar que tiene al lado.',
+    note: 'Tiene que ser la «secreta», no la «pública». Google te avisa que no la compartas: está bien, yo la guardo cifrada solo en esta compu.'
+  },
+  {
+    title: 'Volvé acá',
+    text: 'Cuando la copies, la encuentro sola, la pruebo y la sumo a mi agenda. Para sumar otra materia, repetí desde el paso 2.',
+    note: 'Con las cuentas del colegio, a veces el colegio no deja ver la dirección secreta. Si no aparece, se puede sumar tu calendario personal igual.'
+  }
+]
+
+export function CalendarWizard({ onAdded }) {
+  const [status, setStatus] = useState({ kind: 'waiting', text: 'Cuando copies la dirección secreta, la encuentro sola.' })
+  const [manual, setManual] = useState('')
+  const [guide, setGuide] = useState(false)
+  const busy = useRef(false)
+
+  const finish = (res) => {
+    busy.current = false
+    setStatus({ kind: res.ok ? 'ok' : 'error', text: res.mensaje })
+    if (res.ok) {
+      setManual('')
+      onAdded?.(res)
+    }
+  }
+
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (busy.current) return
+      const r = await api.settings.clipboardCalendar?.()
+      if (!r?.encontrada) return
+      busy.current = true
+      setStatus({ kind: 'testing', text: 'Encontré la dirección de un calendario. La estoy probando…' })
+      finish(await api.settings.addCalendar(null))
+    }, 1200)
+    return () => clearInterval(id)
+  }, [status.kind])
+
+  const tryManual = async () => {
+    if (!manual.trim() || busy.current) return
+    busy.current = true
+    setStatus({ kind: 'testing', text: 'La estoy probando…' })
+    finish(await api.settings.addCalendar(manual.trim()))
+  }
+
+  return (
+    <div className="wizard">
+      {guide ? (
+        <Guide steps={CALENDAR_GUIDE} onClose={() => setGuide(false)} onAction={() => api.settings.openGoogleCalendar?.()} actionLabel="Abrir Google Calendar" />
+      ) : (
+        <>
+          <ol className="steps">
+            <li>
+              <span>
+                En <b>Google Calendar</b> (en la compu), entrá a la configuración de tu calendario o de una materia de Classroom.
+              </span>
+              <button type="button" className="button" onClick={() => api.settings.openGoogleCalendar?.()}>
+                Abrir Google Calendar
+              </button>
+            </li>
+            <li>
+              <span>
+                En «Integrar el calendario», copiá la <b>dirección secreta en formato iCal</b>.
+              </span>
+            </li>
+            <li>
+              <span>
+                <b>Listo:</b> la encuentro, la pruebo y la sumo a mi agenda.
+              </span>
+            </li>
+          </ol>
+          <button type="button" className="button secondary guide-open" onClick={() => setGuide(true)}>
+            No sé dónde está: explicame paso a paso
+          </button>
+        </>
+      )}
+      <p className={`status ${status.kind}`} role="status" aria-live="polite">
+        {status.text}
+      </p>
+      <div className="manual">
+        <input
+          className="field mono"
+          placeholder="O pegá la dirección acá (termina en .ics)"
+          value={manual}
+          onChange={(e) => {
+            setManual(e.target.value)
+            if (status.kind === 'error') setStatus({ kind: 'waiting', text: 'Cuando copies la dirección secreta, la encuentro sola.' })
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && tryManual()}
+          aria-label="Dirección del calendario"
+        />
+        <button type="button" className="button secondary" onClick={tryManual} disabled={!manual.trim() || status.kind === 'testing'}>
+          Sumar
+        </button>
       </div>
     </div>
   )

@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld('pixie', {
     testingWake: (on) => ipcRenderer.invoke('ajustes:palabra-probando', Boolean(on)),
     wakeTemplates: () => ipcRenderer.invoke('ajustes:palabra-plantillas'),
     speak: (text) => ipcRenderer.invoke('ajustes:decir', String(text).slice(0, 400)),
+    addCalendar: (url) => ipcRenderer.invoke('ajustes:calendario-agregar', url ?? null),
+    clipboardCalendar: () => ipcRenderer.invoke('ajustes:calendario-portapapeles'),
+    removeCalendar: (id) => ipcRenderer.invoke('ajustes:calendario-quitar', String(id)),
+    calendarAlerts: (id, on) => ipcRenderer.invoke('ajustes:calendario-avisos', String(id), Boolean(on)),
+    openGoogleCalendar: () => ipcRenderer.invoke('ajustes:abrir-google-calendar'),
+    previewNews: () => ipcRenderer.invoke('ajustes:noticias-probar'),
     onView: (callback) => {
       const handler = (_event, view) => callback(view)
       ipcRenderer.on('ajustes:vista', handler)

@@ -23,6 +23,8 @@ function todosText(todos) {
   return `Tenés ${todos.length === 1 ? 'un pendiente' : `${todos.length} pendientes`}: ${list}.`
 }
 
+const DELIVERY = /\b(entreg\w*|tps?|trabajos? practicos?|trabajos?|tareas?|pruebas?|examen(es)?|parcial(es)?|evaluaci\w*|final(es)?|lecci\w*)\b/i
+
 function eventText(e, now) {
   return `${e.texto} ${describeWhen(e.cuando, e.conHora, now)}`
 }
@@ -160,8 +162,15 @@ export const memoryActions = [
   {
     name: 'ver_agenda',
     description: 'Cuenta lo que tenés agendado',
-    run: ({ dia, dias }, ctx) => {
+    run: ({ dia, dias, entregas }, ctx) => {
       const now = new Date()
+      if (entregas) {
+        // Solo lo que hay que entregar o rendir (las tareas de Classroom, TPs, pruebas)
+        const from = startOfDay(now)
+        const due = ctx.memory.eventsBetween(from, addDays(from, dias ?? 14)).filter((e) => DELIVERY.test(e.texto) || (!e.conHora && e.calendario))
+        if (!due.length) return { text: `No tenés entregas ni pruebas en los próximos ${dias ?? 14} días.`, face: 'happy' }
+        return { text: `Para entregar o rendir: ${listText(due.map((e) => eventText(e, now)))}.`, face: 'happy' }
+      }
       const todos = ctx.memory.listTodos().length
       const extra = todos ? ` Y tenés ${todos === 1 ? 'un pendiente' : `${todos} pendientes`}.` : ''
       if (dia) {

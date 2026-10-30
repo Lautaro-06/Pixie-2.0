@@ -431,6 +431,17 @@ body.ventana-ajustes #root {
   flex: 1;
 }
 
+/* ── Noticias ── */
+.ventana-ajustes .headlines {
+  margin-top: 12px;
+  color: var(--text);
+  gap: 8px;
+}
+.ventana-ajustes .headlines .source {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* ── «Pixie, ¿estás?» ── */
 .ventana-ajustes .wake-lead {
   margin: 4px 0 12px;

@@ -13,6 +13,7 @@ import { browserActions } from './browser.js'
 import { healthActions } from './health.js'
 import { deviceActions } from './devices.js'
 import { appActions } from './app.js'
+import { newsActions } from './news.js'
 import { FriendlyError, BlockedError } from '../windows.js'
 import { BrowserError } from '../browser.js'
 
@@ -28,7 +29,8 @@ const ALL = [
   ...browserActions,
   ...healthActions,
   ...deviceActions,
-  ...appActions
+  ...appActions,
+  ...newsActions
 ]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))

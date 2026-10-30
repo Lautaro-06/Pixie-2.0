@@ -18,10 +18,12 @@ import { createMediaSession } from './media-session.js'
 import { createUpdater } from './updates.js'
 import { createDiagnostics } from './diagnostics.js'
 import { shortcutText } from './shortcut.js'
-import { createSettings, AI_STUDIO_URL } from './settings.js'
+import { createSettings, AI_STUDIO_URL, GOOGLE_CALENDAR_SETTINGS_URL } from './settings.js'
 import { openSettingsWindow, getSettingsWindow } from './settings-window.js'
 import { currentConditions } from './actions/weather.js'
 import { createWakeStore } from './wake-store.js'
+import { createCalendars } from './calendars.js'
+import { createNews } from './news.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -42,6 +44,8 @@ let media = null
 let updates = null
 let trayMenu = null
 let wake = null // «Pixie, ¿estás?»
+let calendars = null // Google Calendar, Classroom
+let news = null
 const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
 
 // Errores anotados para el informe de diagnóstico (errores.log en la carpeta de Pixie)
@@ -133,6 +137,8 @@ function diagnosticsReport() {
     `Palabra mágica: ${wake?.status().activa ? `activa (sensibilidad ${wake.status().sensibilidad})` : wake?.status().grabada ? 'apagada' : 'sin grabar'}`,
     `Atajo: ${shortcutLabel()}${getConfig().atajo && getConfig().atajo !== activeShortcut ? ` (pidió ${shortcutText(getConfig().atajo)}, ocupado)` : ''}`,
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
+    `Calendarios: ${calendars?.status().map((c) => `${c.nombre}${c.error ? ' (no anda)' : ''}`).join(', ') || 'ninguno'}`,
+    `Noticias por su cuenta: ${getConfig().noticiasAvisos ?? 'aveces'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
   ])
 }
@@ -252,7 +258,7 @@ async function ask(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre', 'pregunta']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta', 'tema']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
       pending = it
@@ -319,11 +325,12 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     app.setAppUserModelId(app.isPackaged ? 'com.pixie.asistente' : process.execPath)
     // Las claves de config.json se guardan cifradas con la cuenta de Windows
-    setCipher({
+    const cipher = {
       available: () => safeStorage.isEncryptionAvailable(),
       encrypt: (text) => safeStorage.encryptString(text).toString('base64'),
       decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64'))
-    })
+    }
+    setCipher(cipher)
     // En una compu nueva, recupera la memoria del respaldo antes de arrancar
     backup = createBackup({ dataDir: app.getPath('userData'), getConfig })
     const restored = backup.restoreIfMissing()
@@ -410,7 +417,19 @@ if (!app.requestSingleInstanceLock()) {
       announce: (text, face) => mind.say({ kind: 'voz', text, face })
     })
     media = createMediaSession({ getConfig, log: logAction })
+    // Noticias de Infobae y TN, y los calendarios de Google y Classroom (se suman a la agenda)
+    news = createNews({ log: logAction })
+    calendars = createCalendars({
+      file: join(app.getPath('userData'), 'calendarios.json'),
+      cipher,
+      log: logAction,
+      onChange: () => trayMenu?.refresh()
+    })
+    mind.memory.setExternal({ eventsBetween: calendars.eventsBetween, dueAlerts: calendars.dueAlerts })
+    calendars.start()
     Object.assign(ctx, {
+      news,
+      calendars,
       phone,
       media,
       voice: tts,
@@ -505,6 +524,8 @@ if (!app.requestSingleInstanceLock()) {
       errorCount: () => diagnostics.list().length,
       readClipboard: () => clipboard.readText(),
       wake,
+      calendars,
+      news,
       version: app.getVersion()
     })
     const fromSettings = (e) => e.sender === getSettingsWindow()?.webContents
@@ -544,6 +565,16 @@ if (!app.requestSingleInstanceLock()) {
     })
     handle('ajustes:palabra-borrar', () => settings.forgetWake())
     handle('ajustes:palabra-plantillas', () => wake.templates())
+    handle('ajustes:calendario-agregar', async (url) => {
+      const r = await settings.addCalendar(url)
+      if (r.ok) logAction(`agenda: sumé un calendario (${r.mensaje})`)
+      return r
+    })
+    handle('ajustes:calendario-portapapeles', () => settings.clipboardCalendar())
+    handle('ajustes:calendario-quitar', (id) => settings.removeCalendar(id))
+    handle('ajustes:calendario-avisos', (id, on) => settings.calendarAlerts(id, on))
+    handle('ajustes:abrir-google-calendar', () => shell.openExternal(GOOGLE_CALENDAR_SETTINGS_URL))
+    handle('ajustes:noticias-probar', () => settings.previewNews())
     // Pixie lee en voz alta un paso de la guía (para quien prefiere escuchar)
     handle('ajustes:decir', (text) => sendEvent({ type: 'prueba-voz', text: String(text ?? '').slice(0, 400) }))
     // Mientras probás la frase en Ajustes, la ventanita no se despierta
@@ -658,6 +689,7 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.unregisterAll()
     mind?.stop()
     media?.stop()
+    calendars?.stop()
     backup?.backup()
     browser?.close()
   })

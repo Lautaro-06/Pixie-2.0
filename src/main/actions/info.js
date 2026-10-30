@@ -89,6 +89,12 @@ export const infoActions = [
       } catch {
         // sin internet: el resumen sale igual
       }
+      // Un titular, si las noticias están prendidas (sin esperar más de 3 segundos)
+      if (ctx.news && ctx.getConfig?.().noticiasAvisos !== 'nunca') {
+        const fuentes = ctx.getConfig?.().noticiasFuentes ?? ['infobae', 'tn']
+        const first = await Promise.race([ctx.news.latest({ fuentes }).then((l) => l[0]), new Promise((r) => setTimeout(r, 3000))]).catch(() => null)
+        if (first) parts.push(`En las noticias: «${first.titulo}» (${first.fuente}).`)
+      }
       parts.push(timersSummary())
       return { text: parts.filter(Boolean).join(' '), face: 'happy' }
     }

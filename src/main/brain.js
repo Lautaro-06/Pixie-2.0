@@ -240,6 +240,27 @@ const RULES = [
     /^(tengo|me llegaron) (mensajes|whatsapps?)( nuevos)?( en whatsapp)?$/.test(t)
       ? intent('chats_privados')
       : null,
+  // Noticias: "abrí la segunda", "más noticias", "¿qué noticias hay?", "noticias de TN", "noticias de deportes"
+  (t) => {
+    const m =
+      /^(?:abri|abrime|abrir|mostrame)(?: la| el)? (primera|primero|segunda|segundo|tercera|tercero|ultima|1|2|3)(?: noticia| nota)?$/.exec(t) ||
+      /^(?:abri|abrime|abrir|mostrame) (?:la|esa) (noticia|nota)$/.exec(t)
+    if (!m) return null
+    const n = { primera: 1, primero: 1, 1: 1, segunda: 2, segundo: 2, 2: 2, tercera: 3, tercero: 3, 3: 3, ultima: -1 }[m[1]] ?? 1
+    return intent('abrir_noticia', { n })
+  },
+  (t) => {
+    if (/^(dame |conta(me)? |deci(me)? )?(mas|otras) noticias$|^segui con las noticias$/.test(t)) return intent('noticias', { mas: true })
+    if (!/\b(noticias|titulares|ultimo momento|que (paso|esta pasando) (hoy|en el pais|en el mundo|en argentina)|que dice (infobae|tn))\b/.test(t)) return null
+    const fuente = /\binfobae\b/.test(t) ? 'infobae' : /\b(tn|todo noticias)\b/.test(t) ? 'tn' : null
+    const about = /\b(?:noticias|titulares)\s+(?:de|del|de la|de los|sobre|con)\s+(.+)$/.exec(t)
+    const tema = about?.[1]
+      .replace(/\b(infobae|tn|todo noticias|hoy|ahora|ayer|ultimo momento|hay)\b/g, ' ')
+      .replace(/^\s*(el|la|los|las)\s+/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return intent('noticias', { ...(fuente ? { fuente } : {}), ...(tema ? { tema } : {}) })
+  },
   // Llamarla con la voz: "¿cómo te llamo con la voz?", "quiero enseñarte mi voz"
   (t) =>
     /\b(palabra magica|(llamarte|te llamo|llamar(te)?) (con|por) (la )?voz|llamarte hablando|(aprende(r)?|ensenarte|grabar) mi voz|que me escuches (siempre|sin tocar))\b/.test(t)
@@ -332,6 +353,12 @@ const RULES = [
       t.match(/^ya ((?:hice|termine|complete|compre|llame|entregue|estudie|lave|limpie|arregle|mande|pague|saque|busque|lei|ordene|cocine|escribi|hable)\b.*)$/)
     return m ? intent('completar_pendiente', { buscar: m[1] }) : null
   },
+  // Calendarios de afuera: "conectá mi Google Calendar", "sumá Classroom"; y las entregas
+  (t) =>
+    /\b(conecta|conectar|conectame|suma|sumar|sumame|agrega|agregar|agregame|vincula|vincular|pone|poner|poneme)\b.*\b(calendario|google calendar|calendar|classroom|agenda de google)\b/.test(t)
+      ? intent('conectar_calendario')
+      : null,
+  (t) => (/\b(que tengo que entregar|mis entregas|las entregas|que entregas|tareas de classroom|tareas del classroom)\b/.test(t) ? intent('ver_agenda', { dias: 14, entregas: true }) : null),
   (t) => (/\b(que tengo pendiente|mis pendientes|los pendientes|pendientes|mis tareas|lista de tareas|que me falta hacer|que me falta|mi lista)\b/.test(t) ? intent('ver_pendientes') : null),
 
   // Agenda: consultar

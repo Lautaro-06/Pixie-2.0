@@ -29,11 +29,24 @@ Pixie se fija sola si hay una versión nueva al arrancar y cada 6 horas. La baja
 
 También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qué versión tenés?», o desde el ícono → **Buscar actualizaciones**.
 
+### Agenda: Google Calendar y Classroom
+
+Pixie suma tus calendarios a su agenda: «¿qué tengo hoy?», «¿qué tengo esta semana?», «¿qué tengo que entregar?» y el resumen del día los incluyen, y te avisa **15 minutos antes** de cada clase o evento y **la noche anterior y a la mañana** de cada entrega.
+
+En **Ajustes → Agenda** (o pedile «conectá mi Google Calendar») copiás la **dirección secreta en formato iCal** de tu calendario y Pixie la encuentra sola. Cada materia de Classroom tiene su propio calendario en Google Calendar: sumá uno por materia y las entregas te aparecen. Si no sabés dónde está la dirección, **«No sé dónde está»** te guía paso a paso (y te lo lee en voz alta).
+
+Es gratis y no pide iniciar sesión. La dirección secreta deja ver tu calendario a quien la tenga: Pixie la guarda **cifrada solo en esta compu** (`calendarios.json`, no va al respaldo) y se fija si hay cambios cada 15 minutos. Con algunas cuentas del colegio, el colegio no deja ver la dirección secreta.
+
+### Noticias
+
+«¿Qué noticias hay?», «noticias de TN», «noticias sobre el dólar», «más noticias» y «abrí la segunda». Lee los titulares de **Infobae** y **TN** por RSS (si el de un diario no responde, usa Google Noticias de ese diario), sin clave y gratis. De vez en cuando te cuenta un titular nuevo por su cuenta (de 9 a 22, nunca mientras estudiás, jugás o estás en una reunión) y suma uno al resumen del día. En **Ajustes → Noticias** elegís los diarios y cada cuánto (**Nunca**, **A veces**: unas 2 por día, o **Más seguido**: unas 4). No lee titulares para adultos ni violentos.
+
 ### Ajustes
 
 Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
 
 - **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud y avisos al celular.
+- **Agenda** y **Noticias** (ver arriba).
 - **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
 - **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
 - **Voz:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
@@ -49,7 +62,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.8)
+## Qué hace (versión 0.9)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -118,7 +131,7 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu.
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 
@@ -315,6 +328,8 @@ src/
     window.js      ← la ventana flotante (se vuelve a cargar sola si se cuelga)
     tray.js        ← el menú de Pixie (el ícono al lado del reloj y la ventanita usan el mismo)
     wake-store.js  ← guarda la huella de tu voz para «Pixie, ¿estás?»
+    calendars.js   ← lee Google Calendar y Classroom (formato iCal) y los suma a la agenda
+    news.js        ← los titulares de Infobae y TN (RSS)
     updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
     diagnostics.js ← anota los errores y arma el informe (sin claves)
     secrets.js     ← cifra las claves de config.json con la cuenta de Windows
@@ -357,6 +372,11 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.9 (acá se probó con un calendario de ejemplo; a Google, Infobae y TN no se pudo llegar desde el entorno de prueba):
+
+- **Agenda:** sumar tu Google Calendar y una materia de Classroom con la dirección secreta, preguntar «¿qué tengo esta semana?» y «¿qué tengo que entregar?», y ver que avise 15 minutos antes de algo.
+- **Noticias:** «¿qué noticias hay?», «noticias de TN», «más noticias» y «abrí la primera». En Ajustes → Noticias, **Ver los titulares**. Si Infobae o TN no aparecen, pasanos el informe de diagnóstico.
 
 Lo nuevo de la versión 0.8 (acá se probó con un micrófono simulado y voz sintética; falta con tu voz de verdad):
 

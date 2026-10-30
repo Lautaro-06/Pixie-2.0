@@ -86,6 +86,8 @@ const FOLLOW_UP_WINDOW = 20 * 60 * MIN
 
 export function createMemory(file) {
   let data = load()
+  // Calendarios de afuera (Google Calendar, Classroom): se suman a la agenda pero no se guardan acá
+  let external = { eventsBetween: () => [], dueAlerts: () => [] }
 
   function load() {
     try {
@@ -186,12 +188,17 @@ export function createMemory(file) {
       save()
       return item
     },
-    // Eventos entre dos fechas (incluidas), ordenados.
+    setExternal(source) {
+      external = { ...external, ...source }
+    },
+    // Eventos entre dos fechas (incluidas), ordenados: los de Pixie y los de tus calendarios.
     eventsBetween(from, to) {
-      return data.agenda.filter((e) => {
+      const own = data.agenda.filter((e) => {
         const d = new Date(e.cuando)
         return d >= from && d <= to
       })
+      const outside = external.eventsBetween(from, to)
+      return outside.length ? [...own, ...outside].sort((a, b) => new Date(a.cuando) - new Date(b.cuando)) : own
     },
     findEvent: (query) => best(data.agenda, query),
     removeEvent(query) {
@@ -219,7 +226,7 @@ export function createMemory(file) {
       const before = data.agenda.length
       data.agenda = data.agenda.filter((e) => now - new Date(e.cuando) < 2 * 24 * 60 * MIN)
       if (changed || data.agenda.length !== before) save()
-      return due
+      return [...due, ...external.dueAlerts(now)]
     },
 
     // Eventos que ya pasaron y todavía no le preguntó cómo le fue

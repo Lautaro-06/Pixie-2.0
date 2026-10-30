@@ -52,6 +52,10 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
   async function deliver(notice) {
     let n = notice
     if (n.kind === 'resumen') n = { ...(await runAction('buen_dia', {}, ctx)), kind: 'resumen' }
+    if (n.kind === 'noticias') {
+      n = { ...(await runAction('noticias', { aviso: true }, ctx)), kind: 'noticias' }
+      if (!n.text) return // sin internet o sin nada nuevo: no dice nada
+    }
     const quiet = isQuiet()
     if (n.urgent) {
       notify('Pixie', n.text)
@@ -72,7 +76,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     }
     const { notices, presence } = initiative.tick(
       now,
-      { ...snap, silencioHasta: quietUntil, pomodoro: isPomodoroRunning(), salud: ctx.getConfig().recordatoriosSalud !== false },
+      { ...snap, silencioHasta: quietUntil, pomodoro: isPomodoroRunning(), salud: ctx.getConfig().recordatoriosSalud !== false, noticias: ctx.getConfig().noticiasAvisos ?? 'aveces' },
       memory
     )
     if (presence) sendEvent({ type: 'presence', away: presence === 'ausente' })

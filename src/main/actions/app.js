@@ -46,6 +46,19 @@ export const appActions = [
     }
   },
   {
+    name: 'conectar_calendario',
+    description: 'Explica cómo sumar Google Calendar o las materias de Classroom a la agenda de Pixie y abre donde se hace',
+    run: (_params, ctx) => {
+      ctx.openSettings?.('ajustes/agenda')
+      const n = ctx.calendars?.count() ?? 0
+      const ya = n ? `Ya tengo ${n === 1 ? 'un calendario' : `${n} calendarios`}. ` : ''
+      return {
+        text: `${ya}Te abrí mi agenda en Ajustes: copiá la «dirección secreta en formato iCal» de tu Google Calendar (o de cada materia de Classroom) y yo la encuentro sola. Si no sabés dónde está, tocá «No sé dónde está» y te guío paso a paso.`,
+        face: 'happy'
+      }
+    }
+  },
+  {
     name: 'chats_privados',
     description: 'Explica que Pixie no puede entrar a WhatsApp ni a otros chats',
     run: () => ({
