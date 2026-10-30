@@ -35,42 +35,54 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Armar el instalador
+        run: npx electron-builder --win --publish never
 
+      # Publica si esta versión todavía no tiene una Release completa (con latest.yml).
       - name: ¿Es una versión nueva?
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           v=$(node -p "require('./package.json').version")
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "push" ] && ! git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then
+          completas=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" \
+            --jq "[.[] | select(.tag_name == \"v$v\" and .draft == false and ([.assets[].name] | index(\"latest.yml\")))] | length")
+          if [ "${{ github.event_name }}" = "push" ] && [ "$completas" = "0" ]; then
             echo "publicar=true" >> "$GITHUB_OUTPUT"
           else
             echo "publicar=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Armar el instalador
-        if: steps.version.outputs.publicar != 'true'
-        run: npx electron-builder --win --publish never
-
+      # gh crea la Release, sube los tres archivos y recién ahí la publica:
+      # nunca queda una Release a medias que las Pixie instaladas puedan ver.
       - name: Publicar la versión ${{ steps.version.outputs.version }}
         if: steps.version.outputs.publicar == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="v${{ steps.version.outputs.version }}"
-          git tag "$tag"
-          git push origin "$tag"
-          npx electron-builder --win --publish always
-          gh release edit "$tag" --draft=false --latest
+          v="${{ steps.version.outputs.version }}"
+          # Si quedó una Release a medias de esta versión, se borra (con su etiqueta) y se hace de nuevo
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" --jq ".[] | select(.tag_name == \"v$v\") | .id"); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+          done
+          git push origin ":refs/tags/v$v" 2> /dev/null || true
+          gh release create "v$v" \
+            "dist/Pixie-$v-instalador.exe" \
+            "dist/Pixie-$v-instalador.exe.blockmap" \
+            dist/latest.yml \
+            --target "$GITHUB_SHA" \
+            --title "Pixie $v" \
+            --generate-notes \
+            --latest
 
       - uses: actions/upload-artifact@v4
         with:

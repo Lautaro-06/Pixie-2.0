@@ -4,7 +4,7 @@ Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pant
 
 ## Instalar Pixie
 
-1. Entrá a [Releases](https://github.com/Lautaro-06/pixie-2.0/releases/latest) y bajá `Pixie-…-instalador.exe`.
+1. Entrá a [Releases](https://github.com/Lautaro-06/Pixie-2.0/releases/latest) y bajá `Pixie-…-instalador.exe`.
 2. Abrilo. Como Pixie todavía no tiene firma digital, Windows muestra «Windows protegió su PC»: tocá **Más información → Ejecutar de todas formas**.
 3. Listo: aparece la cara abajo a la derecha y queda arrancando sola con Windows (se apaga desde el ícono de Pixie → **Iniciar con Windows**).
 
