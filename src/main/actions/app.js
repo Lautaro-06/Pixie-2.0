@@ -3,6 +3,15 @@ import { parseShortcut, shortcutText } from '../shortcut.js'
 
 export const appActions = [
   {
+    name: 'ajustes',
+    description: 'Abre la ventana de Ajustes de Pixie (nombre, atajo, IA, voz, qué muestra en reposo, actualizaciones)',
+    run: (_params, ctx) => {
+      if (!ctx.openSettings) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
+      ctx.openSettings('ajustes')
+      return { text: 'Te abrí mis ajustes.', face: 'happy' }
+    }
+  },
+  {
     name: 'cambiar_atajo',
     description: 'Dice o cambia el atajo de teclado para llamar a Pixie (por ejemplo Ctrl+Alt+P)',
     run: ({ atajo }, ctx) => {

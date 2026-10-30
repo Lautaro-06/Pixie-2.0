@@ -1,10 +1,10 @@
-import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer, clipboard } from 'electron'
+import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer, clipboard, safeStorage, shell } from 'electron'
 import { join } from 'node:path'
 import { release } from 'node:os'
 import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction } from './actions/index.js'
-import { loadConfig, getConfig, saveConfig, logAction, watchConfig } from './config.js'
+import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createTray } from './tray.js'
 import { createMind } from './mind.js'
@@ -18,6 +18,9 @@ import { createMediaSession } from './media-session.js'
 import { createUpdater } from './updates.js'
 import { createDiagnostics } from './diagnostics.js'
 import { shortcutText } from './shortcut.js'
+import { createSettings, AI_STUDIO_URL } from './settings.js'
+import { openSettingsWindow, getSettingsWindow } from './settings-window.js'
+import { currentConditions } from './actions/weather.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -25,6 +28,9 @@ const MAX_AUDIO_BYTES = 3 * 1024 * 1024
 let activeShortcut = null
 let voiceShortcut = null
 let pending = null // acción esperando que la persona confirme
+let settings = null
+let weatherNow = null // temperatura e ícono para el resumen en reposo
+let weatherTimer = null
 let mind = null
 let ai = null
 let browser = null
@@ -89,6 +95,7 @@ const ctx = {
     return Math.min(diagnostics.list().length, 30)
   },
   hideWindow: () => getWindow()?.hide(),
+  openSettings: (view) => openSettingsWindow(view),
   notify: (title, body) => {
     if (Notification.isSupported()) new Notification({ title, body }).show()
   }
@@ -113,6 +120,26 @@ function diagnosticsReport() {
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
   ])
+}
+
+// El resumen en reposo muestra el clima: se actualiza cada 30 minutos mientras esté elegido
+async function refreshWeather() {
+  try {
+    weatherNow = await currentConditions(ctx)
+    sendEvent({ type: 'clima', temp: weatherNow.temp, icon: weatherNow.icon })
+  } catch (err) {
+    logAction(`clima del resumen: ${err.message}`)
+  }
+}
+
+function syncStandby(mode = getConfig().pantallaReposo ?? 'cara') {
+  sendEvent({ type: 'ajustes', pantallaReposo: mode })
+  clearInterval(weatherTimer)
+  weatherTimer = null
+  if (mode === 'resumen') {
+    refreshWeather()
+    weatherTimer = setInterval(refreshWeather, 30 * 60 * 1000)
+  }
 }
 
 function openBar() {
@@ -276,6 +303,12 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     app.setAppUserModelId(app.isPackaged ? 'com.pixie.asistente' : process.execPath)
+    // Las claves de config.json se guardan cifradas con la cuenta de Windows
+    setCipher({
+      available: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (text) => safeStorage.encryptString(text).toString('base64'),
+      decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64'))
+    })
     // En una compu nueva, recupera la memoria del respaldo antes de arrancar
     backup = createBackup({ dataDir: app.getPath('userData'), getConfig })
     const restored = backup.restoreIfMissing()
@@ -313,7 +346,9 @@ if (!app.requestSingleInstanceLock()) {
       shortcut: shortcutLabel(),
       version: app.getVersion(),
       feeling: mind?.feeling(),
-      ai: Boolean(ai?.enabled())
+      ai: Boolean(ai?.enabled()),
+      pantallaReposo: getConfig().pantallaReposo ?? 'cara',
+      clima: weatherNow ? { temp: weatherNow.temp, icon: weatherNow.icon } : null
     }))
     ipcMain.on('pixie:mode', (_e, mode) => setMode(mode))
     // Errores de la ventana (la cara y la barra)
@@ -406,6 +441,68 @@ if (!app.requestSingleInstanceLock()) {
     })
     ctx.updates = updates
 
+    // Ajustes y bienvenida: solo la ventana de Ajustes puede usar estos pedidos
+    settings = createSettings({
+      getConfig,
+      saveConfig,
+      memory: mind.memory,
+      voices: tts,
+      updates,
+      ai,
+      loginItem: {
+        get: () => {
+          try {
+            return app.getLoginItemSettings().openAtLogin
+          } catch {
+            return false
+          }
+        },
+        set: (on) => app.setLoginItemSettings({ openAtLogin: on })
+      },
+      changeShortcut,
+      shortcutLabel,
+      setCity: async (ciudad) => (await runAction('configurar_ciudad', { ciudad }, ctx)).text,
+      onStandby: (mode) => syncStandby(mode),
+      errorCount: () => diagnostics.list().length,
+      readClipboard: () => clipboard.readText(),
+      version: app.getVersion()
+    })
+    const fromSettings = (e) => e.sender === getSettingsWindow()?.webContents
+    const handle = (channel, fn) =>
+      ipcMain.handle(channel, (e, ...args) => {
+        if (!fromSettings(e)) throw new Error('Solo desde la ventana de Ajustes')
+        return fn(...args)
+      })
+    handle('ajustes:leer', () => settings.snapshot())
+    handle('ajustes:cambiar', (patch) => settings.apply(patch && typeof patch === 'object' ? patch : {}))
+    handle('ajustes:probar-clave', (key) => settings.testKey(key))
+    handle('ajustes:guardar-clave', async (key) => {
+      const r = await settings.saveKey(key)
+      if (r.guardada) logAction('ajustes: clave de IA nueva guardada (cifrada)')
+      return r
+    })
+    handle('ajustes:clave-portapapeles', () => settings.clipboardKey())
+    handle('ajustes:borrar-clave', () => settings.forgetKey())
+    handle('ajustes:abrir-ai-studio', () => shell.openExternal(AI_STUDIO_URL))
+    handle('ajustes:buscar-version', async () => {
+      await updates.check()
+      return settings.snapshot()
+    })
+    handle('ajustes:instalar-version', () => updates.install())
+    handle('ajustes:copiar-informe', () => ctx.copyDiagnostics())
+    handle('ajustes:abrir-carpeta', () => shell.openPath(app.getPath('userData')))
+    handle('ajustes:probar-voz', () => sendEvent({ type: 'prueba-voz', text: '¡Hola! Así sueno. ¿Te gusta mi voz?' }))
+    handle('ajustes:bienvenida-lista', () => {
+      settings.finishWelcome()
+      getSettingsWindow()?.close()
+      const nombre = mind.memory.getName()
+      mind.say({
+        kind: 'bienvenida',
+        text: `¡Listo${nombre ? `, ${nombre}` : ''}! Ya estoy. Llamame con ${shortcutLabel()} o tocándome, y pedime lo que quieras.`,
+        face: 'love'
+      })
+    })
+
     // La primera vez que se abre la app instalada, queda arrancando con Windows (se apaga desde el ícono)
     if (app.isPackaged && isWindows && !getConfig().arranqueConfigurado) {
       app.setLoginItemSettings({ openAtLogin: true })
@@ -432,11 +529,19 @@ if (!app.requestSingleInstanceLock()) {
       copyDiagnostics: () => {
         ctx.copyDiagnostics()
         ctx.notify('Pixie', 'Copié el informe de diagnóstico. Pegalo con Ctrl+V donde lo quieras mandar.')
-      }
+      },
+      openSettings: () => openSettingsWindow('ajustes')
     })
     mind.start()
     updates.start()
+    syncStandby()
     console.log(`Pixie ${app.getVersion()} · ${ai.status()}`)
+
+    // La primera vez: si todavía no tiene IA, abre la bienvenida para dejarla lista en un minuto
+    if (!getConfig().bienvenidaHecha) {
+      if (describeAI(getConfig()).on) settings.finishWelcome()
+      else setTimeout(() => openSettingsWindow('bienvenida'), 2500)
+    }
 
     // Si otro programa (por ejemplo Claude) ya usa el atajo, Pixie avisa cuál le quedó (una vez por caso)
     const wanted = getConfig().atajo
@@ -455,10 +560,15 @@ if (!app.requestSingleInstanceLock()) {
 
     // Si editás config.json con Pixie abierto, lo lee solo (también un atajo nuevo)
     let lastShortcut = getConfig().atajo
+    let lastStandby = getConfig().pantallaReposo
     watchConfig((cfg) => {
       const msg = `config.json cambió · ${describeAI(cfg).text}`
       console.log(msg)
       logAction(msg)
+      if (cfg.pantallaReposo !== lastStandby) {
+        lastStandby = cfg.pantallaReposo
+        syncStandby()
+      }
       if (cfg.atajo === lastShortcut) return
       lastShortcut = cfg.atajo
       if (cfg.atajo && cfg.atajo !== activeShortcut && !changeShortcut(cfg.atajo).ok) {

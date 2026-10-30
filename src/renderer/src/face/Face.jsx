@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { renderFace, WIDTH, HEIGHT } from './draw.js'
 import { REACTIONS, IDLE_BY_FEELING, compose, talking } from './animations.js'
+import { renderStandby } from './standby.js'
 
 const SCALE = 2
 const FOLLOW_MS = 4000 // sigue al mouse hasta 4 s después de que se deja de mover
@@ -11,9 +12,15 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 // speech: { id, ms } — mueve la boca durante ms
 // cursor: { x, y, at } — posición del mouse en la pantalla
 // feeling: contento | normal | aburrido | cansado — cambia lo que hace cuando está solo
-export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null, feeling = 'normal' }) {
+// standby: { mode: 'reloj' | 'resumen', weather } — en reposo muestra eso en vez de la cara
+//          (la cara vuelve sola mientras habla o reacciona)
+export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null, feeling = 'normal', standby = null }) {
   const canvasRef = useRef(null)
-  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, lastKey: '', feeling })
+  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, lastKey: '', feeling, standby })
+
+  useEffect(() => {
+    engine.current.standby = standby
+  }, [standby])
 
   useEffect(() => {
     engine.current.feeling = feeling
@@ -104,7 +111,9 @@ export default function Face({ mood = 'idle', reaction = null, speech = null, cu
       const now = performance.now()
       e.overlays = e.overlays.filter((o) => now - o.start < o.duration)
       const follow = e.follow && Date.now() - e.follow.at < FOLLOW_MS ? e.follow.look : null
-      const bits = renderFace(compose(e.mood, e.moodStart, e.overlays, now, { still, follow, tired: e.feeling === 'cansado' }))
+      const face = renderFace(compose(e.mood, e.moodStart, e.overlays, now, { still, follow, tired: e.feeling === 'cansado' }))
+      const expressive = e.overlays.some((o) => o.kind === 'talk' || o.kind === 'reaction')
+      const bits = e.standby?.mode && !expressive ? renderStandby(e.standby.mode, face, new Date(), e.standby.weather) : face
       const key = bits.join('')
       if (key === e.lastKey) return
       e.lastKey = key

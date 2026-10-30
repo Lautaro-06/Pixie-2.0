@@ -18,5 +18,26 @@ contextBridge.exposeInMainWorld('pixie', {
     const handler = (_event, data) => callback(data)
     ipcRenderer.on('pixie:event', handler)
     return () => ipcRenderer.removeListener('pixie:event', handler)
+  },
+  // Solo responden si los pide la ventana de Ajustes (lo controla el proceso principal)
+  settings: {
+    get: () => ipcRenderer.invoke('ajustes:leer'),
+    set: (patch) => ipcRenderer.invoke('ajustes:cambiar', patch),
+    testKey: (key) => ipcRenderer.invoke('ajustes:probar-clave', key ?? null),
+    saveKey: (key) => ipcRenderer.invoke('ajustes:guardar-clave', key ?? null),
+    clipboardKey: () => ipcRenderer.invoke('ajustes:clave-portapapeles'),
+    forgetKey: () => ipcRenderer.invoke('ajustes:borrar-clave'),
+    openKeyPage: () => ipcRenderer.invoke('ajustes:abrir-ai-studio'),
+    checkUpdates: () => ipcRenderer.invoke('ajustes:buscar-version'),
+    installUpdate: () => ipcRenderer.invoke('ajustes:instalar-version'),
+    copyReport: () => ipcRenderer.invoke('ajustes:copiar-informe'),
+    openFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta'),
+    testVoice: () => ipcRenderer.invoke('ajustes:probar-voz'),
+    finishWelcome: () => ipcRenderer.invoke('ajustes:bienvenida-lista'),
+    onView: (callback) => {
+      const handler = (_event, view) => callback(view)
+      ipcRenderer.on('ajustes:vista', handler)
+      return () => ipcRenderer.removeListener('ajustes:vista', handler)
+    }
   }
 })

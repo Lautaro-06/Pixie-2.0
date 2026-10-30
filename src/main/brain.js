@@ -223,6 +223,13 @@ const RULES = [
     /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
       ? intent('diagnostico')
       : null,
+  // Sus ajustes (los de Windows siguen yendo a la Configuración de Windows).
+  // "pixie" se borra al normalizar: "configuración de Pixie" llega como "configuracion de"
+  (t) =>
+    !/\bwindows\b/.test(t) &&
+    /\b(tus ajustes|ajustes de pixie|tu configuracion|configuracion de pixie|configurarte|personalizarte|tus preferencias|panel de (personalizacion|ajustes))\b|^(abri |abrir |mostrame )?(los |tus )?ajustes$|\b(ajustes|configuracion) de$/.test(t)
+      ? intent('ajustes')
+      : null,
   // El atajo para llamarla: "cambiá el atajo a Ctrl+Alt+P", "¿cuál es tu atajo?"
   (t) => {
     const m = /^(cambia(r)?|pone(r)?|usa(r)?|configura(r)?|quiero) (el |tu |mi )?atajo (a|en|por|para que sea|que sea) (?<atajo>.+)$/.exec(t)

@@ -14,9 +14,19 @@ Pixie se fija sola si hay una versión nueva al arrancar y cada 6 horas. La baja
 
 También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qué versión tenés?», o desde el ícono → **Buscar actualizaciones**.
 
+### Ajustes
+
+Clic derecho en el ícono de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
+
+- **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud y avisos al celular.
+- **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
+- **Inteligencia artificial:** si está conectada, probar la clave, cambiarla o borrarla.
+- **Voz:** natural (argentina, sin internet), la de Windows o Gemini, y un botón para escucharla.
+- **Actualizaciones** y **Ayuda** (el informe de diagnóstico y la carpeta de Pixie).
+
 ### Si el atajo no anda
 
-Si otro programa ya usa **Ctrl+Espacio** (por ejemplo Claude), Pixie toma otro atajo y te avisa cuál: casi siempre **Ctrl+Shift+Espacio**. Lo ves también en el primer renglón del menú de su ícono. Para elegir otro, decile «cambiá el atajo a Ctrl+Alt+P» (tiene que llevar Ctrl o Alt); si ese también está ocupado, te lo dice. «¿Cuál es tu atajo?» te dice el que tiene ahora.
+Si otro programa ya usa **Ctrl+Espacio** (por ejemplo Claude), Pixie toma otro atajo y te avisa cuál: casi siempre **Ctrl+Shift+Espacio**. Lo ves también en el primer renglón del menú de su ícono. Para elegir otro, decile «cambiá el atajo a Ctrl+Alt+P» o cambialo en **Ajustes → General** apretando las teclas (tiene que llevar Ctrl o Alt); si ese también está ocupado, te lo dice. «¿Cuál es tu atajo?» te dice el que tiene ahora.
 
 ### Si algo falla
 
@@ -24,7 +34,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.6)
+## Qué hace (versión 0.7)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -171,21 +181,15 @@ Se activa poniendo una clave en `config.json`. Pixie se da cuenta de qué IA es 
 
 ### Activarla con Gemini (gratis)
 
-1. Entrá a https://aistudio.google.com/apikey con tu cuenta de Google, tocá **Create API key** y copiala. (No hace falta el *Playground* ni pagar nada: si te ofrece un plan pago, cerralo.)
-2. Abrí Pixie (`npm run dev`) para que cree su configuración.
-3. Apretá **Win + R**, escribí `notepad %APPDATA%\Pixie\config.json` y Enter. Agregá la clave al final (ojo con la coma de la línea de antes):
+La primera vez que abrís Pixie sin IA aparece la **bienvenida**, que te guía en un minuto. También está en **Ajustes → Inteligencia artificial**:
 
-   ```json
-   {
-     "ciudad": "Buenos Aires",
-     "lugar": null,
-     "atajo": "Control+Space",
-     "apps": [],
-     "claveIA": "AQ...."
-   }
-   ```
+1. Tocá **Abrir AI Studio** y entrá con tu cuenta de Google. (No hace falta el *Playground* ni pagar nada: si te ofrece un plan pago, cerralo.)
+2. Tocá **Create API key** y copiala con el botón de copiar.
+3. Listo: Pixie encuentra la clave copiada, la prueba y la guarda **cifrada** en tu compu. Si preferís, la podés pegar en el campo de abajo.
 
-4. Guardá: Pixie lo lee solo en un par de segundos. Para probar: «estado de la IA» o «¿qué es un agujero negro?» (con IA te lo explica; sin IA abre Google).
+El plan gratis de Gemini alcanza para unos 500 pedidos por día. En el plan gratis, Google puede usar lo que le mandás para mejorar sus productos: no le pases datos privados.
+
+Las claves (la de la IA y la de WhatsApp) quedan cifradas con tu cuenta de Windows dentro de `config.json`, en la sección `"cifrado"`. Si pegás una clave a mano en `config.json` (`"claveIA": "AQ...."`), Pixie la cifra sola la próxima vez que lo lee. Una clave cifrada no se puede usar en otra compu: si restaurás el respaldo en una PC nueva, Pixie te la vuelve a pedir.
 
 Si `config.json` queda mal escrito (por ejemplo, falta una coma), Pixie lo avisa en la terminal y no lo toca: lo arreglás, guardás y lo lee solo. Por las dudas deja una copia en `config.roto.json`.
 
@@ -297,8 +301,13 @@ src/
     tray.js        ← el ícono al lado del reloj
     updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
     diagnostics.js ← anota los errores y arma el informe (sin claves)
+    secrets.js     ← cifra las claves de config.json con la cuenta de Windows
+    settings.js    ← lo que muestra y cambia la ventana de Ajustes (y la bienvenida)
+    settings-window.js ← la ventana de Ajustes
+    shortcut.js    ← entiende atajos («control alt p» → Control+Alt+P)
   preload/         ← el puente seguro entre la interfaz y las acciones
-  renderer/        ← la interfaz en React: la barra para escribir, la cara (src/face/) y el Pong (src/games/)
+  renderer/        ← la interfaz en React: la barra para escribir, la cara (src/face/, con la pantalla de reposo en standby.js),
+                     el Pong (src/games/) y la ventana de Ajustes y la bienvenida (src/settings/)
 extension/         ← la extensión «Pixie para Chrome» (YouTube, Gmail y páginas)
 test/              ← pruebas de las frases, fechas, memoria, iniciativa, la cara, el Pong, la IA y más
 scripts/           ← control de la versión de Node antes de npm install
@@ -332,7 +341,14 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
-Lo nuevo de la versión 0.6 (el instalador se arma solo en GitHub; lo que falta es probarlo en una PC):
+Lo nuevo de la versión 0.7:
+
+- **Bienvenida:** con una instalación nueva (o sin clave), que aparezca, que «Abrir AI Studio» abra el navegador y que, al copiar la clave, Pixie la encuentre sola y diga «¡Funciona!».
+- **Ajustes:** abrirlos desde el ícono, cambiar el nombre, la ciudad, el atajo (apretando las teclas) y las casillas, y ver que se guarden.
+- **Pantalla de reposo:** elegir «Reloj» y «Resumen» en Personalización y ver que la cara vuelva cuando le hablás.
+- **Clave cifrada:** abrir `config.json` y ver que la clave no esté a la vista (está en `"cifrado"`), y que Pixie siga contestando con IA.
+
+De la versión 0.6 (el instalador se arma solo en GitHub; lo que falta es probarlo en una PC):
 
 - **Instalador:** que instale, que la cara aparezca y que el ícono muestre «Pixie 0.6.0».
 - **Arrancar con Windows:** reiniciar la compu y ver que Pixie abra sola. Destildar «Iniciar con Windows» y ver que deje de hacerlo.

@@ -2,6 +2,7 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, writeFileSync, mkdirSync, appendFile, copyFileSync, watchFile } from 'node:fs'
+import { sealSecrets, openSecrets, forgetSecrets } from './secrets.js'
 
 const DEFAULTS = {
   ciudad: 'Buenos Aires',
@@ -11,6 +12,37 @@ const DEFAULTS = {
 }
 
 let config = { ...DEFAULTS }
+let cipher = null // cifra las claves con la cuenta de Windows (safeStorage); sin él quedan como estaban
+
+export function setCipher(next) {
+  cipher = next
+}
+
+// Si config.json tiene claves a la vista, las cifra y lo reescribe. Devuelve los datos tal como quedaron.
+function sealOnDisk(data) {
+  const { data: sealed, changed } = sealSecrets(data, cipher)
+  if (changed) {
+    try {
+      writeFileSync(configPath(), JSON.stringify(sealed, null, 2))
+    } catch (err) {
+      console.error('No se pudo cifrar la clave en config.json', err)
+      return data
+    }
+  }
+  return sealed
+}
+
+const warned = new Set()
+function fromDisk(data) {
+  return {
+    ...DEFAULTS,
+    ...openSecrets(data, cipher, (key) => {
+      if (warned.has(key)) return
+      warned.add(key)
+      logAction(`config: no pude descifrar «${key}» (¿se guardó en otra compu?). Hay que cargarla de nuevo.`)
+    })
+  }
+}
 
 export function configPath() {
   return join(app.getPath('userData'), 'config.json')
@@ -40,7 +72,7 @@ function reportBroken(err) {
 export function loadConfig() {
   const disk = readDisk()
   if (disk.ok) {
-    config = { ...DEFAULTS, ...disk.data }
+    config = fromDisk(sealOnDisk(disk.data))
     return config
   }
   config = { ...DEFAULTS }
@@ -56,7 +88,7 @@ export function reloadConfig() {
     if (!disk.missing) reportBroken(disk.error)
     return false
   }
-  const next = { ...DEFAULTS, ...disk.data }
+  const next = fromDisk(sealOnDisk(disk.data))
   if (JSON.stringify(next) === JSON.stringify(config)) return false
   config = next
   return true
@@ -84,11 +116,13 @@ export function saveConfig(patch) {
     config = { ...config, ...patch } // el archivo está a medio editar: no se toca
     return config
   }
-  const merged = { ...(disk.ok ? disk.data : config), ...patch }
-  config = { ...DEFAULTS, ...merged }
+  // Las claves nuevas se cifran; { claveIA: null } la borra (también la cifrada)
+  const merged = forgetSecrets({ ...(disk.ok ? disk.data : config), ...patch }, patch)
+  const { data: toWrite } = sealSecrets(merged, cipher)
+  config = fromDisk(toWrite)
   try {
     mkdirSync(app.getPath('userData'), { recursive: true })
-    writeFileSync(configPath(), JSON.stringify(merged, null, 2))
+    writeFileSync(configPath(), JSON.stringify(toWrite, null, 2))
   } catch (err) {
     console.error('No se pudo guardar la configuración', err)
   }

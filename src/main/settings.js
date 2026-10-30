@@ -1,0 +1,148 @@
+// Lo que muestra y cambia la ventana de Ajustes (y la bienvenida).
+// No toca Electron directamente: todo lo que necesita le llega armado, así se puede probar.
+import { describeAI, pickProvider, aiErrorText } from './ai.js'
+import { AIHttpError, AIConnectionError } from './ai-compatible.js'
+import { maskSecret } from './secrets.js'
+import { parseShortcut, shortcutText } from './shortcut.js'
+
+export const STANDBY_MODES = ['cara', 'reloj', 'resumen']
+export const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey'
+const NAMES = { gemini: 'Gemini', groq: 'Groq', claude: 'Claude', ollama: 'Ollama' }
+const KEY = /(AIza[\w-]{30,}|AQ\.[\w.-]{20,}|gsk_[A-Za-z0-9]{20,}|sk-ant-[\w-]{20,})/
+
+// Encuentra una clave de IA en un texto (por ejemplo, lo que copiaste)
+export function findKey(text) {
+  const m = KEY.exec(String(text ?? ''))
+  return m ? m[1] : null
+}
+
+// El error de la prueba, dicho para la ventana de Ajustes (sin mandar a editar config.json)
+export function keyErrorText(err) {
+  if (err instanceof AIConnectionError) return 'No me pude conectar para probarla. ¿Hay internet?'
+  if (err instanceof AIHttpError || err?.status) {
+    if (err.status === 400 || err.status === 401 || err.status === 403) return 'Esa clave no funciona. Fijate que esté copiada entera.'
+    if (err.status === 429) return 'La clave anda, pero ya se usó todo lo gratis por ahora. Probá en un rato.'
+  }
+  return aiErrorText(err) ?? 'No me pude conectar para probarla. ¿Hay internet?'
+}
+
+export function createSettings({
+  getConfig,
+  saveConfig,
+  memory,
+  voices,
+  updates,
+  ai,
+  loginItem,
+  changeShortcut,
+  shortcutLabel,
+  setCity,
+  onStandby = () => {},
+  errorCount = () => 0,
+  readClipboard = () => '',
+  version = '0.0.0'
+}) {
+  let candidate = null // la clave que se encontró copiada, sin mostrarla
+
+  function snapshot() {
+    const cfg = getConfig()
+    const p = pickProvider(cfg)
+    return {
+      version,
+      bienvenidaHecha: cfg.bienvenidaHecha === true,
+      general: {
+        nombre: memory?.getName() ?? '',
+        ciudad: cfg.ciudad ?? '',
+        atajo: shortcutLabel(),
+        arrancarConWindows: Boolean(loginItem.get()),
+        recordatoriosSalud: cfg.recordatoriosSalud !== false,
+        avisosAlCelular: cfg.avisosAlCelular !== false
+      },
+      apariencia: { pantallaReposo: STANDBY_MODES.includes(cfg.pantallaReposo) ? cfg.pantallaReposo : 'cara' },
+      ia: {
+        activa: cfg.ia !== false,
+        estado: describeAI(cfg).text,
+        proveedor: p ? (NAMES[p.name] ?? p.name) : null,
+        modelo: p?.model ?? null,
+        clave: maskSecret(cfg.claveIA),
+        tieneClave: Boolean(cfg.claveIA)
+      },
+      voz: {
+        modo: cfg.vozNatural === false ? 'windows' : cfg.vozNatural === 'gemini' ? 'gemini' : 'natural',
+        estado: voices?.status() ?? ''
+      },
+      actualizaciones: { ...updates.status(), texto: updates.describe() },
+      ayuda: { errores: errorCount() }
+    }
+  }
+
+  async function apply(patch = {}) {
+    const mensajes = []
+    if (typeof patch.nombre === 'string' && patch.nombre.trim()) memory?.setName(patch.nombre.trim().slice(0, 40))
+    if (typeof patch.ciudad === 'string' && patch.ciudad.trim() && patch.ciudad.trim() !== getConfig().ciudad) {
+      mensajes.push(await setCity(patch.ciudad.trim()))
+    }
+    if ('arrancarConWindows' in patch) loginItem.set(Boolean(patch.arrancarConWindows))
+    if ('recordatoriosSalud' in patch) saveConfig({ recordatoriosSalud: Boolean(patch.recordatoriosSalud) })
+    if ('avisosAlCelular' in patch) saveConfig({ avisosAlCelular: Boolean(patch.avisosAlCelular) })
+    if (STANDBY_MODES.includes(patch.pantallaReposo)) {
+      saveConfig({ pantallaReposo: patch.pantallaReposo })
+      onStandby(patch.pantallaReposo)
+    }
+    if ('iaActiva' in patch) saveConfig({ ia: patch.iaActiva ? undefined : false })
+    if (patch.vozModo === 'windows') voices.use(false)
+    else if (patch.vozModo === 'gemini') voices.use('gemini')
+    else if (patch.vozModo === 'natural') {
+      voices.use(true)
+      voices.install()
+    }
+    if (typeof patch.atajo === 'string') {
+      const accel = parseShortcut(patch.atajo)
+      if (!accel) mensajes.push('Ese atajo no sirve: tiene que llevar Ctrl o Alt y una tecla.')
+      else {
+        const r = changeShortcut(accel)
+        mensajes.push(r.ok ? `Ahora me llamás con ${shortcutText(accel)}.` : `${shortcutText(accel)} lo está usando otro programa. Probá con otro.`)
+      }
+    }
+    return { ...snapshot(), mensajes }
+  }
+
+  async function testKey(key) {
+    const k = typeof key === 'string' && key.trim() ? findKey(key) ?? key.trim() : candidate
+    if (!k) return { ok: false, mensaje: 'Copiá o pegá la clave primero.' }
+    try {
+      const r = await ai.ping(k)
+      return { ok: true, clave: k, mensaje: `¡Funciona! Uso ${NAMES[r.provider] ?? r.provider}.` }
+    } catch (err) {
+      return { ok: false, mensaje: keyErrorText(err) }
+    }
+  }
+
+  // Prueba la clave (la escrita o la que encontró copiada) y, si anda, la guarda cifrada
+  async function saveKey(key) {
+    const r = await testKey(key)
+    if (!r.ok) return r
+    saveConfig({ claveIA: r.clave, proveedorIA: undefined, ia: undefined })
+    candidate = null
+    return { ok: true, mensaje: r.mensaje, guardada: true }
+  }
+
+  function forgetKey() {
+    saveConfig({ claveIA: null })
+    return snapshot()
+  }
+
+  // Mira si lo último que copiaste es una clave de IA (no guarda nada más de lo copiado)
+  function clipboardKey() {
+    const k = findKey(readClipboard())
+    if (!k || k === getConfig().claveIA) return { encontrada: false }
+    candidate = k
+    return { encontrada: true, clave: maskSecret(k) }
+  }
+
+  function finishWelcome() {
+    saveConfig({ bienvenidaHecha: true })
+  }
+
+  return { snapshot, apply, testKey, saveKey, forgetKey, clipboardKey, finishWelcome }
+}

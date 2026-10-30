@@ -263,10 +263,20 @@ export function createAI({
     return /^\[?nada\]?\.?$/i.test(text) ? '' : text
   }
 
+  // Prueba una clave (o la guardada) con un pedido cortito. Devuelve { provider, model, reply } o tira el error.
+  async function ping(key) {
+    const cfg = key ? { ...getConfig(), claveIA: key, proveedorIA: undefined, ia: true } : getConfig()
+    const p = pickProvider(cfg)
+    if (!p) throw new FriendlyError('No reconozco esa clave. Las de Gemini empiezan con «AIza» o «AQ.».')
+    const r = await driverFor(p).step([{ role: 'user', content: 'Respondé solamente: listo' }], { tools: false, persona: false })
+    return { provider: p.name, model: p.model, reply: r.text }
+  }
+
   return {
     enabled,
     provider: () => provider()?.name ?? null,
     status: () => describeAI(getConfig()).text,
+    ping,
     chat,
     summarize,
     look,

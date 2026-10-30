@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Face from './face/Face.jsx'
 import PongGame from './games/PongGame.jsx'
 import { api, isPreview } from './api.js'
@@ -53,6 +53,8 @@ export default function App() {
   const [shortcut, setShortcut] = useState('Ctrl+Espacio')
   const [notice, setNotice] = useState(null) // aviso que Pixie da por su cuenta
   const [feeling, setFeeling] = useState('normal')
+  const [standbyMode, setStandbyMode] = useState('cara') // qué muestra en reposo: cara | reloj | resumen
+  const [weather, setWeather] = useState(null) // { temp, icon } para el resumen
   const [game, setGame] = useState(null) // 'pong' mientras se juega
   const [listening, setListening] = useState(false) // grabando lo que decís
   const [micLevel, setMicLevel] = useState(0)
@@ -175,6 +177,8 @@ export default function App() {
       setNaturalVoice(info.naturalVoice)
       setVoiceAvailable(hasSpanishVoice())
       if (info.feeling) setFeeling(info.feeling)
+      if (info.pantallaReposo) setStandbyMode(info.pantallaReposo)
+      if (info.clima) setWeather(info.clima)
     }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
@@ -190,6 +194,10 @@ export default function App() {
         }
       }
       if (event.type === 'feeling') setFeeling(event.feeling)
+      if (event.type === 'ajustes' && event.pantallaReposo) setStandbyMode(event.pantallaReposo)
+      if (event.type === 'clima') setWeather({ temp: event.temp, icon: event.icon })
+      // "Probar voz" desde los ajustes: habla aunque la voz esté apagada
+      if (event.type === 'prueba-voz') speak(event.text, 'happy')
       if (event.type === 'presence') {
         if (event.away) {
           asleepRef.current = true
@@ -268,6 +276,12 @@ export default function App() {
   }, [minimize])
 
   const mood = busy ? 'thinking' : expanded ? 'listening' : asleep ? 'sleeping' : 'idle'
+  // En reposo puede mostrar la hora o el resumen; mientras la usás, siempre la cara
+  const resting = !expanded && !notice && !game && !listening && !busy
+  const standby = useMemo(
+    () => (resting && standbyMode !== 'cara' ? { mode: standbyMode, weather } : null),
+    [resting, standbyMode, weather]
+  )
 
   async function send(text, { spoken = false } = {}) {
     const clean = text.trim()
@@ -501,7 +515,7 @@ export default function App() {
       )}
 
       <div className="face" ref={faceRef} title="Arrastrame para moverme">
-        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} />
+        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} />
       </div>
 
       {!expanded && !notice && (

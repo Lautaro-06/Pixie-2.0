@@ -1,8 +1,14 @@
 import { Component, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import SettingsApp from './settings/SettingsApp.jsx'
 import { api } from './api.js'
 import './styles.css'
+
+// La misma interfaz sirve para dos ventanas: la cara (sin #) y la de Ajustes/bienvenida (#ajustes, #bienvenida)
+const view = decodeURIComponent(location.hash.slice(1))
+const isSettings = view === 'bienvenida' || view.startsWith('ajustes')
+if (isSettings) document.body.classList.add('ventana-ajustes')
 
 // Los errores de la interfaz quedan anotados para el informe de diagnóstico
 const report = (message, stack) => api.reportError?.({ message: String(message ?? 'error'), stack: String(stack ?? '') })
@@ -52,8 +58,6 @@ class Recover extends Component {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Recover>
-      <App />
-    </Recover>
+    <Recover>{isSettings ? <SettingsApp initial={view} /> : <App />}</Recover>
   </StrictMode>
 )

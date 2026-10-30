@@ -5,7 +5,7 @@ import { configPath } from './config.js'
 
 let tray = null
 
-export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyDiagnostics }) {
+export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyDiagnostics, openSettings }) {
   // En la app instalada, los íconos quedan fuera del paquete (app.asar.unpacked).
   tray = new Tray(nativeImage.createFromPath(trayIcon.replace('app.asar', 'app.asar.unpacked')))
   tray.setToolTip('Pixie')
@@ -30,6 +30,7 @@ export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyD
           else win?.showInactive()
         }
       },
+      { label: 'Ajustes…', click: () => openSettings?.() },
       { type: 'separator' },
       updateItem(),
       {

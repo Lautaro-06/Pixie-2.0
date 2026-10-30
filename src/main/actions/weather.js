@@ -75,6 +75,26 @@ export async function getWeather(ctx, ciudad) {
   return { text, face: rainy ? 'sad' : 'happy' }
 }
 
+// Un ícono simple para la pantallita de Pixie
+export function weatherIcon(code, isDay = true) {
+  if ([0, 1].includes(code)) return isDay ? 'sol' : 'luna'
+  if (code === 2) return isDay ? 'parcial' : 'nube'
+  if ([95, 96, 99].includes(code)) return 'tormenta'
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'nieve'
+  if (RAIN_CODES.includes(code)) return 'lluvia'
+  return 'nube'
+}
+
+// Temperatura e ícono de ahora, para el resumen en reposo
+export async function currentConditions(ctx) {
+  const lugar = await currentPlace(ctx)
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lugar.lat}&longitude=${lugar.lon}` +
+    '&current=temperature_2m,weather_code,is_day&timezone=auto'
+  const now = (await getJson(url)).current
+  return { temp: Math.round(now.temperature_2m), icon: weatherIcon(now.weather_code, now.is_day !== 0), lugar: lugar.nombre }
+}
+
 export async function describeWeather(ctx) {
   return (await getWeather(ctx)).text
 }
