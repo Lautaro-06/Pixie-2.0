@@ -1,4 +1,5 @@
 const MAX_SECONDS = 24 * 3600
+export const POMODORO = 'Pomodoro'
 const timers = new Map()
 let nextId = 1
 
@@ -14,19 +15,86 @@ export function durationText(totalSeconds) {
   return parts.join(' y ') || '0 segundos'
 }
 
-function describe(timer) {
-  const left = Math.ceil((timer.endsAt - Date.now()) / 1000)
-  return `${timer.etiqueta ? `«${timer.etiqueta}»` : 'el timer'} (faltan ${durationText(left)})`
+// Segundos que le faltan a un timer (si está en pausa, lo que le quedaba al pausarlo).
+function remainingSeconds(timer) {
+  const ms = timer.paused ? timer.remainingMs : timer.endsAt - Date.now()
+  return Math.max(0, Math.ceil(ms / 1000))
 }
 
+function describe(timer) {
+  const left = durationText(remainingSeconds(timer))
+  const name = timer.etiqueta ? `«${timer.etiqueta}»` : 'el timer'
+  return timer.paused ? `${name} (en pausa, faltan ${left})` : `${name} (faltan ${left})`
+}
+
+// Orden en que se muestran: primero el Pomodoro, después el que termina antes.
+function sortedTimers() {
+  return [...timers.values()].sort((a, b) => {
+    const pa = a.etiqueta === POMODORO ? 0 : 1
+    const pb = b.etiqueta === POMODORO ? 0 : 1
+    return pa - pb || remainingSeconds(a) - remainingSeconds(b)
+  })
+}
+
+// Lo que necesita la interfaz para dibujar el cronómetro. El primero de la lista es el que se muestra grande.
+// `endsAt` (ms) permite que la interfaz cuente sola, sin que main mande un mensaje por segundo; en pausa va null.
+export function timersSnapshot() {
+  return sortedTimers().map((t) => ({
+    id: t.id,
+    etiqueta: t.etiqueta ?? null,
+    pomodoro: t.etiqueta === POMODORO,
+    total: t.total,
+    remaining: remainingSeconds(t),
+    endsAt: t.paused ? null : t.endsAt,
+    paused: t.paused
+  }))
+}
+
+function publish(ctx) {
+  ctx.emit({ type: 'timers', timers: timersSnapshot() })
+}
+
+// Un Pomodoro en pausa sigue contando como Pomodoro andando (la sesión sigue abierta).
 export function isPomodoroRunning() {
-  return [...timers.values()].some((t) => t.etiqueta === 'Pomodoro')
+  return [...timers.values()].some((t) => t.etiqueta === POMODORO)
 }
 
 export function timersSummary() {
   if (!timers.size) return ''
-  const list = [...timers.values()].map(describe)
+  const list = sortedTimers().map(describe)
   return timers.size === 1 ? `Tenés ${list[0]}.` : `Tenés ${timers.size} timers: ${list.join(', ')}.`
+}
+
+function finish(timer, ctx) {
+  timers.delete(timer.id)
+  const { etiqueta, total } = timer
+  const pomodoro = etiqueta === POMODORO
+  const text = pomodoro
+    ? '¡Terminó el Pomodoro! Muy bien. Tomate 5 minutos de descanso.'
+    : etiqueta
+      ? `¡Tiempo! Te aviso: ${etiqueta}.`
+      : `¡Terminó el timer de ${durationText(total)}!`
+  publish(ctx)
+  ctx.notify('Pixie', text)
+  ctx.phoneIfAway?.(text)
+  ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
+  ctx.log(`timer terminado: ${etiqueta ?? durationText(total)}`)
+}
+
+function arm(timer, ms, ctx) {
+  timer.endsAt = Date.now() + ms
+  timer.paused = false
+  timer.remainingMs = null
+  timer.handle = setTimeout(() => finish(timer, ctx), ms)
+}
+
+// Elige el timer al que se refiere el pedido: el que dice `id`, o si no, el primero que cumpla `filtro`.
+function pick(id, filtro) {
+  if (id != null) {
+    const byId = timers.get(Number(id))
+    return byId && filtro(byId) ? byId : undefined
+  }
+  return sortedTimers().find(filtro)
 }
 
 export const timerActions = [
@@ -34,30 +102,19 @@ export const timerActions = [
     name: 'crear_timer',
     description: 'Pone un timer o recordatorio',
     run: ({ segundos, etiqueta }, ctx) => {
-      if (!segundos) {
+      const total = Math.round(Number(segundos))
+      if (!total || total <= 0) {
         return { text: '¿De cuánto? Por ejemplo: «timer de 10 minutos».', face: 'confused' }
       }
-      if (segundos > MAX_SECONDS) {
+      if (total > MAX_SECONDS) {
         return { text: 'Por ahora pongo timers de hasta 24 horas.', face: 'confused' }
       }
-      const id = nextId++
-      const timer = { id, etiqueta, endsAt: Date.now() + segundos * 1000 }
-      timer.handle = setTimeout(() => {
-        timers.delete(id)
-        const pomodoro = etiqueta === 'Pomodoro'
-        const text = pomodoro
-          ? '¡Terminó el Pomodoro! Muy bien. Tomate 5 minutos de descanso.'
-          : etiqueta
-            ? `¡Tiempo! Te aviso: ${etiqueta}.`
-            : `¡Terminó el timer de ${durationText(segundos)}!`
-        ctx.notify('Pixie', text)
-        ctx.phoneIfAway?.(text)
-        ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
-        ctx.log(`timer terminado: ${etiqueta ?? durationText(segundos)}`)
-      }, segundos * 1000)
-      timers.set(id, timer)
-      const about = etiqueta && etiqueta !== 'Pomodoro' ? ` para «${etiqueta}»` : ''
-      const kind = etiqueta === 'Pomodoro' ? 'Pomodoro de 25 minutos. ¡A concentrarse!' : `timer de ${durationText(segundos)}${about}.`
+      const timer = { id: nextId++, etiqueta, total, endsAt: 0, paused: false, remainingMs: null, handle: null }
+      arm(timer, total * 1000, ctx)
+      timers.set(timer.id, timer)
+      publish(ctx)
+      const about = etiqueta && etiqueta !== POMODORO ? ` para «${etiqueta}»` : ''
+      const kind = etiqueta === POMODORO ? `Pomodoro de ${durationText(total)}. ¡A concentrarse!` : `timer de ${durationText(total)}${about}.`
       return { text: `Listo, ${kind}`, face: 'happy' }
     }
   },
@@ -67,12 +124,50 @@ export const timerActions = [
     run: () => ({ text: timersSummary() || 'No hay timers andando.', face: 'happy' })
   },
   {
+    name: 'pausar_timer',
+    description: 'Pausa un timer (el que se ve en pantalla, o el indicado por id)',
+    run: ({ id } = {}, ctx) => {
+      const timer = pick(id, (t) => !t.paused)
+      if (!timer) return { text: 'No hay ningún timer andando para pausar.', face: 'confused' }
+      clearTimeout(timer.handle)
+      timer.remainingMs = Math.max(0, timer.endsAt - Date.now())
+      timer.paused = true
+      timer.handle = null
+      publish(ctx)
+      return { text: `Listo, pausé ${describe(timer)}.`, face: 'happy' }
+    }
+  },
+  {
+    name: 'reanudar_timer',
+    description: 'Sigue un timer que estaba en pausa',
+    run: ({ id } = {}, ctx) => {
+      const timer = pick(id, (t) => t.paused)
+      if (!timer) return { text: 'No hay ningún timer en pausa.', face: 'confused' }
+      arm(timer, timer.remainingMs, ctx)
+      publish(ctx)
+      return { text: `Seguimos: ${describe(timer)}.`, face: 'happy' }
+    }
+  },
+  {
+    name: 'cancelar_timer',
+    description: 'Cancela un solo timer (el que se ve en pantalla, o el indicado por id)',
+    run: ({ id } = {}, ctx) => {
+      const timer = pick(id, () => true)
+      if (!timer) return { text: 'No hay ningún timer para cancelar.', face: 'confused' }
+      clearTimeout(timer.handle)
+      timers.delete(timer.id)
+      publish(ctx)
+      return { text: `Cancelé ${timer.etiqueta ? `«${timer.etiqueta}»` : 'el timer'}.`, face: 'happy' }
+    }
+  },
+  {
     name: 'cancelar_timers',
     description: 'Cancela todos los timers',
-    run: () => {
+    run: (_args, ctx) => {
       const n = timers.size
       for (const t of timers.values()) clearTimeout(t.handle)
       timers.clear()
+      publish(ctx)
       return { text: n ? `Cancelé ${n === 1 ? 'el timer' : `${n} timers`}.` : 'No había timers andando.', face: 'happy' }
     }
   }
