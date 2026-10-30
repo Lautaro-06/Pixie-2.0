@@ -138,6 +138,8 @@ async function handle(cmd, args) {
     if (!tab) throw new Error('No encontré un video de YouTube abierto en Chrome.')
     return run(tab.id, youtubeAction, [args.accion, args.valor ?? null])
   }
+  // Tus Pendientes de Classroom (para la agenda de Pixie)
+  if (cmd === 'classroom') return readClassroom()
   if (cmd === 'leer') {
     if (args.que === 'mail') {
       const tab = await findTab((url) => url.startsWith('https://mail.google.com/'))
@@ -153,6 +155,31 @@ async function handle(cmd, args) {
     return r
   }
   throw new Error(`Pedido desconocido: ${cmd}`)
+}
+
+// Abre tus Pendientes de Classroom en una pestaña de fondo, los lee y la cierra. Usa la sesión
+// que ya tenés en Chrome. Si en esa cuenta no hay nada y tenés otras, prueba la siguiente.
+async function readClassroom() {
+  const tab = await chrome.tabs.create({ url: 'about:blank', active: false })
+  try {
+    let last = null
+    for (let u = 0; u < 4; u++) {
+      await chrome.tabs.update(tab.id, { url: `https://classroom.google.com/u/${u}/a/not-turned-in/all` })
+      await loaded(tab.id, 20000)
+      await sleep(1500) // la lista aparece un rato después de cargar
+      await poll(tab.id, expandClassroomSections, [], 3, 400)
+      const r = await poll(tab.id, readClassroomTodo, [], 25, 600)
+      if (!r || r.login) {
+        if (u === 0) throw new Error(r?.login ? 'Entrá a Classroom en Chrome con tu cuenta y probá de nuevo.' : 'No pude leer Classroom. ¿Se abre bien classroom.google.com en Chrome?')
+        break // esa cuenta no existe: nos quedamos con lo que ya leímos
+      }
+      last = { ...r, cuenta: u }
+      if (r.items.length) return last
+    }
+    return last
+  } finally {
+    chrome.tabs.remove(tab.id).catch(() => {})
+  }
 }
 
 // ───────────── Funciones que corren dentro de la página ─────────────
@@ -306,4 +333,50 @@ function readPage() {
   if (truncated) text = text.slice(0, MAX)
   if (!text) return { ok: false, text: 'Esta página no tiene texto para leer.' }
   return { ok: true, kind: 'pagina', title: document.title, url: location.href, text, truncated }
+}
+
+// Abre las secciones cerradas de Pendientes («Esta semana», «Más adelante»…) para ver todas las tareas
+function expandClassroomSections() {
+  const names = /^(sin fecha|esta semana|la (pr[oó]xima )?semana|la semana que viene|m[aá]s adelante|m[aá]s tarde|anteriores|no due date|this week|next week|later|earlier)/i
+  let clicked = 0
+  for (const el of document.querySelectorAll('[aria-expanded="false"]')) {
+    if (names.test((el.innerText || '').trim())) {
+      el.click()
+      clicked++
+    }
+  }
+  return { clicked }
+}
+
+// Lee la lista de Pendientes: cada tarea con sus renglones (título, materia, fecha) y la sección donde está
+function readClassroomTodo() {
+  if (location.hostname !== 'classroom.google.com') return { login: true }
+  const text = document.body?.innerText || ''
+  const links = [...document.querySelectorAll('a[href]')].filter((a) => /\/c\/[^/]+\/[a-z]{1,3}\/[^/]+/.test(a.getAttribute('href') || ''))
+  if (!links.length) {
+    // Sin tareas: la página lo dice (o todavía está cargando)
+    if (/no hay trabajo|no ten[eé]s (trabajos|tareas)|todo (al d[ií]a|listo)|no work|nothing to do|no tienes trabajo/i.test(text)) return { items: [], vacio: true }
+    return null
+  }
+  const headings = [...document.querySelectorAll('h1, h2, h3, h4, [role="heading"]')]
+  const sectionOf = (el) => {
+    let found = ''
+    for (const h of headings) if (h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) found = (h.innerText || '').trim()
+    return found.slice(0, 60)
+  }
+  const seen = new Set()
+  const items = []
+  for (const a of links) {
+    const href = new URL(a.getAttribute('href'), location.href).href
+    if (seen.has(href)) continue
+    seen.add(href)
+    const box = a.closest('li') || a
+    const lineas = (box.innerText || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+    items.push({ link: href, lineas, seccion: sectionOf(box) })
+  }
+  return { items: items.slice(0, 80) }
 }

@@ -529,7 +529,7 @@ const CALENDAR_GUIDE = [
   },
   {
     title: 'Elegí el calendario',
-    text: 'A la izquierda, en «Configuración de mis calendarios», tocá el nombre de tu calendario. Las materias de Classroom aparecen ahí también, cada una con su nombre.'
+    text: 'A la izquierda, en «Configuración de mis calendarios», tocá el nombre de tu calendario (el que tiene tu nombre). Las materias de Classroom no sirven acá: Google no da su dirección. Esas las leo con la extensión de Chrome (más arriba, en «Classroom»).'
   },
   {
     title: 'Copiá la dirección secreta',
@@ -538,8 +538,8 @@ const CALENDAR_GUIDE = [
   },
   {
     title: 'Volvé acá',
-    text: 'Cuando la copies, la encuentro sola, la pruebo y la sumo a mi agenda. Para sumar otra materia, repetí desde el paso 2.',
-    note: 'Con las cuentas del colegio, a veces el colegio no deja ver la dirección secreta. Si no aparece, se puede sumar tu calendario personal igual.'
+    text: 'Cuando la copies, la encuentro sola, la pruebo y la sumo a mi agenda. Si tenés otro calendario tuyo, repetí desde el paso 2.',
+    note: 'Si no aparece «Dirección secreta en formato iCal», ese calendario no es tuyo (es de otra persona) o tu colegio la desactivó.'
   }
 ]
 
@@ -586,7 +586,7 @@ export function CalendarWizard({ onAdded }) {
           <ol className="steps">
             <li>
               <span>
-                En <b>Google Calendar</b> (en la compu), entrá a la configuración de tu calendario o de una materia de Classroom.
+                En <b>Google Calendar</b> (en la compu), entrá a la configuración de tu calendario.
               </span>
               <button type="button" className="button" onClick={() => api.settings.openGoogleCalendar?.()}>
                 Abrir Google Calendar

@@ -240,7 +240,7 @@ test('entiende los pedidos de noticias y de la agenda', () => {
   assert.deepEqual(act('abrí chrome'), [['abrir', { objetivo: 'chrome' }]])
   assert.equal(act('tengo una noticia buenísima'), undefined)
   assert.deepEqual(act('conectá mi Google Calendar'), [['conectar_calendario', {}]])
-  assert.deepEqual(act('sumá Classroom'), [['conectar_calendario', {}]])
+  assert.deepEqual(act('sumá Classroom'), [['classroom', {}]])
   assert.deepEqual(act('¿qué tengo que entregar?'), [['ver_agenda', { dias: 14, entregas: true }]])
   assert.deepEqual(act('mis tareas'), [['ver_pendientes', {}]])
 })

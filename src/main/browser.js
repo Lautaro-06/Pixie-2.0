@@ -10,12 +10,13 @@ export class BrowserError extends Error {}
 
 export class NoExtensionError extends BrowserError {
   constructor() {
-    super('Para eso necesito la extensión de Pixie en Chrome. Está en la carpeta «extension» del proyecto y el README explica cómo instalarla.')
+    super('Para eso necesito mi extensión de Chrome. En mis Ajustes → Agenda está cómo instalarla (es una sola vez).')
   }
 }
 
-export function createBrowserBridge({ log = () => {} } = {}) {
+export function createBrowserBridge({ log = () => {}, onConnect = () => {} } = {}) {
   let socket = null
+  let version = null // la versión de la extensión (para avisar si hay que recargarla)
   let nextId = 1
   const waiting = new Map()
 
@@ -34,6 +35,11 @@ export function createBrowserBridge({ log = () => {} } = {}) {
       try {
         msg = JSON.parse(String(data))
       } catch {
+        return
+      }
+      if (msg.type === 'hola') {
+        version = String(msg.version ?? '')
+        onConnect(version)
         return
       }
       const pending = msg.id && waiting.get(msg.id)
@@ -66,6 +72,7 @@ export function createBrowserBridge({ log = () => {} } = {}) {
   return {
     request,
     connected: () => Boolean(socket),
+    version: () => (socket ? version : null),
     close: () => wss.close()
   }
 }

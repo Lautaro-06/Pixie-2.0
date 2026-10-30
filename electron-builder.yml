@@ -23,3 +23,6 @@ publish:
   owner: Lautaro-06
   repo: Pixie-2.0
   releaseType: draft
+extraResources:
+  - from: extension
+    to: extension

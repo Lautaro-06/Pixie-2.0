@@ -7,7 +7,10 @@ let fakeSettings = {
   bienvenidaHecha: false,
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
   apariencia: { pantallaReposo: 'cara' },
-  agenda: { calendarios: [] },
+  agenda: {
+    calendarios: [],
+    classroom: { estado: 'sin-leer', conectada: false, tareas: 0, conFecha: 0, leido: null, error: null, avisos: true, extension: { carpeta: null, version: '0.9.1', conectada: false, vieja: false } }
+  },
   noticias: { fuentes: ['infobae', 'tn'], avisos: 'aveces' },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
   voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.', palabra: { grabada: false, activa: false, sensibilidad: 'normal' } },
@@ -74,6 +77,16 @@ const previewSettings = {
     return { ok: true, mensaje: '¡Listo! Sumé «Matemática 5°B»: tiene 3 cosas en los próximos 7 días.', ...fakeSettings }
   },
   clipboardCalendar: async () => ({ encontrada: false }),
+  readClassroom: async () => {
+    await wait(900)
+    fakeSettings = {
+      ...fakeSettings,
+      agenda: { ...fakeSettings.agenda, classroom: { ...fakeSettings.agenda.classroom, estado: 'ok', tareas: 3, conFecha: 2, leido: Date.now(), extension: { ...fakeSettings.agenda.classroom.extension, conectada: true } } }
+    }
+    return { ...fakeSettings, mensaje: 'Leí tus Pendientes: tenés 3 tareas.' }
+  },
+  openExtensionFolder: async () => {},
+  copyExtensionsAddress: async () => {},
   removeCalendar: async (id) => (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.filter((c) => c.id !== id) } }),
   calendarAlerts: async (id, on) =>
     (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.map((c) => (c.id === id ? { ...c, avisos: on } : c)) } }),

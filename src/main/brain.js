@@ -353,7 +353,9 @@ const RULES = [
       t.match(/^ya ((?:hice|termine|complete|compre|llame|entregue|estudie|lave|limpie|arregle|mande|pague|saque|busque|lei|ordene|cocine|escribi|hable)\b.*)$/)
     return m ? intent('completar_pendiente', { buscar: m[1] }) : null
   },
-  // Calendarios de afuera: "conectá mi Google Calendar", "sumá Classroom"; y las entregas
+  // Classroom (con la extensión): "¿qué tengo en Classroom?", "revisá Classroom", "conectá Classroom"
+  (t) => (/\bclassroom\b/.test(t) && !/^(abri|abrir|abrime|entra a|anda a)\b/.test(t) ? intent('classroom') : null),
+  // Calendarios de afuera: "conectá mi Google Calendar"; y las entregas
   (t) =>
     /\b(conecta|conectar|conectame|suma|sumar|sumame|agrega|agregar|agregame|vincula|vincular|pone|poner|poneme)\b.*\b(calendario|google calendar|calendar|classroom|agenda de google)\b/.test(t)
       ? intent('conectar_calendario')

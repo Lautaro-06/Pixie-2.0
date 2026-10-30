@@ -47,6 +47,8 @@ export function createSettings({
   wake = null,
   calendars = null,
   news = null,
+  classroom = null,
+  extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
 }) {
   let candidate = null // la clave que se encontró copiada, sin mostrarla
@@ -81,7 +83,10 @@ export function createSettings({
         estado: voices?.status() ?? '',
         palabra: wake?.status() ?? { grabada: false, activa: false, sensibilidad: 'normal' }
       },
-      agenda: { calendarios: calendars?.status() ?? [] },
+      agenda: {
+        calendarios: calendars?.status() ?? [],
+        classroom: classroom ? { ...classroom.status(), extension: extension() } : null
+      },
       noticias: {
         fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
         avisos: NEWS_ALERTS.includes(cfg.noticiasAvisos) ? cfg.noticiasAvisos : 'aveces'
@@ -113,6 +118,7 @@ export function createSettings({
     }
     if (Array.isArray(patch.noticiasFuentes)) saveConfig({ noticiasFuentes: patch.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) })
     if (NEWS_ALERTS.includes(patch.noticiasAvisos)) saveConfig({ noticiasAvisos: patch.noticiasAvisos })
+    if ('classroomAvisos' in patch) saveConfig({ classroomAvisos: Boolean(patch.classroomAvisos) })
     if ('palabraMagica' in patch) wake?.setActive(Boolean(patch.palabraMagica))
     if (typeof patch.sensibilidadPalabra === 'string') wake?.setSensitivity(patch.sensibilidadPalabra)
     if (typeof patch.atajo === 'string') {
@@ -205,6 +211,20 @@ export function createSettings({
     return snapshot()
   }
 
+  // Classroom: la lee ahora (con la extensión de Chrome)
+  async function readClassroom() {
+    const st = await classroom.refresh({ force: true })
+    const mensaje =
+      st.estado === 'ok'
+        ? `Leí tus Pendientes: ${st.tareas === 0 ? 'no tenés tareas asignadas' : st.tareas === 1 ? 'tenés 1 tarea' : `tenés ${st.tareas} tareas`}.`
+        : st.estado === 'sin-extension'
+          ? 'Primero instalá la extensión de Chrome (los pasos están acá abajo) y dejá Chrome abierto.'
+          : st.estado === 'extension-vieja'
+            ? 'La extensión está desactualizada: en chrome://extensions tocá recargar en «Pixie para Chrome».'
+            : `No pude leer Classroom: ${st.error ?? 'probá de nuevo en un rato'}`
+    return { ...snapshot(), mensaje }
+  }
+
   // Los últimos titulares, para ver cómo quedan
   async function previewNews() {
     try {
@@ -229,6 +249,7 @@ export function createSettings({
     clipboardCalendar,
     removeCalendar,
     calendarAlerts,
-    previewNews
+    previewNews,
+    readClassroom
   }
 }

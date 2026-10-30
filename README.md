@@ -31,11 +31,11 @@ También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qu�
 
 ### Agenda: Google Calendar y Classroom
 
-Pixie suma tus calendarios a su agenda: «¿qué tengo hoy?», «¿qué tengo esta semana?», «¿qué tengo que entregar?» y el resumen del día los incluyen, y te avisa **15 minutos antes** de cada clase o evento y **la noche anterior y a la mañana** de cada entrega.
+Pixie suma tu calendario y tus tareas de Classroom a su agenda: «¿qué tengo hoy?», «¿qué tengo esta semana?», «¿qué tengo que entregar?» y el resumen del día los incluyen, y te avisa **15 minutos antes** de cada clase o evento y **la noche anterior y a la mañana** de cada entrega.
 
-En **Ajustes → Agenda** (o pedile «conectá mi Google Calendar») copiás la **dirección secreta en formato iCal** de tu calendario y Pixie la encuentra sola. Cada materia de Classroom tiene su propio calendario en Google Calendar: sumá uno por materia y las entregas te aparecen. Si no sabés dónde está la dirección, **«No sé dónde está»** te guía paso a paso (y te lo lee en voz alta).
+**Google Calendar.** En **Ajustes → Agenda** (o pedile «conectá mi Google Calendar») copiás la **dirección secreta en formato iCal** de tu calendario y Pixie la encuentra sola. Si no sabés dónde está, **«No sé dónde está»** te guía paso a paso (y te lo lee en voz alta). Es gratis y no pide iniciar sesión. La dirección secreta deja ver tu calendario a quien la tenga: Pixie la guarda **cifrada solo en esta compu** (`calendarios.json`, no va al respaldo) y se fija si hay cambios cada 15 minutos. Google solo la da para los calendarios que son tuyos, y algunos colegios la desactivan.
 
-Es gratis y no pide iniciar sesión. La dirección secreta deja ver tu calendario a quien la tenga: Pixie la guarda **cifrada solo en esta compu** (`calendarios.json`, no va al respaldo) y se fija si hay cambios cada 15 minutos. Con algunas cuentas del colegio, el colegio no deja ver la dirección secreta.
+**Classroom.** Las materias de Classroom son calendarios del profe y Google no da su dirección secreta. Por eso Pixie las lee con su **extensión de Chrome** (ver [Pixie para Chrome](#pixie-para-chrome-youtube-gmail-y-classroom)): cada 2 horas, si Chrome está abierto, abre tus **Pendientes** en una pestaña de fondo, los lee y la cierra. Usa la sesión que ya tenés en Chrome, así que anda también con cuentas del colegio. Las tareas con fecha van a la agenda como entregas, con sus avisos. Pedile «¿qué tengo en Classroom?» o tocá **Leer ahora** en Ajustes → Agenda. Lo último que leyó queda en `classroom.json`.
 
 ### Noticias
 
@@ -239,19 +239,20 @@ Las órdenes cortas que las reglas ya entienden («abrí Spotify», «subí el v
 
 Las acciones riesgosas (apagar, bloquear, cerrar apps) siempre te piden confirmación con botones, aunque las pida la IA.
 
-## Pixie para Chrome (YouTube y Gmail)
+## Pixie para Chrome (YouTube, Gmail y Classroom)
 
-Para que Pixie pueda darle like a un video o resumir un mail, instalá la extensión que está en la carpeta `extension/`:
+Para que Pixie pueda darle like a un video, resumir un mail o leer tus Pendientes de Classroom, instalá su extensión. Viene adentro de Pixie: al arrancar, la copia a la carpeta `extension-chrome` de su carpeta de datos.
 
-1. En Chrome, abrí `chrome://extensions` (en Edge, `edge://extensions`).
-2. Activá el **Modo de desarrollador** (arriba a la derecha en Chrome, a la izquierda en Edge).
-3. Tocá **Cargar extensión sin empaquetar** (o «Cargar desempaquetada») y elegí la carpeta `extension` de este repo.
+1. En Pixie: **Ajustes → Agenda → Classroom → Cómo instalar la extensión → Abrir la carpeta** (es `%APPDATA%\Pixie\extension-chrome`).
+2. En Chrome, abrí `chrome://extensions` (en Edge, `edge://extensions`).
+3. Activá el **Modo de desarrollador** (arriba a la derecha en Chrome, a la izquierda en Edge).
+4. Tocá **Cargar extensión sin empaquetar** (o «Cargar desempaquetada») y elegí la carpeta `extension-chrome`.
 
 Con Pixie abierto, la extensión se conecta sola (tarda hasta 30 segundos). Después probá con un video de YouTube abierto: «dale like» o «¿qué estoy viendo?». Para el mail, abrí uno en Gmail y decile «resumime este mail».
 
 **Poner temas.** Con la extensión, «poné goteo de Duki» busca en tu pestaña de YouTube (o abre una), elige el primer video (sin Shorts ni anuncios), lo reproduce y se fija que esté sonando; si Chrome no lo deja arrancar solo, le da play. Sin la extensión, Pixie busca el video y lo abre directo en el navegador. El filtro de contenido vale también para lo que pidas y para el título del video.
 
-**Cuando bajen una versión nueva de la extensión** (por ejemplo con `git pull`), en `chrome://extensions` tocá el botón de recargar de «Pixie para Chrome».
+**Cuando Pixie se actualiza**, la extensión nueva queda en la misma carpeta: en `chrome://extensions` tocá el botón de recargar de «Pixie para Chrome» (si está desactualizada, Pixie te lo dice). Si la habías instalado desde la carpeta `extension` del proyecto, quitala y cargá la de `extension-chrome`.
 
 Sin IA, el resumen es simple (de quién es, el asunto y las primeras oraciones). Con IA es un resumen de verdad y le podés hacer preguntas sobre el mail o la página.
 
@@ -330,6 +331,8 @@ src/
     wake-store.js  ← guarda la huella de tu voz para «Pixie, ¿estás?»
     calendars.js   ← lee Google Calendar y Classroom (formato iCal) y los suma a la agenda
     news.js        ← los titulares de Infobae y TN (RSS)
+    classroom.js   ← las tareas de Classroom que lee la extensión (y sus fechas de entrega)
+    extension-files.js ← copia la extensión de Chrome a la carpeta de datos de Pixie
     updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
     diagnostics.js ← anota los errores y arma el informe (sin claves)
     secrets.js     ← cifra las claves de config.json con la cuenta de Windows
@@ -375,7 +378,8 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 Lo nuevo de la versión 0.9 (acá se probó con un calendario de ejemplo; a Google, Infobae y TN no se pudo llegar desde el entorno de prueba):
 
-- **Agenda:** sumar tu Google Calendar y una materia de Classroom con la dirección secreta, preguntar «¿qué tengo esta semana?» y «¿qué tengo que entregar?», y ver que avise 15 minutos antes de algo.
+- **Agenda:** sumar tu Google Calendar con la dirección secreta, preguntar «¿qué tengo esta semana?» y «¿qué tengo que entregar?», y ver que avise 15 minutos antes de algo.
+- **Classroom (0.9.1):** instalar la extensión desde `extension-chrome`, tocar **Leer ahora** y comparar con tus Pendientes. Acá se probó con una página de ejemplo: si con el Classroom de verdad faltan tareas o salen mal, pasanos el `classroom.json` de la carpeta de Pixie (tiene lo que leyó).
 - **Noticias:** «¿qué noticias hay?», «noticias de TN», «más noticias» y «abrí la primera». En Ajustes → Noticias, **Ver los titulares**. Si Infobae o TN no aparecen, pasanos el informe de diagnóstico.
 
 Lo nuevo de la versión 0.8 (acá se probó con un micrófono simulado y voz sintética; falta con tu voz de verdad):

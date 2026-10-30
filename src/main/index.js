@@ -24,6 +24,8 @@ import { currentConditions } from './actions/weather.js'
 import { createWakeStore } from './wake-store.js'
 import { createCalendars } from './calendars.js'
 import { createNews } from './news.js'
+import { createClassroom } from './classroom.js'
+import { installExtensionFiles, olderThan } from './extension-files.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -46,6 +48,8 @@ let trayMenu = null
 let wake = null // «Pixie, ¿estás?»
 let calendars = null // Google Calendar, Classroom
 let news = null
+let classroom = null // las tareas de Classroom, con la extensión de Chrome
+let extensionFiles = null // dónde quedó la extensión para instalarla en Chrome
 const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
 
 // Errores anotados para el informe de diagnóstico (errores.log en la carpeta de Pixie)
@@ -137,6 +141,7 @@ function diagnosticsReport() {
     `Palabra mágica: ${wake?.status().activa ? `activa (sensibilidad ${wake.status().sensibilidad})` : wake?.status().grabada ? 'apagada' : 'sin grabar'}`,
     `Atajo: ${shortcutLabel()}${getConfig().atajo && getConfig().atajo !== activeShortcut ? ` (pidió ${shortcutText(getConfig().atajo)}, ocupado)` : ''}`,
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
+    `Classroom: ${classroom ? `${classroom.status().estado}, ${classroom.status().tareas} tareas` : 'sin arrancar'}`,
     `Calendarios: ${calendars?.status().map((c) => `${c.nombre}${c.error ? ' (no anda)' : ''}`).join(', ') || 'ninguno'}`,
     `Noticias por su cuenta: ${getConfig().noticiasAvisos ?? 'aveces'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
@@ -403,7 +408,14 @@ if (!app.requestSingleInstanceLock()) {
         if (win && !win.isVisible()) win.showInactive()
       }
     })
-    browser = createBrowserBridge({ log: logAction })
+    browser = createBrowserBridge({
+      log: logAction,
+      // Apenas se conecta la extensión (abriste Chrome), se fija en tus Pendientes de Classroom
+      onConnect: (version) => {
+        logAction(`extensión de Chrome ${version}`)
+        setTimeout(() => classroom?.refresh(), 5000)
+      }
+    })
     ai = createAI({ getConfig, ctx })
     phone = createPhone({ getConfig, log: logAction })
     tts = createVoices({
@@ -425,11 +437,32 @@ if (!app.requestSingleInstanceLock()) {
       log: logAction,
       onChange: () => trayMenu?.refresh()
     })
-    mind.memory.setExternal({ eventsBetween: calendars.eventsBetween, dueAlerts: calendars.dueAlerts })
+    classroom = createClassroom({
+      browser,
+      file: join(app.getPath('userData'), 'classroom.json'),
+      getConfig,
+      log: logAction,
+      onChange: () => trayMenu?.refresh()
+    })
+    mind.memory.setExternal({
+      eventsBetween: (from, to) => [...calendars.eventsBetween(from, to), ...classroom.eventsBetween(from, to)],
+      dueAlerts: (now) => [...calendars.dueAlerts(now), ...classroom.dueAlerts(now)]
+    })
     calendars.start()
+    classroom.start()
+    // La extensión viaja adentro de Pixie: queda copiada en su carpeta de datos para instalarla en Chrome
+    try {
+      extensionFiles = installExtensionFiles({
+        from: app.isPackaged ? join(process.resourcesPath, 'extension') : join(app.getAppPath(), 'extension'),
+        to: join(app.getPath('userData'), 'extension-chrome')
+      })
+    } catch (err) {
+      logAction(`extensión de Chrome: no la pude copiar (${err.message})`)
+    }
     Object.assign(ctx, {
       news,
       calendars,
+      classroom,
       phone,
       media,
       voice: tts,
@@ -526,6 +559,13 @@ if (!app.requestSingleInstanceLock()) {
       wake,
       calendars,
       news,
+      classroom,
+      extension: () => ({
+        carpeta: extensionFiles?.carpeta ?? null,
+        version: extensionFiles?.version ?? null,
+        conectada: Boolean(browser?.connected()),
+        vieja: Boolean(browser?.connected() && extensionFiles?.version && olderThan(browser.version(), extensionFiles.version))
+      }),
       version: app.getVersion()
     })
     const fromSettings = (e) => e.sender === getSettingsWindow()?.webContents
@@ -575,6 +615,10 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:calendario-avisos', (id, on) => settings.calendarAlerts(id, on))
     handle('ajustes:abrir-google-calendar', () => shell.openExternal(GOOGLE_CALENDAR_SETTINGS_URL))
     handle('ajustes:noticias-probar', () => settings.previewNews())
+    handle('ajustes:classroom-leer', () => settings.readClassroom())
+    handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
+    // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
+    handle('ajustes:copiar-direccion-extensiones', () => clipboard.writeText('chrome://extensions'))
     // Pixie lee en voz alta un paso de la guía (para quien prefiere escuchar)
     handle('ajustes:decir', (text) => sendEvent({ type: 'prueba-voz', text: String(text ?? '').slice(0, 400) }))
     // Mientras probás la frase en Ajustes, la ventanita no se despierta
@@ -690,6 +734,7 @@ if (!app.requestSingleInstanceLock()) {
     mind?.stop()
     media?.stop()
     calendars?.stop()
+    classroom?.stop()
     backup?.backup()
     browser?.close()
   })

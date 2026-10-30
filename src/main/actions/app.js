@@ -1,5 +1,6 @@
 // Acciones sobre Pixie misma: actualizarse, decir su versión, su atajo, cerrarse y armar el informe de diagnóstico.
 import { parseShortcut, shortcutText } from '../shortcut.js'
+import { describeWhen } from '../dates.js'
 
 export const appActions = [
   {
@@ -47,15 +48,44 @@ export const appActions = [
   },
   {
     name: 'conectar_calendario',
-    description: 'Explica cómo sumar Google Calendar o las materias de Classroom a la agenda de Pixie y abre donde se hace',
+    description: 'Explica cómo sumar tu Google Calendar a la agenda de Pixie y abre donde se hace',
     run: (_params, ctx) => {
       ctx.openSettings?.('ajustes/agenda')
       const n = ctx.calendars?.count() ?? 0
       const ya = n ? `Ya tengo ${n === 1 ? 'un calendario' : `${n} calendarios`}. ` : ''
       return {
-        text: `${ya}Te abrí mi agenda en Ajustes: copiá la «dirección secreta en formato iCal» de tu Google Calendar (o de cada materia de Classroom) y yo la encuentro sola. Si no sabés dónde está, tocá «No sé dónde está» y te guío paso a paso.`,
+        text: `${ya}Te abrí mi agenda en Ajustes: copiá la «dirección secreta en formato iCal» de tu Google Calendar y yo la encuentro sola. Si no sabés dónde está, tocá «No sé dónde está» y te guío paso a paso. Las tareas de Classroom las leo con mi extensión de Chrome.`,
         face: 'happy'
       }
+    }
+  },
+  {
+    name: 'classroom',
+    description: 'Lee tus Pendientes de Classroom (con la extensión de Chrome) y cuenta qué tenés que entregar',
+    run: async (_params, ctx) => {
+      if (!ctx.classroom) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
+      const st = await ctx.classroom.refresh({ force: true })
+      if (st.estado === 'sin-extension' && !st.leido) {
+        ctx.openSettings?.('ajustes/agenda')
+        return {
+          text: 'Las materias de Classroom no tienen dirección secreta, así que las leo con mi extensión de Chrome. Te abrí mis ajustes: en Agenda está cómo instalarla (es una sola vez).',
+          face: 'idle'
+        }
+      }
+      if (st.estado === 'extension-vieja') return { text: 'Mi extensión de Chrome está desactualizada: en chrome://extensions tocá recargar en «Pixie para Chrome».', face: 'confused' }
+      if (st.estado === 'error' && !st.leido) return { text: `No pude leer Classroom: ${st.error}`, face: 'confused' }
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const tasks = ctx.classroom.tasks()
+      const upcoming = tasks.filter((x) => x.cuando && new Date(x.cuando) >= today).sort((a, b) => new Date(a.cuando) - new Date(b.cuando))
+      const old = st.estado === 'ok' ? '' : ' (es lo último que leí: ahora no pude volver a mirar)'
+      if (!tasks.length) return { text: `En Classroom no tenés tareas asignadas.${old}`, face: 'happy' }
+      const names = upcoming.slice(0, 3).map((x) => `${x.titulo}${x.materia ? ` (${x.materia})` : ''} ${describeWhen(new Date(x.cuando), false, now)}`)
+      const sinFecha = tasks.length - upcoming.length
+      const total = tasks.length === 1 ? 'una tarea pendiente' : `${tasks.length} tareas pendientes`
+      const next = names.length ? ` Lo próximo: ${names.join('; ')}.` : ''
+      const rest = sinFecha ? ` ${sinFecha === 1 ? 'Una no tiene' : `${sinFecha} no tienen`} fecha de entrega.` : ''
+      return { text: `En Classroom tenés ${total}.${next}${rest}${old}`, face: upcoming.length ? 'surprised' : 'happy' }
     }
   },
   {

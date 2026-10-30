@@ -162,8 +162,13 @@ export const AI_TOOLS = [
     input_schema: obj({ n: int('Cuál de las noticias leídas', 1, 3) }, ['n'])
   },
   {
+    name: 'classroom',
+    description: 'Lee los Pendientes de Classroom del usuario (tareas asignadas, materia y fecha de entrega). Usala si pregunta por sus tareas o entregas de Classroom.',
+    input_schema: obj()
+  },
+  {
     name: 'conectar_calendario',
-    description: 'Abre la sección para sumar Google Calendar o las materias de Classroom a la agenda de Pixie y explica cómo',
+    description: 'Abre la sección para sumar el Google Calendar del usuario a la agenda de Pixie y explica cómo (Classroom va con la herramienta classroom)',
     input_schema: obj()
   },
   {

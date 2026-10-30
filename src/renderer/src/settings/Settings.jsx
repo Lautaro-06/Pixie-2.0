@@ -67,7 +67,7 @@ export default function Settings({ section: initial = 'general' }) {
       <main className="content">
         {section === 'general' && <General s={s} change={change} />}
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
-        {section === 'agenda' && <AgendaSection s={s} setS={setS} say={say} />}
+        {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
         {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
         {section === 'ia' && <AISection s={s} change={change} reload={load} say={say} />}
         {section === 'voz' && <VoiceSection s={s} setS={setS} change={change} say={say} />}
@@ -137,7 +137,107 @@ function Personalization({ s, change }) {
   )
 }
 
-function AgendaSection({ s, setS, say }) {
+// Hace cuánto: "hace 5 minutos", "hace 2 horas"
+function ago(ms) {
+  const min = Math.max(0, Math.round((Date.now() - ms) / 60000))
+  if (min < 1) return 'recién'
+  if (min < 60) return `hace ${min} ${min === 1 ? 'minuto' : 'minutos'}`
+  const h = Math.round(min / 60)
+  return h < 24 ? `hace ${h} ${h === 1 ? 'hora' : 'horas'}` : `hace ${Math.round(h / 24)} días`
+}
+
+function ClassroomCard({ c, setS, change, say }) {
+  const ext = c.extension
+  const [reading, setReading] = useState(false)
+  const [steps, setSteps] = useState(!ext.conectada && !c.leido)
+  let state
+  if (ext.vieja) state = 'La extensión está desactualizada: en chrome://extensions tocá el botón de recargar de «Pixie para Chrome».'
+  else if (c.estado === 'leyendo' || reading) state = 'Leyendo tus Pendientes…'
+  else if (c.leido) {
+    const tareas = c.tareas === 0 ? 'no tenías tareas asignadas' : c.tareas === 1 ? 'tenías 1 tarea' : `tenías ${c.tareas} tareas`
+    state = `Leí tus Pendientes ${ago(c.leido)}: ${tareas}${c.conFecha ? ` (${c.conFecha} con fecha de entrega, ya están en la agenda)` : ''}.${c.error ? ` La última vez no pude: ${c.error}` : ''}`
+  } else if (!ext.conectada) state = 'Todavía no está conectada la extensión de Chrome (o Chrome está cerrado).'
+  else state = c.error ? `No pude leer Classroom: ${c.error}` : 'La extensión está conectada. Tocá «Leer ahora».'
+  return (
+    <Card
+      title="Classroom"
+      note="Las materias de Classroom son calendarios del profe y Google no da su dirección secreta. Por eso las leo con mi extensión de Chrome: cada 2 horas, si Chrome está abierto, abro tus Pendientes en una pestaña de fondo, los leo y la cierro. No mando nada a internet."
+    >
+      <p className="big-status">{state}</p>
+      <Row label="Avisarme de las entregas" hint="La noche anterior a las 20 y ese día a las 8.">
+        <Toggle label="Avisarme de las entregas de Classroom" on={c.avisos} onChange={(v) => change({ classroomAvisos: v })} />
+      </Row>
+      <div className="buttons">
+        <button
+          type="button"
+          className="button"
+          disabled={reading}
+          onClick={async () => {
+            setReading(true)
+            const r = await api.settings.readClassroom()
+            setReading(false)
+            setS(r)
+            say(r.mensaje)
+          }}
+        >
+          {reading ? 'Leyendo…' : 'Leer ahora'}
+        </button>
+        <button type="button" className="button secondary" onClick={() => setSteps(!steps)}>
+          {steps ? 'Ocultar los pasos' : 'Cómo instalar la extensión'}
+        </button>
+      </div>
+      {steps && (
+        <div className="wizard">
+          <ol className="steps">
+            <li>
+              <span>
+                Abrí la carpeta de la extensión. Es <b>extension-chrome</b>, adentro de la carpeta de Pixie.
+              </span>
+              <button type="button" className="button secondary" onClick={() => api.settings.openExtensionFolder()}>
+                Abrir la carpeta
+              </button>
+            </li>
+            <li>
+              <span>
+                En Chrome, pegá <b>chrome://extensions</b> en la barra de direcciones y apretá Enter.
+              </span>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={async () => {
+                  await api.settings.copyExtensionsAddress()
+                  say('Copiado: pegalo en la barra de Chrome con Ctrl+V.')
+                }}
+              >
+                Copiar
+              </button>
+            </li>
+            <li>
+              <span>
+                Prendé <b>«Modo de desarrollador»</b> (arriba a la derecha).
+              </span>
+            </li>
+            <li>
+              <span>
+                Tocá <b>«Cargar extensión sin empaquetar»</b> y elegí la carpeta <b>extension-chrome</b> del paso 1.
+              </span>
+            </li>
+            <li>
+              <span>
+                <b>Listo:</b> en menos de un minuto se conecta y leo tus Pendientes. En Chrome tenés que haber entrado a Classroom con tu cuenta.
+              </span>
+            </li>
+          </ol>
+          <p className="note">
+            Si ya la tenías instalada desde la carpeta del proyecto, quitala y cargá esta: con cada versión nueva de Pixie se actualiza sola y solo tenés que tocar recargar.
+          </p>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function AgendaSection({ s, setS, change, say }) {
   const list = s.agenda.calendarios
   const hint = (c) => {
     if (c.error) return `No lo pude leer: ${c.error}`
@@ -146,7 +246,7 @@ function AgendaSection({ s, setS, say }) {
   }
   return (
     <>
-      <Header title="Agenda" text="Sumá tu Google Calendar y las materias de Classroom: te aviso antes de cada cosa y te las cuento cuando me preguntás «¿qué tengo hoy?»." />
+      <Header title="Agenda" text="Sumá tu Google Calendar y tus tareas de Classroom: te aviso antes de cada cosa y te las cuento cuando me preguntás «¿qué tengo hoy?» o «¿qué tengo que entregar?»." />
       {list.length > 0 && (
         <Card title="Tus calendarios" note="El interruptor es para los avisos: 15 minutos antes de cada clase o evento, y la noche anterior y a la mañana de cada entrega.">
           {list.map((c) => (
@@ -168,7 +268,8 @@ function AgendaSection({ s, setS, say }) {
           ))}
         </Card>
       )}
-      <Card title={list.length ? 'Sumar otro calendario' : 'Sumar un calendario'}>
+      {s.agenda.classroom && <ClassroomCard c={s.agenda.classroom} setS={setS} change={change} say={say} />}
+      <Card title={list.length ? 'Sumar otro calendario de Google' : 'Sumar tu Google Calendar'}>
         <CalendarWizard
           onAdded={(r) => {
             setS(r)

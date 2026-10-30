@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('pixie', {
     calendarAlerts: (id, on) => ipcRenderer.invoke('ajustes:calendario-avisos', String(id), Boolean(on)),
     openGoogleCalendar: () => ipcRenderer.invoke('ajustes:abrir-google-calendar'),
     previewNews: () => ipcRenderer.invoke('ajustes:noticias-probar'),
+    readClassroom: () => ipcRenderer.invoke('ajustes:classroom-leer'),
+    openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
+    copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),
     onView: (callback) => {
       const handler = (_event, view) => callback(view)
       ipcRenderer.on('ajustes:vista', handler)
