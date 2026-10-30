@@ -2,7 +2,25 @@
 
 Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pantalla con su cara animada: lo llamás con **Ctrl+Espacio**, le escribís lo que necesitás y lo hace en tu compu.
 
-## Qué hace (versión 0.5)
+## Instalar Pixie
+
+1. Entrá a [Releases](https://github.com/Lautaro-06/pixie-2.0/releases/latest) y bajá `Pixie-…-instalador.exe`.
+2. Abrilo. Como Pixie todavía no tiene firma digital, Windows muestra «Windows protegió su PC»: tocá **Más información → Ejecutar de todas formas**.
+3. Listo: aparece la cara abajo a la derecha y queda arrancando sola con Windows (se apaga desde el ícono de Pixie → **Iniciar con Windows**).
+
+### Actualizaciones
+
+Pixie se fija sola si hay una versión nueva al arrancar y cada 6 horas. La baja en segundo plano y, cuando está lista, avisa: «¡Hay una versión nueva de Pixie! ¿Me actualizo ahora?». Tocás **actualizar** y en unos segundos vuelve con la versión nueva. Si no, se instala sola la próxima vez que se cierre.
+
+También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qué versión tenés?», o desde el ícono → **Buscar actualizaciones**.
+
+### Si algo falla
+
+Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar informe de diagnóstico**) y pegá el informe con Ctrl+V donde lo quieras mandar. Trae la versión, la IA y la voz que usa y los últimos errores, **sin claves, contraseñas ni teléfonos**. Los errores también quedan en `errores.log`, en la carpeta de Pixie (ícono → **Abrir la carpeta de Pixie**).
+
+Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
+
+## Qué hace (versión 0.6)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -213,14 +231,14 @@ Se dibuja por código a partir del diseño original del ESP32, así que tiene mu
 
 ## Cómo correrlo
 
-Necesitás Windows 10 u 11, [Node.js 22](https://nodejs.org) y Git.
+Para usar Pixie alcanza con el instalador (ver [Instalar Pixie](#instalar-pixie)). Para programarla necesitás Windows 10 u 11, [Node.js 22.12 o más nuevo](https://nodejs.org) y Git.
 
 ```bash
 npm install
 npm run dev
 ```
 
-`npm install` también descarga Electron (unos 100 MB). Si en algún momento aparece el error `Electron uninstall`, corré `npx install-electron` y después de nuevo `npm run dev`.
+Si tu Node es más viejo, `npm install` avisa y te dice cómo actualizarlo. `npm install` también descarga Electron (unos 100 MB). Si en algún momento aparece el error `Electron uninstall`, corré `npx install-electron` y después de nuevo `npm run dev`. En modo desarrollo las actualizaciones automáticas están apagadas.
 
 Aparece la cara de Pixie abajo a la derecha y un ícono al lado del reloj de Windows. Apretá **Ctrl+Espacio** (o tocá el botón debajo de la cara, o el ícono) y escribile. La cara se puede arrastrar a cualquier lugar de la pantalla. Si hacés clic en otra ventana, Pixie no se calla: termina de pensar, escuchar o hablar, y 10 segundos después se achica dejando la respuesta en el globito. La **×** la achica sin callarla; **Esc** la cierra y la calla.
 
@@ -231,6 +249,15 @@ npm test          # prueba que Pixie entienda las frases
 npm run build     # compila la app
 npm run dist:win  # arma el instalador en dist/
 ```
+
+### Publicar una versión nueva
+
+GitHub Actions ([`.github/workflows/pixie.yml`](.github/workflows/pixie.yml)) corre las pruebas y arma el instalador en una compu con Windows con cada cambio en `main` (el instalador queda para bajar en la pestaña **Actions**). Para que les llegue a todos:
+
+1. Subí el número de `"version"` en `package.json` (por ejemplo, de 0.6.0 a 0.6.1).
+2. Subí el cambio a `main`.
+
+GitHub Actions crea la etiqueta `v0.6.1`, publica la Release con el instalador y, en unas horas como mucho, cada Pixie instalada ofrece actualizarse. Si la versión no cambió, no publica nada: así un arreglo a medias no le llega a nadie.
 
 ## Cómo está armado
 
@@ -262,12 +289,16 @@ src/
     catalog.js     ← apps, sitios y carpetas que sabe abrir
     windows.js     ← ayudantes para hablar con Windows
     config.js      ← configuración y historial en la compu
-    window.js      ← la ventana flotante
+    window.js      ← la ventana flotante (se vuelve a cargar sola si se cuelga)
     tray.js        ← el ícono al lado del reloj
+    updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
+    diagnostics.js ← anota los errores y arma el informe (sin claves)
   preload/         ← el puente seguro entre la interfaz y las acciones
   renderer/        ← la interfaz en React: la barra para escribir, la cara (src/face/) y el Pong (src/games/)
 extension/         ← la extensión «Pixie para Chrome» (YouTube, Gmail y páginas)
 test/              ← pruebas de las frases, fechas, memoria, iniciativa, la cara, el Pong, la IA y más
+scripts/           ← control de la versión de Node antes de npm install
+.github/workflows/ ← pruebas, instalador y Releases en GitHub Actions
 ```
 
 La interfaz (React) nunca toca Windows directamente: le pasa el texto a `main`, que decide qué acción corresponde y solo ejecuta las que están en `src/main/actions`.
@@ -297,7 +328,14 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
-Lo nuevo de la versión 0.5. Probado acá con Gemini de verdad: pasar la voz a texto y mirar una captura de pantalla. Falta probar en una PC con Windows:
+Lo nuevo de la versión 0.6 (el instalador se arma solo en GitHub; lo que falta es probarlo en una PC):
+
+- **Instalador:** que instale, que la cara aparezca y que el ícono muestre «Pixie 0.6.0».
+- **Arrancar con Windows:** reiniciar la compu y ver que Pixie abra sola. Destildar «Iniciar con Windows» y ver que deje de hacerlo.
+- **Actualizaciones:** con la 0.6.0 instalada, cuando se publique la 0.6.1 tiene que aparecer el aviso con el botón **actualizar** (o ícono → **Buscar actualizaciones**) y volver con la versión nueva.
+- **Informe:** «copiame el informe» y pegarlo en el bloc de notas: que tenga la versión y no tenga claves.
+
+De la versión 0.5. Probado acá con Gemini de verdad: pasar la voz a texto y mirar una captura de pantalla. Falta probar en una PC con Windows:
 
 - **Micrófono:** que pida permiso y te escuche (el botón del micrófono y Ctrl+Alt+Espacio).
 - **Voz natural:** «instalá la voz natural», esperar el aviso de que terminó y escuchar cómo habla.

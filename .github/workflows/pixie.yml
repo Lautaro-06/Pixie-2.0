@@ -1,0 +1,81 @@
+# Con cada cambio en main: prueba Pixie, arma el instalador en Windows y,
+# si la versión de package.json es nueva, la publica como Release.
+# Las Pixie instaladas ven esa Release y muestran el botón «Actualizar».
+name: Pixie
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pixie-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Las pruebas no necesitan bajar Electron (usan uno de mentira)
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run build
+
+  windows:
+    needs: pruebas
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: ¿Es una versión nueva?
+        id: version
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ] && ! git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then
+            echo "publicar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publicar=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Armar el instalador
+        if: steps.version.outputs.publicar != 'true'
+        run: npx electron-builder --win --publish never
+
+      - name: Publicar la versión ${{ steps.version.outputs.version }}
+        if: steps.version.outputs.publicar == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          git tag "$tag"
+          git push origin "$tag"
+          npx electron-builder --win --publish always
+          gh release edit "$tag" --draft=false --latest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixie-instalador
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          retention-days: 14

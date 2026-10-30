@@ -18,3 +18,8 @@ nsis:
   shortcutName: Pixie
   uninstallDisplayName: Pixie
   createDesktopShortcut: always
+publish:
+  provider: github
+  owner: Lautaro-06
+  repo: pixie-2.0
+  releaseType: draft

@@ -1,4 +1,7 @@
-import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer } from 'electron'
+import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer, clipboard } from 'electron'
+import { join } from 'node:path'
+import { release } from 'node:os'
+import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction } from './actions/index.js'
 import { loadConfig, getConfig, saveConfig, logAction, watchConfig } from './config.js'
@@ -9,9 +12,11 @@ import { createAI, aiErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
 import { createPhone } from './phone.js'
-import { FriendlyError } from './windows.js'
+import { FriendlyError, isWindows } from './windows.js'
 import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
+import { createUpdater } from './updates.js'
+import { createDiagnostics } from './diagnostics.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -26,7 +31,20 @@ let backup = null
 let phone = null
 let tts = null
 let media = null
+let updates = null
+let trayMenu = null
 const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
+
+// Errores anotados para el informe de diagnóstico (errores.log en la carpeta de Pixie)
+const diagnostics = createDiagnostics({ file: join(app.getPath('userData'), 'errores.log') })
+process.on('uncaughtException', (err) => {
+  console.error(err)
+  diagnostics.record('principal', err)
+})
+process.on('unhandledRejection', (err) => {
+  console.error(err)
+  diagnostics.record('principal', err)
+})
 
 // Lo que conviene mandarle a la IA aunque las reglas lo entiendan: charla y preguntas
 const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar_memoria'])
@@ -43,10 +61,36 @@ const ctx = {
   shortcutLabel,
   log: logAction,
   emit: sendEvent,
+  reportError: (source, err) => diagnostics.record(source, err),
+  // Copia el informe de diagnóstico y devuelve cuántos errores tiene
+  copyDiagnostics: () => {
+    clipboard.writeText(diagnosticsReport())
+    return Math.min(diagnostics.list().length, 30)
+  },
   hideWindow: () => getWindow()?.hide(),
   notify: (title, body) => {
     if (Notification.isSupported()) new Notification({ title, body }).show()
   }
+}
+
+function diagnosticsReport() {
+  let login = 'no'
+  try {
+    login = app.getLoginItemSettings().openAtLogin ? 'sí' : 'no'
+  } catch {
+    login = 'no se sabe'
+  }
+  return diagnostics.report([
+    `Versión: ${app.getVersion()} (${app.isPackaged ? 'instalada' : 'desarrollo'})`,
+    `Sistema: ${process.platform} ${release()} · ${process.arch}`,
+    `Electron ${process.versions.electron} · Chrome ${process.versions.chrome} · Node ${process.versions.node}`,
+    `IA: ${describeAI(getConfig()).text}`,
+    `Voz: ${({ piper: 'natural (Piper)', gemini: 'Gemini' })[tts?.engine()] ?? 'la de Windows'}`,
+    `Actualizaciones: ${updates?.describe() ?? 'sin arrancar'}`,
+    `Arranca con Windows: ${login}`,
+    `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
+    `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
+  ])
 }
 
 function openBar() {
@@ -122,6 +166,7 @@ async function ask(text) {
       const line = `IA (${ai.provider()}): ${err.status ? `${err.status} ` : ''}${err.message}`
       console.error(line)
       logAction(line)
+      diagnostics.record('ia', { message: line, stack: err.stack })
       const msg = aiErrorText(err)
       if (msg) return { text: msg, face: 'confused' }
     }
@@ -224,6 +269,7 @@ if (!app.requestSingleInstanceLock()) {
         return { text: await ai.transcribe(bytes) }
       } catch (err) {
         logAction(`voz: ${err.status ? `${err.status} ` : ''}${err.message}`)
+        diagnostics.record('micrófono', err)
         return { error: aiErrorText(err) ?? 'No me pude conectar para entenderte. ¿Hay internet?' }
       }
     })
@@ -248,6 +294,10 @@ if (!app.requestSingleInstanceLock()) {
       ai: Boolean(ai?.enabled())
     }))
     ipcMain.on('pixie:mode', (_e, mode) => setMode(mode))
+    // Errores de la ventana (la cara y la barra)
+    ipcMain.on('pixie:error', (_e, info) => {
+      diagnostics.record('ventana', { message: String(info?.message ?? info).slice(0, 500), stack: String(info?.stack ?? '').slice(0, 2000) })
+    })
     ipcMain.on('pixie:hide', () => getWindow()?.hide())
     ipcMain.on('pixie:game-result', (_e, result) => {
       const ganador = result?.ganador === 'user' ? 'vos' : 'Pixie'
@@ -291,6 +341,7 @@ if (!app.requestSingleInstanceLock()) {
           return await ai.look(image, pregunta)
         } catch (err) {
           logAction(`pantalla: ${err.status ? `${err.status} ` : ''}${err.message}`)
+          diagnostics.record('pantalla', err)
           throw new FriendlyError(aiErrorText(err) ?? 'No me pude conectar con la IA para mirar la pantalla.')
         }
       },
@@ -315,12 +366,54 @@ if (!app.requestSingleInstanceLock()) {
       howAreYou: mind.howAreYou
     })
 
-    createPixieWindow()
+    // Versiones nuevas desde las Releases de GitHub
+    updates = createUpdater({
+      updater: autoUpdater,
+      packaged: app.isPackaged,
+      currentVersion: app.getVersion(),
+      log: logAction,
+      reportError: ctx.reportError,
+      onChange: () => trayMenu?.refresh(),
+      onReady: (version) =>
+        mind.say({
+          kind: 'actualizacion',
+          text: `¡Hay una versión nueva de Pixie, la ${version}! ¿Me actualizo ahora? Si no, se instala sola la próxima vez que me cierres.`,
+          face: 'happy',
+          suggestions: ['actualizar']
+        })
+    })
+    ctx.updates = updates
+
+    // La primera vez que se abre la app instalada, queda arrancando con Windows (se apaga desde el ícono)
+    if (app.isPackaged && isWindows && !getConfig().arranqueConfigurado) {
+      app.setLoginItemSettings({ openAtLogin: true })
+      saveConfig({ arranqueConfigurado: true })
+    }
+
+    createPixieWindow({
+      onProblem: (what) => {
+        logAction(`ventana: ${what}`)
+        diagnostics.record('ventana', what)
+      }
+    })
     registerShortcut()
     registerVoiceShortcut()
     followCursor()
-    createTray({ onTalk: openBar, shortcutLabel })
+    trayMenu = createTray({
+      onTalk: openBar,
+      shortcutLabel,
+      updates,
+      checkUpdates: async () => {
+        const s = await updates.check()
+        if (s.state !== 'ready') ctx.notify('Pixie', updates.describe())
+      },
+      copyDiagnostics: () => {
+        ctx.copyDiagnostics()
+        ctx.notify('Pixie', 'Copié el informe de diagnóstico. Pegalo con Ctrl+V donde lo quieras mandar.')
+      }
+    })
     mind.start()
+    updates.start()
     console.log(`Pixie ${app.getVersion()} · ${ai.status()}`)
     // Si editás config.json con Pixie abierto, lo lee solo
     watchConfig((cfg) => {

@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('pixie', {
   voiceStop: (id) => ipcRenderer.send('pixie:voice-stop', id),
   speaking: (on) => ipcRenderer.send('pixie:speaking', Boolean(on)),
   transcribe: (wav) => ipcRenderer.invoke('pixie:transcribe', wav instanceof Uint8Array ? wav : new Uint8Array(wav)),
+  reportError: (info) =>
+    ipcRenderer.send('pixie:error', { message: String(info?.message ?? info).slice(0, 500), stack: String(info?.stack ?? '').slice(0, 2000) }),
   onEvent: (callback) => {
     const handler = (_event, data) => callback(data)
     ipcRenderer.on('pixie:event', handler)

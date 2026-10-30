@@ -17,7 +17,11 @@ export function getWindow() {
   return win
 }
 
-export function createPixieWindow() {
+// Si la cara se cuelga o se cierra, se vuelve a cargar sola (como mucho 5 veces cada 10 minutos)
+const RELOADS_ALLOWED = 5
+const RELOAD_WINDOW_MS = 10 * 60 * 1000
+
+export function createPixieWindow({ onProblem = () => {} } = {}) {
   const { workArea } = screen.getPrimaryDisplay()
   const size = SIZES.compact
   win = new BrowserWindow({
@@ -45,6 +49,20 @@ export function createPixieWindow() {
   })
   win.setAlwaysOnTop(true, 'floating')
   win.once('ready-to-show', () => win.showInactive())
+
+  const reloads = []
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit') return
+    onProblem(`la cara se cerró de golpe (${details.reason})`)
+    const now = Date.now()
+    while (reloads.length && now - reloads[0] > RELOAD_WINDOW_MS) reloads.shift()
+    if (reloads.length >= RELOADS_ALLOWED) return
+    reloads.push(now)
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.webContents.reload()
+    }, 1000)
+  })
+  win.on('unresponsive', () => onProblem('la cara dejó de responder'))
 
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(join(__dirname, '../renderer/index.html'))

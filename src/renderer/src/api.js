@@ -10,6 +10,7 @@ const preview = {
   setMode: () => {},
   hide: () => {},
   gameResult: () => {},
+  reportError: (info) => console.error(info),
   onEvent: () => () => {}
 }
 

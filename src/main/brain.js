@@ -213,6 +213,16 @@ function cleanEventText(s) {
 }
 
 const RULES = [
+  // Pixie misma: actualizarse, su versión y el informe de diagnóstico
+  (t) =>
+    /^(actualiza(te|r|la)?|actualizar (a )?(pixie|la app)|instala(r)? la (actualizacion|version nueva)|(busca(r)?|fijate si hay) (una |alguna )?(actualizacion(es)?|version nueva)|hay (una |alguna )?(actualizacion(es)?|version nueva))$/.test(t)
+      ? intent('actualizar')
+      : null,
+  (t) => (/\b(que version (tenes|sos|es|estas usando|usas)|en que version estas|tu version|version de pixie)\b/.test(t) ? intent('version') : null),
+  (t) =>
+    /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
+      ? intent('diagnostico')
+      : null,
   // Mirar la pantalla: "¿qué ves en mi pantalla?", "ayudame con esto", "explicame este error"
   (t) => {
     const screen =

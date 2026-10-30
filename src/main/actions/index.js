@@ -12,6 +12,7 @@ import { memoryActions, contextActions } from './memory.js'
 import { browserActions } from './browser.js'
 import { healthActions } from './health.js'
 import { deviceActions } from './devices.js'
+import { appActions } from './app.js'
 import { FriendlyError, BlockedError } from '../windows.js'
 import { BrowserError } from '../browser.js'
 
@@ -26,7 +27,8 @@ const ALL = [
   ...contextActions,
   ...browserActions,
   ...healthActions,
-  ...deviceActions
+  ...deviceActions,
+  ...appActions
 ]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
@@ -50,6 +52,7 @@ export async function runAction(name, params, ctx) {
     ctx.log(`${name} ${JSON.stringify(params ?? {})} → error: ${err.message}`)
     if (err instanceof FriendlyError || err instanceof BrowserError) return { text: err.message, face: 'confused' }
     console.error(err)
+    ctx.reportError?.(`acción ${name}`, err)
     return { text: 'Algo salió mal al hacerlo. Probá de nuevo.', face: 'confused' }
   }
 }
