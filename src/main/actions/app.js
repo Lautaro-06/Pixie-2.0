@@ -1,4 +1,4 @@
-// Acciones sobre Pixie misma: actualizarse, decir su versión, su atajo y armar el informe de diagnóstico.
+// Acciones sobre Pixie misma: actualizarse, decir su versión, su atajo, cerrarse y armar el informe de diagnóstico.
 import { parseShortcut, shortcutText } from '../shortcut.js'
 
 export const appActions = [
@@ -10,6 +10,48 @@ export const appActions = [
       ctx.openSettings('ajustes')
       return { text: 'Te abrí mis ajustes.', face: 'happy' }
     }
+  },
+  {
+    name: 'cerrar_pixie',
+    description: 'Cierra Pixie del todo (pide confirmación). Para esconderla un rato, mejor «escondete».',
+    confirm: true,
+    confirmText: () => '¿Me cierro del todo? Para volver a abrirme vas a tener que buscarme en el menú Inicio. Si solo querés que me corra, decime «escondete».',
+    run: (_params, ctx) => {
+      if (!ctx.quit) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
+      setTimeout(() => ctx.quit(), 1800)
+      return { text: '¡Chau! Me cierro.', face: 'sad' }
+    }
+  },
+  {
+    name: 'clave_ia',
+    description: 'Explica paso a paso cómo conseguir gratis la clave de Gemini y abre la guía',
+    run: (_params, ctx) => {
+      ctx.openSettings?.('ajustes/ia')
+      if (ctx.ai?.enabled()) return { text: 'Ya tengo IA. Te abrí mis ajustes por si la querés cambiar.', face: 'happy' }
+      return {
+        text: 'Te abrí la guía paso a paso. Es gratis: entrás a Google AI Studio con tu cuenta de Google, tocás «Crear clave de API» y la copiás. Yo la encuentro sola cuando la copiás.',
+        face: 'happy'
+      }
+    }
+  },
+  {
+    name: 'palabra_magica',
+    description: 'Explica cómo llamar a Pixie con la voz («Pixie, ¿estás?») y abre donde se graba',
+    run: (_params, ctx) => {
+      const w = ctx.wake?.status()
+      ctx.openSettings?.('ajustes/voz')
+      if (w?.activa) return { text: 'Ya te escucho: decí «Pixie, ¿estás?» y te atiendo. Si no te reconozco bien, grabá tu voz de nuevo en Ajustes.', face: 'happy' }
+      if (w?.grabada) return { text: 'Tengo tu voz grabada pero no estoy escuchando. Prendelo en Ajustes → Voz.', face: 'idle' }
+      return { text: 'Te abrí mis ajustes: decí tres veces «Pixie, ¿estás?» y aprendo tu voz. Después me llamás así, sin tocar nada.', face: 'happy' }
+    }
+  },
+  {
+    name: 'chats_privados',
+    description: 'Explica que Pixie no puede entrar a WhatsApp ni a otros chats',
+    run: () => ({
+      text: 'No puedo entrar a tu WhatsApp ni leer tus chats: no tengo acceso. Lo único que puedo es mirar tu pantalla si me lo pedís («mirá mi pantalla»), y ahí veo lo mismo que vos.',
+      face: 'idle'
+    })
   },
   {
     name: 'cambiar_atajo',

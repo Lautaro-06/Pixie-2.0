@@ -148,7 +148,7 @@ export const AI_TOOLS = [
   { name: 'que_suena', description: 'Dice qué canción o video está sonando en la compu (Spotify, YouTube, etc.).', input_schema: obj() },
   {
     name: 'ver_pantalla',
-    description: 'Saca una foto de la pantalla del usuario y la analiza para ayudarlo (errores, ejercicios, lo que esté viendo). Usala cuando diga "esto", "acá" o pida ayuda con lo que tiene abierto.',
+    description: 'Saca una foto de la pantalla del usuario y la analiza para ayudarlo (errores, ejercicios, lo que esté viendo). Usala solo cuando pida ayuda con lo que está viendo ("esto", "acá", "mirá mi pantalla"), nunca para revisar sus chats o cuentas. Si tiene una app de chat adelante, Pixie le pregunta antes.',
     input_schema: obj({ pregunta: str('Qué quiere saber el usuario sobre su pantalla') }, ['pregunta'])
   },
   {

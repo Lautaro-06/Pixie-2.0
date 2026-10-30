@@ -3,10 +3,10 @@ import { join } from 'node:path'
 import { release } from 'node:os'
 import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
-import { actions, runAction } from './actions/index.js'
+import { actions, runAction, needsConfirm } from './actions/index.js'
 import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
-import { createTray } from './tray.js'
+import { createMenus } from './tray.js'
 import { createMind } from './mind.js'
 import { createAI, aiErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
@@ -21,6 +21,7 @@ import { shortcutText } from './shortcut.js'
 import { createSettings, AI_STUDIO_URL } from './settings.js'
 import { openSettingsWindow, getSettingsWindow } from './settings-window.js'
 import { currentConditions } from './actions/weather.js'
+import { createWakeStore } from './wake-store.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -40,6 +41,7 @@ let tts = null
 let media = null
 let updates = null
 let trayMenu = null
+let wake = null // «Pixie, ¿estás?»
 const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
 
 // Errores anotados para el informe de diagnóstico (errores.log en la carpeta de Pixie)
@@ -96,9 +98,21 @@ const ctx = {
   },
   hideWindow: () => getWindow()?.hide(),
   openSettings: (view) => openSettingsWindow(view),
+  quit: () => quitPixie(),
   notify: (title, body) => {
     if (Notification.isSupported()) new Notification({ title, body }).show()
   }
+}
+
+// Cerrar del todo (no solo esconderla). Avisa cómo volver a abrirla.
+function quitPixie() {
+  ctx.notify('Pixie', 'Me cierro. Para volver a abrirme, buscá «Pixie» en el menú Inicio.')
+  logAction('cerrar: me cerraste')
+  setTimeout(() => app.quit(), 400)
+}
+
+function openHistory() {
+  shell.openPath(join(app.getPath('userData'), 'historial.txt'))
 }
 
 function diagnosticsReport() {
@@ -116,6 +130,7 @@ function diagnosticsReport() {
     `Voz: ${({ piper: 'natural (Piper)', gemini: 'Gemini' })[tts?.engine()] ?? 'la de Windows'}`,
     `Actualizaciones: ${updates?.describe() ?? 'sin arrancar'}`,
     `Arranca con Windows: ${login}`,
+    `Palabra mágica: ${wake?.status().activa ? `activa (sensibilidad ${wake.status().sensibilidad})` : wake?.status().grabada ? 'apagada' : 'sin grabar'}`,
     `Atajo: ${shortcutLabel()}${getConfig().atajo && getConfig().atajo !== activeShortcut ? ` (pidió ${shortcutText(getConfig().atajo)}, ocupado)` : ''}`,
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
@@ -239,7 +254,7 @@ async function ask(text) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
     for (const key of ['texto', 'nombre', 'pregunta']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     const action = actions[it.action]
-    if (action?.confirm) {
+    if (needsConfirm(action, it.params, ctx)) {
       pending = it
       results.push({ text: action.confirmText(it.params, ctx), face: 'idle', confirm: true })
       break
@@ -347,6 +362,7 @@ if (!app.requestSingleInstanceLock()) {
       version: app.getVersion(),
       feeling: mind?.feeling(),
       ai: Boolean(ai?.enabled()),
+      palabra: wake?.forWindow() ?? null,
       pantallaReposo: getConfig().pantallaReposo ?? 'cara',
       clima: weatherNow ? { temp: weatherNow.temp, icon: weatherNow.icon } : null
     }))
@@ -356,6 +372,14 @@ if (!app.requestSingleInstanceLock()) {
       diagnostics.record('ventana', { message: String(info?.message ?? info).slice(0, 500), stack: String(info?.stack ?? '').slice(0, 2000) })
     })
     ipcMain.on('pixie:hide', () => getWindow()?.hide())
+    // Solo la ventanita de Pixie: su menú, aparecer si estaba escondida (cuando la llamás con la voz)
+    const fromPixie = (e) => e.sender === getWindow()?.webContents
+    ipcMain.on('pixie:menu', (e) => fromPixie(e) && trayMenu?.popup())
+    ipcMain.on('pixie:show', (e) => {
+      const win = getWindow()
+      if (fromPixie(e) && win && !win.isVisible()) win.showInactive()
+    })
+    ipcMain.on('pixie:wake-log', (e, line) => fromPixie(e) && logAction(`palabra mágica: ${String(line).slice(0, 200)}`))
     ipcMain.on('pixie:game-result', (_e, result) => {
       const ganador = result?.ganador === 'user' ? 'vos' : 'Pixie'
       logAction(`partido de pong: ganó ${ganador}`)
@@ -441,6 +465,18 @@ if (!app.requestSingleInstanceLock()) {
     })
     ctx.updates = updates
 
+    // «Pixie, ¿estás?»: la huella de tu voz, en esta compu
+    wake = createWakeStore({
+      file: join(app.getPath('userData'), 'palabra-magica.json'),
+      getConfig,
+      saveConfig,
+      onChange: () => {
+        sendEvent({ type: 'palabra', ...wake.forWindow() })
+        trayMenu?.refresh()
+      }
+    })
+    ctx.wake = wake
+
     // Ajustes y bienvenida: solo la ventana de Ajustes puede usar estos pedidos
     settings = createSettings({
       getConfig,
@@ -462,9 +498,13 @@ if (!app.requestSingleInstanceLock()) {
       changeShortcut,
       shortcutLabel,
       setCity: async (ciudad) => (await runAction('configurar_ciudad', { ciudad }, ctx)).text,
-      onStandby: (mode) => syncStandby(mode),
+      onStandby: (mode) => {
+        syncStandby(mode)
+        trayMenu?.refresh()
+      },
       errorCount: () => diagnostics.list().length,
       readClipboard: () => clipboard.readText(),
+      wake,
       version: app.getVersion()
     })
     const fromSettings = (e) => e.sender === getSettingsWindow()?.webContents
@@ -479,10 +519,15 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:guardar-clave', async (key) => {
       const r = await settings.saveKey(key)
       if (r.guardada) logAction('ajustes: clave de IA nueva guardada (cifrada)')
+      trayMenu?.refresh()
       return r
     })
     handle('ajustes:clave-portapapeles', () => settings.clipboardKey())
-    handle('ajustes:borrar-clave', () => settings.forgetKey())
+    handle('ajustes:borrar-clave', () => {
+      const r = settings.forgetKey()
+      trayMenu?.refresh()
+      return r
+    })
     handle('ajustes:abrir-ai-studio', () => shell.openExternal(AI_STUDIO_URL))
     handle('ajustes:buscar-version', async () => {
       await updates.check()
@@ -492,13 +537,24 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:copiar-informe', () => ctx.copyDiagnostics())
     handle('ajustes:abrir-carpeta', () => shell.openPath(app.getPath('userData')))
     handle('ajustes:probar-voz', () => sendEvent({ type: 'prueba-voz', text: '¡Hola! Así sueno. ¿Te gusta mi voz?' }))
+    handle('ajustes:palabra-guardar', (plantillas) => {
+      const r = settings.saveWake(plantillas)
+      if (r.ok) logAction('palabra mágica: grabaste tu voz')
+      return r
+    })
+    handle('ajustes:palabra-borrar', () => settings.forgetWake())
+    handle('ajustes:palabra-plantillas', () => wake.templates())
+    // Pixie lee en voz alta un paso de la guía (para quien prefiere escuchar)
+    handle('ajustes:decir', (text) => sendEvent({ type: 'prueba-voz', text: String(text ?? '').slice(0, 400) }))
+    // Mientras probás la frase en Ajustes, la ventanita no se despierta
+    handle('ajustes:palabra-probando', (on) => sendEvent({ type: 'palabra', ...wake.forWindow(), pausada: Boolean(on) }))
     handle('ajustes:bienvenida-lista', () => {
       settings.finishWelcome()
       getSettingsWindow()?.close()
       const nombre = mind.memory.getName()
       mind.say({
         kind: 'bienvenida',
-        text: `¡Listo${nombre ? `, ${nombre}` : ''}! Ya estoy. Llamame con ${shortcutLabel()} o tocándome, y pedime lo que quieras.`,
+        text: `¡Listo${nombre ? `, ${nombre}` : ''}! Ya estoy. Llamame ${wake.status().activa ? 'diciendo «Pixie, ¿estás?», ' : ''}con ${shortcutLabel()} o tocándome, y pedime lo que quieras.`,
         face: 'love'
       })
     })
@@ -518,7 +574,7 @@ if (!app.requestSingleInstanceLock()) {
     registerShortcut()
     registerVoiceShortcut()
     followCursor()
-    trayMenu = createTray({
+    trayMenu = createMenus({
       onTalk: openBar,
       shortcutLabel,
       updates,
@@ -530,7 +586,13 @@ if (!app.requestSingleInstanceLock()) {
         ctx.copyDiagnostics()
         ctx.notify('Pixie', 'Copié el informe de diagnóstico. Pegalo con Ctrl+V donde lo quieras mandar.')
       },
-      openSettings: () => openSettingsWindow('ajustes')
+      openSettings: (view = 'ajustes') => openSettingsWindow(view),
+      getConfig,
+      setStandby: (mode) => settings.apply({ pantallaReposo: mode }),
+      wake,
+      hasAI: () => Boolean(ai?.enabled()),
+      openHistory,
+      quit: quitPixie
     })
     mind.start()
     updates.start()

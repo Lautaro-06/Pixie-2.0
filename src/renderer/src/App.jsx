@@ -5,6 +5,7 @@ import { api, isPreview } from './api.js'
 import { speak, stopSpeaking, beep, hasSpanishVoice, onVoicesReady, setNaturalVoice, isSpeaking } from './voice.js'
 import { playSound, hasSound } from './sounds.js'
 import { listen } from './audio.js'
+import { startWakeListener, HandsFreeError } from './wake-listener.js'
 
 function MicIcon() {
   return (
@@ -20,6 +21,7 @@ const SLEEP_AFTER_MS = 2 * 60 * 1000 // se duerme si no lo usás un rato
 const SLEEP_WHEN_TIRED_MS = 45 * 1000
 const WAKE_DISTANCE = 140 // se despierta si acercás el mouse
 const COLLAPSE_AFTER_BLUR_MS = 10 * 1000 // si usás otra ventana, se achica cuando termina y pasa este rato
+const MAX_VOICE_TURNS = 8 // en una charla por voz, cuántas veces seguidas te escucha sin que la vuelvas a llamar
 
 function loadPref(key) {
   try {
@@ -60,6 +62,8 @@ export default function App() {
   const [micLevel, setMicLevel] = useState(0)
   const [youSaid, setYouSaid] = useState(null) // lo que Pixie entendió de tu voz
   const [voiceShortcut, setVoiceShortcut] = useState(null)
+  const [wakeCfg, setWakeCfg] = useState(null) // «Pixie, ¿estás?»: { activa, plantillas, sensibilidad, pausada }
+  const [wakeRestart, setWakeRestart] = useState(0)
   const inputRef = useRef(null)
   const faceRef = useRef(null)
   const history = useRef([])
@@ -77,6 +81,13 @@ export default function App() {
   listeningRef.current = listening
   replyRef.current = reply
   const startListeningRef = useRef(() => {})
+  const wakeRef = useRef(null) // el que escucha la palabra mágica
+  const wakePaused = useRef(false) // mientras la probás en Ajustes
+  const away = useRef(false)
+  const voiceSession = useRef(null) // charla que empezó con «Pixie, ¿estás?»: { turns }
+  const onWakeRef = useRef(() => {})
+  const handsFreeWarned = useRef(false)
+  const micFailures = useRef(0)
 
   const soundsRef = useRef(soundsOn)
   soundsRef.current = soundsOn
@@ -179,6 +190,7 @@ export default function App() {
       if (info.feeling) setFeeling(info.feeling)
       if (info.pantallaReposo) setStandbyMode(info.pantallaReposo)
       if (info.clima) setWeather(info.clima)
+      if (info.palabra) setWakeCfg(info.palabra)
     }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
@@ -196,9 +208,15 @@ export default function App() {
       if (event.type === 'feeling') setFeeling(event.feeling)
       if (event.type === 'ajustes' && event.pantallaReposo) setStandbyMode(event.pantallaReposo)
       if (event.type === 'clima') setWeather({ temp: event.temp, icon: event.icon })
+      if (event.type === 'palabra') {
+        wakePaused.current = Boolean(event.pausada)
+        // Si es la misma voz grabada, no vuelve a abrir el micrófono
+        setWakeCfg((old) => (old && old.activa === event.activa && old.sensibilidad === event.sensibilidad && old.huella === event.huella ? old : event))
+      }
       // "Probar voz" desde los ajustes: habla aunque la voz esté apagada
       if (event.type === 'prueba-voz') speak(event.text, 'happy')
       if (event.type === 'presence') {
+        away.current = Boolean(event.away)
         if (event.away) {
           asleepRef.current = true
           setAsleep(true)
@@ -275,6 +293,105 @@ export default function App() {
     }
   }, [minimize])
 
+  // «Pixie, ¿estás?»: escucha todo el tiempo (en la compu) mientras esté prendido
+  const wakeTemplates = wakeCfg?.activa ? wakeCfg.plantillas : null
+  const wakeSensitivity = wakeCfg?.sensibilidad ?? 'normal'
+  useEffect(() => {
+    if (isPreview || !wakeTemplates) return
+    let stopped = false
+    let listener = null
+    startWakeListener({
+      templates: wakeTemplates,
+      sensibilidad: wakeSensitivity,
+      onWake: (info) => onWakeRef.current(info),
+      onLost: () => !stopped && setTimeout(() => setWakeRestart((n) => n + 1), 3000)
+    })
+      .then((l) => {
+        if (stopped) return l.stop()
+        micFailures.current = 0
+        listener = l
+        wakeRef.current = l
+      })
+      .catch((err) => {
+        if (err instanceof HandsFreeError) {
+          api.wakeLog?.(`no escucho todo el tiempo con el micrófono de los auriculares (${err.message})`)
+          if (!handsFreeWarned.current) {
+            handsFreeWarned.current = true
+            setNotice({
+              text: 'Con el micrófono de tus auriculares Bluetooth no me quedo escuchando «Pixie, ¿estás?»: tu música sonaría como una llamada. Llamame con el atajo o conectá otro micrófono.'
+            })
+          }
+        } else {
+          // Sin permiso o sin micrófono: prueba de nuevo cada vez más espaciado (hasta cada 10 minutos)
+          const fails = micFailures.current++
+          if (fails % 5 === 0) api.wakeLog?.(`no pude abrir el micrófono: ${err.message}`)
+          if (!stopped) setTimeout(() => setWakeRestart((n) => n + 1), Math.min(30000 * 2 ** fails, 10 * 60 * 1000))
+        }
+      })
+    return () => {
+      stopped = true
+      listener?.stop()
+      wakeRef.current = null
+    }
+  }, [wakeTemplates, wakeSensitivity, wakeRestart])
+
+  // No busca la frase mientras habla (para no escucharse a sí misma), te escucha, piensa o jugás
+  useEffect(() => {
+    if (!wakeTemplates) return
+    let quietSince = 0
+    let state = { listener: null, paused: null }
+    const id = setInterval(() => {
+      const l = wakeRef.current
+      if (!l) return
+      if (l !== state.listener) state = { listener: l, paused: null }
+      const speaking = isSpeaking()
+      if (speaking) quietSince = Date.now()
+      const pause =
+        listeningRef.current || busyRef.current || speaking || Date.now() - quietSince < 800 || wakePaused.current || away.current || Boolean(gameRef.current)
+      if (pause !== state.paused) {
+        state.paused = pause
+        if (pause) l.pause()
+        else l.resume()
+      }
+    }, 200)
+    return () => clearInterval(id)
+  }, [wakeTemplates])
+
+  onWakeRef.current = (info) => {
+    if (listeningRef.current || busyRef.current || gameRef.current) return
+    api.wakeLog?.(`me llamaste (distancia ${info.distance.total.toFixed(3)} de ${info.limit.total.toFixed(3)})`)
+    api.show?.()
+    voiceSession.current = { turns: 0 }
+    startListeningRef.current({ byVoice: true })
+  }
+
+  // Terminó la charla por voz (no dijiste nada más): se achica y vuelve a esperar «Pixie, ¿estás?».
+  // Si te habló, la última respuesta queda un rato en el globito de arriba.
+  function endVoiceSession(talked) {
+    voiceSession.current = null
+    if (talked) minimize()
+    else setExpanded(false) // la llamaste sin querer (o era la tele): se achica sin decir nada
+  }
+
+  // En una charla por voz, cuando termina de contestar te vuelve a escuchar un ratito.
+  // Si no decís nada, vuelve a esperar «Pixie, ¿estás?».
+  function keepListening() {
+    const session = voiceSession.current
+    if (!session) return
+    session.turns++
+    if (session.turns >= MAX_VOICE_TURNS) {
+      voiceSession.current = null
+      return
+    }
+    const started = Date.now()
+    const check = () => {
+      if (voiceSession.current !== session) return
+      if (isSpeaking() && Date.now() - started < 30000) return setTimeout(check, 250)
+      setTimeout(() => voiceSession.current === session && startListeningRef.current({ followUp: true }), 400)
+    }
+    setTimeout(check, 600)
+  }
+
   const mood = busy ? 'thinking' : expanded ? 'listening' : asleep ? 'sleeping' : 'idle'
   // En reposo puede mostrar la hora o el resumen; mientras la usás, siempre la cara
   const resting = !expanded && !notice && !game && !listening && !busy
@@ -286,15 +403,22 @@ export default function App() {
   async function send(text, { spoken = false } = {}) {
     const clean = text.trim()
     if (!clean || busy) return
-    if (!spoken) setYouSaid(null)
+    if (!spoken) {
+      setYouSaid(null)
+      voiceSession.current = null // si escribís, deja de escucharte sola
+    }
     lastActivity.current = Date.now()
     history.current = [clean, ...history.current.filter((h) => h !== clean)].slice(0, 30)
     historyPos.current = -1
     setInput('')
     setBusy(true)
     try {
-      show(await api.ask(clean))
+      const result = await api.ask(clean)
+      show(result)
+      if (spoken && !result.game) keepListening()
+      else voiceSession.current = null
     } catch {
+      voiceSession.current = null
       show({ text: 'Algo falló adentro mío. Probá de nuevo.', face: 'confused' })
     } finally {
       setBusy(false)
@@ -312,9 +436,12 @@ export default function App() {
     }
   }
 
-  // Hablarle: graba hasta que dejás de hablar, la IA lo pasa a texto y se manda solo
-  async function startListening() {
+  // Hablarle: graba hasta que dejás de hablar, la IA lo pasa a texto y se manda solo.
+  // byVoice: la llamaste con «Pixie, ¿estás?»; followUp: sigue la charla por voz.
+  async function startListening({ byVoice = false, followUp = false } = {}) {
     if (listening || busy) return
+    const quietly = byVoice || followUp // si no decís nada, no te reta: vuelve a esperar
+    if (!quietly) voiceSession.current = null
     open()
     stopSpeaking()
     if (!api.transcribe) {
@@ -323,8 +450,9 @@ export default function App() {
     }
     let rec
     try {
-      rec = await listen({ onLevel: setMicLevel })
+      rec = await listen({ onLevel: setMicLevel, waitMs: followUp ? 5000 : 6000 })
     } catch {
+      voiceSession.current = null
       show({ text: 'No pude usar el micrófono. Fijate en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.', face: 'confused' })
       return
     }
@@ -336,7 +464,8 @@ export default function App() {
     setListening(false)
     setMicLevel(0)
     if (!wav) {
-      if (!heard) show({ text: 'No te escuché. Tocá el micrófono y hablame.', face: 'confused' })
+      if (quietly) endVoiceSession(followUp)
+      else if (!heard) show({ text: 'No te escuché. Tocá el micrófono y hablame.', face: 'confused' })
       return
     }
     setBusy(true)
@@ -347,8 +476,14 @@ export default function App() {
       result = { error: 'Algo falló adentro mío. Probá de nuevo.' }
     }
     setBusy(false)
-    if (result.error) return show({ text: result.error, face: 'confused' })
-    if (!result.text) return show({ text: 'No te entendí bien. ¿Me lo repetís?', face: 'confused' })
+    if (result.error) {
+      voiceSession.current = null
+      return show({ text: result.error, face: 'confused' })
+    }
+    if (!result.text) {
+      if (followUp) return endVoiceSession(true)
+      return show({ text: 'No te entendí bien. ¿Me lo repetís?', face: 'confused' })
+    }
     setYouSaid(result.text)
     send(result.text, { spoken: true })
   }
@@ -363,6 +498,7 @@ export default function App() {
     if (game) return // el juego maneja sus teclas
     if (e.key === 'Escape' && listening) {
       e.preventDefault()
+      voiceSession.current = null
       stopListening(false)
     } else if (e.key === 'Escape') {
       e.preventDefault()
@@ -404,9 +540,21 @@ export default function App() {
   }
 
   return (
-    <div className={`pixie ${expanded ? 'is-expanded' : 'is-compact'}${booting ? ' is-booting' : ''}`} onKeyDown={onKeyDown}>
+    <div
+      className={`pixie ${expanded ? 'is-expanded' : 'is-compact'}${booting ? ' is-booting' : ''}`}
+      onKeyDown={onKeyDown}
+      onContextMenu={(e) => {
+        // Clic derecho en cualquier parte de Pixie: el mismo menú que el ícono al lado del reloj
+        if (e.target.closest('input')) return
+        e.preventDefault()
+        api.menu?.()
+      }}
+    >
       {expanded && (
         <section className="panel" aria-label="Hablar con Pixie">
+          <button type="button" className="menu-button" aria-label="Menú (ajustes, actualizaciones, cerrar)" title="Menú: ajustes, actualizaciones, cerrar" onClick={() => api.menu?.()}>
+            ⋯
+          </button>
           <button type="button" className="close" aria-label="Achicar (sigue hablando)" title="Achicar" onClick={minimize}>
             ×
           </button>
@@ -414,7 +562,7 @@ export default function App() {
             {youSaid && !listening && <p className="said">«{youSaid}»</p>}
             {listening ? (
               <div className="listening">
-                <p>Te escucho…</p>
+                <p>{voiceSession.current?.turns === 0 ? 'Acá estoy, te escucho…' : 'Te escucho…'}</p>
                 <div className="meter" aria-hidden="true">
                   <span style={{ transform: `scaleX(${Math.min(1, micLevel * 12)})` }} />
                 </div>
@@ -474,7 +622,7 @@ export default function App() {
             <button type="button" className="link" onClick={toggleSounds}>
               {soundsOn ? 'Sonidos: sí' : 'Sonidos: no'}
             </button>
-            <span>{voiceShortcut ? `${voiceShortcut}: hablar` : 'Esc para cerrar'}</span>
+            <span>{wakeTemplates ? 'Decí «Pixie, ¿estás?»' : voiceShortcut ? `${voiceShortcut}: hablar` : 'Esc para cerrar'}</span>
           </div>
         </section>
       )}
@@ -514,13 +662,13 @@ export default function App() {
         </section>
       )}
 
-      <div className="face" ref={faceRef} title="Arrastrame para moverme">
+      <div className="face" ref={faceRef} title="Arrastrame para moverme · clic derecho: menú">
         <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} />
       </div>
 
       {!expanded && !notice && (
-        <button type="button" className="talk" onClick={open}>
-          {shortcut}
+        <button type="button" className="talk" onClick={open} title={wakeTemplates ? `O con ${shortcut}` : undefined}>
+          {wakeTemplates ? '«Pixie, ¿estás?»' : shortcut}
         </button>
       )}
     </div>

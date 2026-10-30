@@ -1,7 +1,7 @@
 // La bienvenida: la primera vez deja a Pixie lista en un minuto (nombre, IA gratis y cómo llamarla).
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { TextSetting, ShortcutPicker, KeyWizard, LedScreen } from './parts.jsx'
+import { TextSetting, ShortcutPicker, KeyWizard, LedScreen, WakeTrainer } from './parts.jsx'
 
 const STEPS = ['hola', 'ia', 'llamar', 'listo']
 
@@ -83,7 +83,11 @@ export default function Welcome() {
       {name === 'llamar' && (
         <section className="welcome-step">
           <h1>Cómo llamarme</h1>
-          <p className="lead">Con este atajo de teclado me abrís desde cualquier lado. También podés tocar mi cara o mi ícono al lado del reloj.</p>
+          <p className="lead">La forma más fácil: decime «Pixie, ¿estás?». Para eso tengo que aprender tu voz (lo hacés una sola vez, acá abajo).</p>
+          <div className="welcome-card">
+            <WakeTrainer palabra={s.voz.palabra} change={change} setS={setS} compact />
+          </div>
+          <p className="lead small">O con este atajo de teclado, desde cualquier lado. También podés tocar mi cara.</p>
           <div className="center">
             <ShortcutPicker current={s.general.atajo} onChange={(atajo) => change({ atajo })} />
           </div>
@@ -105,7 +109,7 @@ export default function Welcome() {
           <h1>¡Listo{s.general.nombre ? `, ${s.general.nombre}` : ''}!</h1>
           <p className="lead">
             {hasAI ? 'Ya tengo todo.' : 'Ya estoy, aunque sin IA: entiendo las órdenes cortas. La podés sumar cuando quieras desde mis Ajustes.'} Probá pedirme «poné música»,
-            «¿qué clima hace?» o «juguemos». Todo esto lo podés cambiar después en mis <b>Ajustes</b> (clic derecho en mi ícono).
+            «¿qué clima hace?» o «juguemos». Todo esto lo podés cambiar después en mis <b>Ajustes</b>: hacé clic derecho en mi cara y aparece mi menú (ahí también me podés cerrar).
           </p>
           <div className="actions">
             <button type="button" className="button" onClick={() => api.settings.finishWelcome()}>

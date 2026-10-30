@@ -159,7 +159,8 @@ export const infoActions = [
     description: 'Esconde a Pixie hasta que lo llames con el atajo',
     run: (_params, ctx) => {
       setTimeout(() => ctx.hideWindow(), 1600)
-      return { text: `¡Chau! Llamame con ${ctx.shortcutLabel()}.`, face: 'wink' }
+      const voice = ctx.wake?.status().activa ? 'decime «Pixie, ¿estás?» o ' : ''
+      return { text: `¡Chau! Cuando me necesites, ${voice}usá ${ctx.shortcutLabel()}.`, face: 'wink' }
     }
   }
 ]

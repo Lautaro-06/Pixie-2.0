@@ -4,6 +4,12 @@ import { describeWhen, startOfDay, addDays } from '../dates.js'
 
 const STEP = 20
 
+// La app de chat que está adelante, o null
+function privateApp(ctx) {
+  const act = ctx.awareness?.()?.actividad
+  return act?.categoria === 'mensajes' ? act.app : null
+}
+
 export const deviceActions = [
   {
     name: 'voz',
@@ -36,6 +42,10 @@ export const deviceActions = [
   {
     name: 'ver_pantalla',
     description: 'Mira tu pantalla (una foto que no se guarda) y te ayuda con lo que ve',
+    // Si tenés un chat adelante (WhatsApp, Telegram, Discord), pregunta antes: la foto va a la IA
+    confirm: (_params, ctx) => privateApp(ctx) !== null,
+    confirmText: (_params, ctx) =>
+      `Tenés ${privateApp(ctx)} abierto. Para mirar tu pantalla le mando una foto a la IA de Google, con tus chats incluidos. ¿Miro igual?`,
     run: ({ pregunta }, ctx) => ctx.lookAtScreen(pregunta)
   },
   {

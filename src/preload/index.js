@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('pixie', {
   info: () => ipcRenderer.invoke('pixie:info'),
   setMode: (mode) => ipcRenderer.send('pixie:mode', mode),
   hide: () => ipcRenderer.send('pixie:hide'),
+  show: () => ipcRenderer.send('pixie:show'),
+  menu: () => ipcRenderer.send('pixie:menu'),
+  wakeLog: (line) => ipcRenderer.send('pixie:wake-log', String(line).slice(0, 200)),
   gameResult: (result) => ipcRenderer.send('pixie:game-result', result),
   voice: (request) => ipcRenderer.invoke('pixie:voice', request),
   voiceStop: (id) => ipcRenderer.send('pixie:voice-stop', id),
@@ -34,6 +37,11 @@ contextBridge.exposeInMainWorld('pixie', {
     openFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta'),
     testVoice: () => ipcRenderer.invoke('ajustes:probar-voz'),
     finishWelcome: () => ipcRenderer.invoke('ajustes:bienvenida-lista'),
+    saveWake: (plantillas) => ipcRenderer.invoke('ajustes:palabra-guardar', plantillas),
+    forgetWake: () => ipcRenderer.invoke('ajustes:palabra-borrar'),
+    testingWake: (on) => ipcRenderer.invoke('ajustes:palabra-probando', Boolean(on)),
+    wakeTemplates: () => ipcRenderer.invoke('ajustes:palabra-plantillas'),
+    speak: (text) => ipcRenderer.invoke('ajustes:decir', String(text).slice(0, 400)),
     onView: (callback) => {
       const handler = (_event, view) => callback(view)
       ipcRenderer.on('ajustes:vista', handler)

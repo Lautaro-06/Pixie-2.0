@@ -5,7 +5,27 @@ import { configPath } from './config.js'
 
 let tray = null
 
-export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyDiagnostics, openSettings }) {
+const STANDBY = [
+  ['cara', 'Mi carita'],
+  ['reloj', 'La hora'],
+  ['resumen', 'Carita, hora y clima']
+]
+
+// El mismo menú sale del ícono al lado del reloj y de la ventanita de Pixie (botón ⋯ o clic derecho en la cara).
+export function createMenus({
+  onTalk,
+  shortcutLabel,
+  updates,
+  checkUpdates,
+  copyDiagnostics,
+  openSettings,
+  getConfig,
+  setStandby,
+  wake,
+  hasAI,
+  openHistory,
+  quit
+}) {
   // En la app instalada, los íconos quedan fuera del paquete (app.asar.unpacked).
   tray = new Tray(nativeImage.createFromPath(trayIcon.replace('app.asar', 'app.asar.unpacked')))
   tray.setToolTip('Pixie')
@@ -19,18 +39,27 @@ export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyD
     return { label: 'Buscar actualizaciones', click: () => checkUpdates?.() }
   }
 
-  const build = () =>
-    Menu.buildFromTemplate([
-      { label: `Hablar con Pixie (${shortcutLabel()})`, click: onTalk },
+  const wakeItem = () => {
+    const w = wake?.status()
+    if (!w?.grabada) return { label: 'Llamarme con la voz («Pixie, ¿estás?»)…', click: () => openSettings?.('ajustes/voz') }
+    return { label: 'Escuchar «Pixie, ¿estás?»', type: 'checkbox', checked: w.activa, click: (item) => wake.setActive(item.checked) }
+  }
+
+  const template = (where) => {
+    const win = getWindow()
+    const standby = getConfig?.().pantallaReposo ?? 'cara'
+    return [
+      where === 'tray' && { label: `Hablar con Pixie (${shortcutLabel()})`, click: onTalk },
+      where === 'tray'
+        ? { label: 'Mostrar u ocultar', click: () => (win?.isVisible() ? win.hide() : win?.showInactive()) }
+        : { label: 'Esconderme un rato', click: () => win?.hide() },
+      { label: 'Ajustes…', click: () => openSettings?.('ajustes') },
       {
-        label: 'Mostrar u ocultar',
-        click: () => {
-          const win = getWindow()
-          if (win?.isVisible()) win.hide()
-          else win?.showInactive()
-        }
+        label: 'En reposo muestro',
+        submenu: STANDBY.map(([id, label]) => ({ label, type: 'radio', checked: standby === id, click: () => setStandby?.(id) }))
       },
-      { label: 'Ajustes…', click: () => openSettings?.() },
+      wakeItem(),
+      !hasAI?.() && { label: 'Activar la IA gratis (te explico paso a paso)…', click: () => openSettings?.('ajustes/ia') },
       { type: 'separator' },
       updateItem(),
       {
@@ -39,16 +68,32 @@ export function createTray({ onTalk, shortcutLabel, updates, checkUpdates, copyD
         checked: app.getLoginItemSettings().openAtLogin,
         click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked })
       },
-      { label: 'Abrir config.json', click: () => shell.openPath(configPath()) },
-      { type: 'separator' },
-      { label: 'Copiar informe de diagnóstico', click: () => copyDiagnostics?.() },
-      { label: 'Abrir la carpeta de Pixie', click: () => shell.openPath(app.getPath('userData')) },
+      {
+        label: 'Ayuda',
+        submenu: [
+          { label: 'Copiar informe de diagnóstico', click: () => copyDiagnostics?.() },
+          { label: 'Ver lo que hice (historial)', click: () => openHistory?.() },
+          { label: 'Abrir la carpeta de Pixie', click: () => shell.openPath(app.getPath('userData')) },
+          { label: 'Abrir config.json', click: () => shell.openPath(configPath()) }
+        ]
+      },
       { label: `Pixie ${app.getVersion()}`, enabled: false },
       { type: 'separator' },
-      { label: 'Salir', click: () => app.quit() }
-    ])
+      { label: 'Cerrar Pixie', click: () => quit?.() }
+    ].filter(Boolean)
+  }
 
-  tray.setContextMenu(build())
+  const refresh = () => tray?.setContextMenu(Menu.buildFromTemplate(template('tray')))
+  refresh()
   tray.on('click', onTalk)
-  return { tray, refresh: () => tray?.setContextMenu(build()) }
+
+  return {
+    tray,
+    refresh,
+    // Desde la ventanita: aparece donde está el mouse
+    popup: () => {
+      const win = getWindow()
+      if (win && !win.isDestroyed()) Menu.buildFromTemplate(template('window')).popup({ window: win })
+    }
+  }
 }

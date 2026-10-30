@@ -14,7 +14,7 @@ body.ventana-ajustes #root {
   overflow: hidden;
 }
 
-.ventana-ajustes .ventana-ajustes .loading {
+.ventana-ajustes .loading {
   display: grid;
   place-items: center;
   height: 100%;
@@ -394,6 +394,106 @@ body.ventana-ajustes #root {
   width: auto;
 }
 
+/* ── Guía paso a paso de la clave ── */
+.ventana-ajustes .guide-open {
+  margin-top: 14px;
+}
+.ventana-ajustes .guide {
+  background: var(--field);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 16px 18px;
+  text-align: left;
+}
+.ventana-ajustes .guide-count {
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ventana-ajustes .guide h3 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.ventana-ajustes .guide-text {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.ventana-ajustes .guide-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.ventana-ajustes .spacer {
+  flex: 1;
+}
+
+/* ── «Pixie, ¿estás?» ── */
+.ventana-ajustes .wake-lead {
+  margin: 4px 0 12px;
+}
+.ventana-ajustes .wake-takes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ventana-ajustes .wake-takes span {
+  width: 28px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.ventana-ajustes .wake-takes span.done {
+  background: var(--ok);
+}
+.ventana-ajustes .wake-takes span.on {
+  background: var(--accent);
+}
+.ventana-ajustes .wake .meter {
+  height: 6px;
+  margin-top: 12px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.ventana-ajustes .wake .meter span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+}
+.ventana-ajustes .wake .status {
+  margin: 12px 0 4px;
+}
+.ventana-ajustes .wake-actions {
+  margin-top: 12px;
+}
+.ventana-ajustes .segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ventana-ajustes .segmented button {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.ventana-ajustes .segmented button:first-child {
+  border-left: 0;
+}
+.ventana-ajustes .segmented button.selected {
+  background: rgba(156, 211, 255, 0.15);
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ── Bienvenida ── */
 .ventana-ajustes .welcome {
   height: 100%;
@@ -459,6 +559,18 @@ body.ventana-ajustes #root {
 }
 .ventana-ajustes .form .field {
   width: 100%;
+}
+.ventana-ajustes .welcome-card {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: left;
+}
+.ventana-ajustes .welcome-step .lead.small {
+  margin: 18px 0 10px;
+  font-size: 14px;
 }
 .ventana-ajustes .center {
   display: flex;

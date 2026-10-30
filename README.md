@@ -1,12 +1,27 @@
 # Pixie
 
-Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pantalla con su cara animada: lo llamás con **Ctrl+Espacio**, le escribís lo que necesitás y lo hace en tu compu.
+Pixie es un asistente de escritorio para Windows. Vive en una esquina de la pantalla con su cara animada: la llamás diciendo **«Pixie, ¿estás?»** (o con **Ctrl+Espacio**), le pedís lo que necesitás y lo hace en tu compu.
 
 ## Instalar Pixie
 
 1. Entrá a [Releases](https://github.com/Lautaro-06/Pixie-2.0/releases/latest) y bajá `Pixie-…-instalador.exe`.
 2. Abrilo. Como Pixie todavía no tiene firma digital, Windows muestra «Windows protegió su PC»: tocá **Más información → Ejecutar de todas formas**.
-3. Listo: aparece la cara abajo a la derecha y queda arrancando sola con Windows (se apaga desde el ícono de Pixie → **Iniciar con Windows**).
+3. Listo: aparece la cara abajo a la derecha y queda arrancando sola con Windows (se apaga desde el menú de Pixie → **Iniciar con Windows**).
+4. La primera vez se abre la **bienvenida**: tu nombre, la clave gratis de la IA y cómo llamarla. Pixie se instala **sin ninguna clave**: cada persona pone la suya. Si nunca sacaste una, tocá **«No entiendo nada: explicame paso a paso»** y te guía de a un paso por vez (y te lo lee en voz alta si querés).
+
+### El menú de Pixie
+
+Todo se hace desde la ventanita: **clic derecho en la cara** (o el botón **⋯** arriba de la barra) abre el menú con **Ajustes**, qué mostrar en reposo, «Pixie, ¿estás?», actualizaciones, arrancar con Windows, la ayuda (informe, historial, carpeta) y **Cerrar Pixie**. Es el mismo menú del ícono al lado del reloj. También podés pedirle «cerrate» (pregunta antes) o «escondete» (se va hasta que la llamás).
+
+### Llamarla con la voz: «Pixie, ¿estás?»
+
+En **Ajustes → Voz** (o en la bienvenida) decís tres veces «Pixie, ¿estás?» y aprende tu voz. Desde ahí la llamás así, sin tocar nada: hace un sonidito, te escucha y, cuando dejás de hablar, hace lo que le pediste. Si le seguís hablando, te sigue escuchando; cuando te quedás callado, vuelve a esperar la frase.
+
+- **Funciona en la compu:** compara lo que oye con tus grabaciones (sin internet). No manda audio a ningún lado hasta que la llamás. De tu voz guarda solo una huella (números) en `palabra-magica.json`, que no va al respaldo.
+- Mientras está prendido, Windows muestra el ícono del micrófono en la barra de tareas.
+- Si se despierta sola, elegí **Menos** en «Qué tan fácil me despierto»; si no te escucha, **Más**, o grabá tu voz de nuevo en el lugar donde la vas a usar. **Probar ahora** te muestra si te reconoce.
+- Con el micrófono de unos auriculares Bluetooth no se queda escuchando (el sonido quedaría «de llamada»): usá el de la compu u otro.
+- Para entender lo que le pedís después de llamarla necesita la IA (Gemini).
 
 ### Actualizaciones
 
@@ -16,12 +31,12 @@ También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qu�
 
 ### Ajustes
 
-Clic derecho en el ícono de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
+Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
 
 - **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud y avisos al celular.
 - **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
-- **Inteligencia artificial:** si está conectada, probar la clave, cambiarla o borrarla.
-- **Voz:** natural (argentina, sin internet), la de Windows o Gemini, y un botón para escucharla.
+- **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
+- **Voz:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
 - **Actualizaciones** y **Ayuda** (el informe de diagnóstico y la carpeta de Pixie).
 
 ### Si el atajo no anda
@@ -34,7 +49,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.7)
+## Qué hace (versión 0.8)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -103,9 +118,9 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. Lo que decís por el micrófono solo se graba mientras el botón está rojo, y el audio va a la IA para pasarlo a texto. Los WhatsApp pasan por CallMeBot, un servicio gratuito de terceros.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros.
 
-Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, en `config.json`.
+Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 
 ## Filtro de contenido
 
@@ -123,7 +138,7 @@ Ningún filtro es perfecto: para una compu que va a usar el público, conviene s
 
 ## Voz
 
-**Hablarle.** Tocá el micrófono de la barra o apretá **Ctrl+Alt+Espacio** desde cualquier app, decí lo que necesitás y quedate callado: Pixie entiende que terminaste, lo pasa a texto y lo hace. Necesita la IA de Gemini (o Groq). Si el micrófono no anda, revisá en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.
+**Hablarle.** Decí **«Pixie, ¿estás?»** (ver [Llamarla con la voz](#llamarla-con-la-voz-pixie-estás)), tocá el micrófono de la barra o apretá **Ctrl+Alt+Espacio** desde cualquier app, decí lo que necesitás y quedate callado: Pixie entiende que terminaste, lo pasa a texto y lo hace. Necesita la IA de Gemini (o Groq). Si el micrófono no anda, revisá en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.
 
 **Su voz.** De entrada usa la voz de Windows. Para que hable con una **voz natural con acento argentino**, decile «instalá la voz natural»: baja una sola vez unos 135 MB ([Piper](https://github.com/rhasspy/piper) con la voz [Daniela](https://huggingface.co/rhasspy/piper-voices), de Argentina) y desde ahí habla con esa voz, **en la compu, sin internet y sin límite**. Habla un poco más rápido o más lento según cómo está. «¿qué voz usás?» te dice cuál está usando y «usá la voz de Windows» vuelve a la de siempre.
 
@@ -298,7 +313,8 @@ src/
     windows.js     ← ayudantes para hablar con Windows
     config.js      ← configuración y historial en la compu
     window.js      ← la ventana flotante (se vuelve a cargar sola si se cuelga)
-    tray.js        ← el ícono al lado del reloj
+    tray.js        ← el menú de Pixie (el ícono al lado del reloj y la ventanita usan el mismo)
+    wake-store.js  ← guarda la huella de tu voz para «Pixie, ¿estás?»
     updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
     diagnostics.js ← anota los errores y arma el informe (sin claves)
     secrets.js     ← cifra las claves de config.json con la cuenta de Windows
@@ -307,7 +323,8 @@ src/
     shortcut.js    ← entiende atajos («control alt p» → Control+Alt+P)
   preload/         ← el puente seguro entre la interfaz y las acciones
   renderer/        ← la interfaz en React: la barra para escribir, la cara (src/face/, con la pantalla de reposo en standby.js),
-                     el Pong (src/games/) y la ventana de Ajustes y la bienvenida (src/settings/)
+                     el Pong (src/games/), la ventana de Ajustes y la bienvenida (src/settings/) y
+                     «Pixie, ¿estás?» (wake.js reconoce la frase, wake-listener.js escucha el micrófono)
 extension/         ← la extensión «Pixie para Chrome» (YouTube, Gmail y páginas)
 test/              ← pruebas de las frases, fechas, memoria, iniciativa, la cara, el Pong, la IA y más
 scripts/           ← control de la versión de Node antes de npm install
@@ -340,6 +357,14 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.8 (acá se probó con un micrófono simulado y voz sintética; falta con tu voz de verdad):
+
+- **«Pixie, ¿estás?»:** grabar tu voz en Ajustes → Voz, tocar **Probar ahora** y llamarla varias veces. Contanos cuántas veces te reconoce y si se despierta sola con la tele, música o gente hablando (y con qué sensibilidad).
+- **Charla por voz:** llamarla, pedirle algo y, cuando conteste, pedirle otra cosa sin volver a llamarla. Quedarte callado y ver que vuelva a esperar.
+- **Menú:** clic derecho en la cara y el botón ⋯: que aparezca el menú y que **Cerrar Pixie** la cierre.
+- **Instalación nueva:** en otra compu (o borrando `%APPDATA%\Pixie`), que arranque sin clave y la bienvenida explique paso a paso cómo sacarla.
+- **Pantalla y chats:** con WhatsApp abierto, «¿qué ves en mi pantalla?» tiene que preguntar antes de mirar.
 
 Lo nuevo de la versión 0.7:
 
@@ -375,7 +400,6 @@ De la versión 0.4:
 
 ## Próximos pasos
 
-- Llamarlo diciendo «Pixie, ¿estás ahí?» (sin tocar nada).
 - Charla fluida por voz, sin esperar a que termine cada frase.
 - Plugins para que cualquiera le sume herramientas.
 - Cambiar el fondo de pantalla según el clima o el ánimo.

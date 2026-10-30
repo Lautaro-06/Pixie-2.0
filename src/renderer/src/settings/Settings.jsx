@@ -1,7 +1,7 @@
 // La ventana de Ajustes: todo lo que antes había que tocar en config.json.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizard, LedScreen } from './parts.jsx'
+import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizard, LedScreen, WakeTrainer } from './parts.jsx'
 
 const SECTIONS = [
   ['general', 'General'],
@@ -66,7 +66,7 @@ export default function Settings({ section: initial = 'general' }) {
         {section === 'general' && <General s={s} change={change} />}
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
         {section === 'ia' && <AISection s={s} change={change} reload={load} say={say} />}
-        {section === 'voz' && <VoiceSection s={s} change={change} say={say} />}
+        {section === 'voz' && <VoiceSection s={s} setS={setS} change={change} say={say} />}
         {section === 'actualizaciones' && <Updates s={s} setS={setS} say={say} />}
         {section === 'ayuda' && <Help s={s} say={say} />}
       </main>
@@ -102,7 +102,7 @@ function General({ s, change }) {
           <TextSetting id="ciudad" value={g.ciudad} placeholder="Buenos Aires" onSave={(ciudad) => change({ ciudad })} />
         </Row>
       </Card>
-      <Card title="Cómo llamarme" note="También podés tocar mi cara o mi ícono al lado del reloj.">
+      <Card title="Cómo llamarme" note="También podés decir «Pixie, ¿estás?» (se activa en Voz) o tocar mi cara. Clic derecho en mi cara abre mi menú.">
         <Row label="Atajo de teclado" hint="Tiene que llevar Ctrl o Alt. Si otro programa ya lo usa, te aviso.">
           <ShortcutPicker current={g.atajo} onChange={(atajo) => change({ atajo })} />
         </Row>
@@ -190,11 +190,17 @@ function AISection({ s, change, reload, say }) {
   )
 }
 
-function VoiceSection({ s, change, say }) {
+function VoiceSection({ s, setS, change, say }) {
   return (
     <>
-      <Header title="Voz" text="Cómo sueno cuando te contesto." />
-      <Card>
+      <Header title="Voz" text="Cómo me llamás con la voz y cómo sueno cuando te contesto." />
+      <Card
+        title="Llamame con la voz"
+        note="Te escucho solo en esta compu: no mando audio a internet hasta que me llamás. Mientras esté prendido, Windows muestra el ícono del micrófono en la barra de tareas. Para entender lo que me pedís después de llamarme, uso la IA."
+      >
+        <WakeTrainer palabra={s.voz.palabra} change={change} setS={setS} />
+      </Card>
+      <Card title="Cómo sueno">
         <div className="choices" role="radiogroup" aria-label="Voz">
           {VOICES.map(([id, name, text]) => (
             <button key={id} type="button" role="radio" aria-checked={s.voz.modo === id} className={`choice${s.voz.modo === id ? ' selected' : ''}`} onClick={() => change({ vozModo: id })}>

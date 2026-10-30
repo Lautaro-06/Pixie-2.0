@@ -67,7 +67,7 @@ export function level(samples) {
 }
 
 // Empieza a escuchar. Termina sola cuando dejás de hablar (o con stop()).
-// Devuelve { done: Promise<{ wav, heard }>, stop(), cancel() }
+// Devuelve { done: Promise<{ wav, samples, heard }>, stop(), cancel() } (samples: a 16 kHz, para aprender tu voz)
 // Los micrófonos de auriculares Bluetooth pasan los auriculares a "manos libres"
 // y todo el sonido de la compu queda como de llamada. Si hay otro micrófono, se usa ese.
 export function isHandsFree(label) {
@@ -90,11 +90,16 @@ async function microphoneId() {
   }
 }
 
-export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 15000, waitMs = 6000 } = {}) {
+// El mismo micrófono y el mismo filtrado para grabar tu voz y para escucharte después
+export async function openMicrophone() {
   const deviceId = await microphoneId()
-  const stream = await navigator.mediaDevices.getUserMedia({
+  return navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }
   })
+}
+
+export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 15000, waitMs = 6000 } = {}) {
+  const stream = await openMicrophone()
   const ctx = new AudioContext()
   const source = ctx.createMediaStreamSource(stream)
   const proc = ctx.createScriptProcessor(4096, 1, 1)
@@ -117,14 +122,15 @@ export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 150
     stream.getTracks().forEach((t) => t.stop())
     const rate = ctx.sampleRate
     ctx.close()
-    if (!keep || !heard) return resolveDone({ wav: null, heard })
+    if (!keep || !heard) return resolveDone({ wav: null, samples: null, heard })
     const all = new Float32Array(chunks.reduce((n, c) => n + c.length, 0))
     let offset = 0
     for (const c of chunks) {
       all.set(c, offset)
       offset += c.length
     }
-    resolveDone({ wav: encodeWav(downsample(all, rate)), heard })
+    const samples = downsample(all, rate)
+    resolveDone({ wav: encodeWav(samples), samples, heard })
   }
 
   proc.onaudioprocess = (e) => {

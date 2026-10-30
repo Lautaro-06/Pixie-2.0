@@ -139,7 +139,22 @@ button, input { font: inherit; color: inherit; }
 .panel > .close:hover { color: var(--accent); }
 .panel { position: relative; }
 .panel > .close { top: 4px; right: 8px; cursor: pointer; z-index: 1; }
-.panel .bubble { padding-right: 18px; }
+.panel > .menu-button {
+  position: absolute;
+  top: 3px;
+  right: 30px;
+  z-index: 1;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.panel > .menu-button:hover { color: var(--accent); }
+.panel .bubble { padding-right: 44px; }
 
 /* Panel para escribirle */
 .panel {

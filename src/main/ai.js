@@ -4,7 +4,7 @@
 // Sin clave (o sin internet) sigue funcionando con las reglas de brain.js.
 import Anthropic from '@anthropic-ai/sdk'
 import { AI_TOOLS } from './ai-tools.js'
-import { actions, runAction } from './actions/index.js'
+import { actions, runAction, needsConfirm } from './actions/index.js'
 import { pageForAI } from './actions/browser.js'
 import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver, whisperTranscribe } from './ai-compatible.js'
 import { FriendlyError } from './windows.js'
@@ -30,6 +30,7 @@ Qué hacés:
 - Si te cuentan algo personal que valga la pena recordar (gustos, familia, planes, cómo les fue), guardalo con recordar_dato sin preguntar. Si mencionan algo con fecha, agendalo.
 - Si te preguntan algo de conocimiento general, respondé vos mismo, corto y claro.
 - Para resumir un mail o una página, usá leer_pagina.
+- No podés entrar a WhatsApp, a los mails ni a ninguna cuenta: no tenés acceso. Si te piden «revisá mi WhatsApp», decí que no podés leer sus chats. Solo ves la pantalla si usás ver_pantalla, y eso es una foto de lo que está a la vista: contalo así («en tu pantalla veo…»).
 - A Pixie la usan chicos y público en general (por ejemplo en una feria). Nunca muestres, describas, abras ni busques contenido sexual, violencia explícita o gore, ni cómo conseguir cosas ilegales (drogas, armas, contrabando, documentos falsos). Si te lo piden, decí que no con buena onda y ofrecé otra cosa, sin sugerir dónde encontrarlo. Si una herramienta contesta que algo está bloqueado, no intentes otra forma de abrirlo.
 - Cada mensaje trae un bloque <contexto> con la fecha, lo que el usuario está haciendo y lo que sabés de él. Usalo con naturalidad, sin recitarlo.`
 
@@ -158,7 +159,7 @@ export function createAI({
     }
     const action = actions[name]
     if (!action) return { content: `No existe la herramienta ${name}.`, isError: true }
-    if (action.confirm) {
+    if (needsConfirm(action, params, ctx)) {
       ctx.setPending({ action: name, params })
       return { content: `Pixie le mostró al usuario botones Sí/No: «${action.confirmText(params, ctx)}». Todavía no se hizo.`, confirm: true }
     }
@@ -237,7 +238,8 @@ export function createAI({
     const prompt =
       'Esta es una captura de la pantalla del usuario. La carita de píxeles en una esquina sos vos: ignorala. ' +
       (question ? `Te pregunta: «${question}». ` : 'Contale en pocas palabras qué está haciendo y ofrecé una ayuda concreta. ') +
-      'Respondé en 1 a 3 oraciones, en español rioplatense, empezando con tu etiqueta de emoción.'
+      'Respondé en 1 a 3 oraciones, en español rioplatense, empezando con tu etiqueta de emoción. ' +
+      'Lo que sabés sale solo de esta foto: decí «en tu pantalla veo…», nunca que revisaste, entraste o leíste una app o una cuenta.'
     const content =
       p.name === 'claude'
         ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } }, { type: 'text', text: prompt }]

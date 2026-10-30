@@ -8,10 +8,11 @@ let fakeSettings = {
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
   apariencia: { pantallaReposo: 'cara' },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
-  voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.' },
+  voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.', palabra: { grabada: false, activa: false, sensibilidad: 'normal' } },
   actualizaciones: { state: 'dev', current: 'navegador', texto: 'Las actualizaciones andan en la app instalada.' },
   ayuda: { errores: 0 }
 }
+if (new URLSearchParams(location.search).get('voz') === 'grabada') fakeSettings.voz.palabra = { grabada: true, activa: true, sensibilidad: 'normal' }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const previewSettings = {
   get: async () => fakeSettings,
@@ -23,7 +24,15 @@ const previewSettings = {
       ...fakeSettings,
       general: g,
       apariencia: patch.pantallaReposo ? { pantallaReposo: patch.pantallaReposo } : fakeSettings.apariencia,
-      voz: patch.vozModo ? { ...fakeSettings.voz, modo: patch.vozModo } : fakeSettings.voz,
+      voz: {
+        ...fakeSettings.voz,
+        ...(patch.vozModo ? { modo: patch.vozModo } : {}),
+        palabra: {
+          ...fakeSettings.voz.palabra,
+          ...('palabraMagica' in patch ? { activa: patch.palabraMagica } : {}),
+          ...(patch.sensibilidadPalabra ? { sensibilidad: patch.sensibilidadPalabra } : {})
+        }
+      },
       ia: 'iaActiva' in patch ? { ...fakeSettings.ia, activa: patch.iaActiva } : fakeSettings.ia
     }
     return { ...fakeSettings, mensajes: patch.atajo ? [`Ahora me llamás con ${g.atajo}.`] : [] }
@@ -43,6 +52,14 @@ const previewSettings = {
   openFolder: async () => {},
   testVoice: async () => {},
   finishWelcome: async () => {},
+  saveWake: async () => {
+    fakeSettings = { ...fakeSettings, voz: { ...fakeSettings.voz, palabra: { grabada: true, activa: true, sensibilidad: 'normal' } } }
+    return { ok: true, mensaje: '¡Listo! Ahora llamame diciendo «Pixie, ¿estás?».', ...fakeSettings }
+  },
+  forgetWake: async () => (fakeSettings = { ...fakeSettings, voz: { ...fakeSettings.voz, palabra: { grabada: false, activa: false, sensibilidad: 'normal' } } }),
+  testingWake: async () => {},
+  wakeTemplates: async () => null,
+  speak: async (text) => console.log('Pixie diría:', text),
   onView: () => () => {}
 }
 
@@ -61,6 +78,9 @@ const preview = {
   }),
   setMode: () => {},
   hide: () => {},
+  show: () => {},
+  menu: () => console.log('Acá aparece el menú de Pixie (en la app de escritorio).'),
+  wakeLog: () => {},
   gameResult: () => {},
   reportError: (info) => console.error(info),
   onEvent: () => () => {},

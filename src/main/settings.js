@@ -40,6 +40,7 @@ export function createSettings({
   onStandby = () => {},
   errorCount = () => 0,
   readClipboard = () => '',
+  wake = null,
   version = '0.0.0'
 }) {
   let candidate = null // la clave que se encontró copiada, sin mostrarla
@@ -69,7 +70,8 @@ export function createSettings({
       },
       voz: {
         modo: cfg.vozNatural === false ? 'windows' : cfg.vozNatural === 'gemini' ? 'gemini' : 'natural',
-        estado: voices?.status() ?? ''
+        estado: voices?.status() ?? '',
+        palabra: wake?.status() ?? { grabada: false, activa: false, sensibilidad: 'normal' }
       },
       actualizaciones: { ...updates.status(), texto: updates.describe() },
       ayuda: { errores: errorCount() }
@@ -96,6 +98,8 @@ export function createSettings({
       voices.use(true)
       voices.install()
     }
+    if ('palabraMagica' in patch) wake?.setActive(Boolean(patch.palabraMagica))
+    if (typeof patch.sensibilidadPalabra === 'string') wake?.setSensitivity(patch.sensibilidadPalabra)
     if (typeof patch.atajo === 'string') {
       const accel = parseShortcut(patch.atajo)
       if (!accel) mensajes.push('Ese atajo no sirve: tiene que llevar Ctrl o Alt y una tecla.')
@@ -144,5 +148,20 @@ export function createSettings({
     saveConfig({ bienvenidaHecha: true })
   }
 
-  return { snapshot, apply, testKey, saveKey, forgetKey, clipboardKey, finishWelcome }
+  // «Pixie, ¿estás?»: guarda o borra la huella de tu voz
+  function saveWake(plantillas) {
+    try {
+      wake.save(plantillas)
+      return { ok: true, mensaje: '¡Listo! Ahora llamame diciendo «Pixie, ¿estás?».', ...snapshot() }
+    } catch (err) {
+      return { ok: false, mensaje: err.message, ...snapshot() }
+    }
+  }
+
+  function forgetWake() {
+    wake.forget()
+    return snapshot()
+  }
+
+  return { snapshot, apply, testKey, saveKey, forgetKey, clipboardKey, finishWelcome, saveWake, forgetWake }
 }

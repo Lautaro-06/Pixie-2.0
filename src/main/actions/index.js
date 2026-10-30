@@ -1,6 +1,6 @@
 // La lista cerrada de acciones de Pixie. Solo se puede ejecutar lo que está acá.
 // Cada acción tiene: name, description, run(params, ctx) y, si es riesgosa,
-// confirm: true y confirmText(params, ctx).
+// confirm: true (o una función que decide según el momento) y confirmText(params, ctx).
 // Más adelante esta misma lista se le puede dar a una IA como herramientas.
 import { infoActions } from './info.js'
 import { openActions } from './open.js'
@@ -32,6 +32,12 @@ const ALL = [
 ]
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
+
+// ¿Hay que preguntar antes? Si el usuario ya dijo que sí, no se vuelve a preguntar.
+export function needsConfirm(action, params, ctx) {
+  if (!action?.confirm || params?.confirmado) return false
+  return typeof action.confirm === 'function' ? Boolean(action.confirm(params ?? {}, ctx)) : true
+}
 
 // Si recién tocaste la música, Pixie no la pausa para hablar
 const MEDIA_ACTIONS = new Set(['musica', 'youtube', 'volumen', 'que_suena', 'reproducir', 'youtube_click'])

@@ -223,6 +223,28 @@ const RULES = [
     /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
       ? intent('diagnostico')
       : null,
+  // Cerrarla del todo ("pixie" se borra al normalizar: "cerrá Pixie" llega como "cerra")
+  (t) =>
+    /^(quiero |podes )?(cerra(te|r)?|cierra(te)?|apaga(te|r)?|sali(r)?( de)?|chau cerrate)( del todo| la app| la aplicacion| el programa| de)?$/.test(t)
+      ? intent('cerrar_pixie')
+      : null,
+  // La clave de la IA: "¿cómo consigo la clave?", "ayudame a poner la IA"
+  (t) =>
+    (/\b(clave|api ?key|apikey)\b/.test(t) && /\b(consig|saco|sacar|pong|poner|ayud|activ|como|donde|entiendo|que es|necesito|no tengo)/.test(t)) ||
+    /\b(pong|poner|activ|conect)\w* (la |tu |una )?(ia|inteligencia artificial|gemini)\b/.test(t)
+      ? intent('clave_ia')
+      : null,
+  // "Revisá mi WhatsApp": no tiene acceso a los chats, y lo dice
+  (t) =>
+    (/\b(revisa|revisame|lee|leeme|lei|mira|fijate|chequea|abri)\b.*\b(whatsapp|mis chats|mis mensajes|mensajes nuevos)\b/.test(t) && !/\b(abri|abrir)\b(?!.*\b(chats?|mensajes)\b)/.test(t)) ||
+    /^(tengo|me llegaron) (mensajes|whatsapps?)( nuevos)?( en whatsapp)?$/.test(t)
+      ? intent('chats_privados')
+      : null,
+  // Llamarla con la voz: "¿cómo te llamo con la voz?", "quiero enseñarte mi voz"
+  (t) =>
+    /\b(palabra magica|(llamarte|te llamo|llamar(te)?) (con|por) (la )?voz|llamarte hablando|(aprende(r)?|ensenarte|grabar) mi voz|que me escuches (siempre|sin tocar))\b/.test(t)
+      ? intent('palabra_magica')
+      : null,
   // Sus ajustes (los de Windows siguen yendo a la Configuración de Windows).
   // "pixie" se borra al normalizar: "configuración de Pixie" llega como "configuracion de"
   (t) =>

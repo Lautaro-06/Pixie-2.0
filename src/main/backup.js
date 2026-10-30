@@ -1,12 +1,21 @@
 // Respaldo de la memoria: una copia en la compu y otra en la nube (la carpeta de
 // OneDrive, que Windows sincroniza solo). Si se rompe la compu, en la nueva Pixie
-// recupera sus recuerdos al arrancar. Las claves nunca se copian.
+// recupera sus recuerdos al arrancar. Las claves nunca se copian, ni lo que es de cada compu
+// (así en una compu nueva Pixie arranca sin clave y con la bienvenida, que explica cómo ponerla).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { dayKey } from './dates.js'
 
 const KEEP_DAYS = 7
-const SECRETS = ['claveIA', 'whatsapp']
+const SECRETS = ['claveIA', 'whatsapp', 'cifrado']
+const THIS_PC = ['bienvenidaHecha', 'arranqueConfigurado', 'atajoAvisado']
+
+// La configuración sin claves ni lo que es de esta compu
+export function portableConfig(cfg) {
+  const out = { ...cfg }
+  for (const k of [...SECRETS, ...THIS_PC]) delete out[k]
+  return out
+}
 
 // Dónde está la nube: la carpeta que diga config.json o la de OneDrive
 export function cloudFolder(cfg = {}, env = process.env) {
@@ -34,9 +43,7 @@ export function createBackup({ dataDir, getConfig = () => ({}), env = process.en
     const { cloud, dirs } = targets()
     let config = null
     try {
-      const cfg = JSON.parse(readFileSync(join(dataDir, 'config.json'), 'utf8'))
-      for (const k of SECRETS) delete cfg[k]
-      config = JSON.stringify(cfg, null, 2)
+      config = JSON.stringify(portableConfig(JSON.parse(readFileSync(join(dataDir, 'config.json'), 'utf8'))), null, 2)
     } catch {
       // sin config: se respalda solo la memoria
     }
@@ -73,7 +80,9 @@ export function createBackup({ dataDir, getConfig = () => ({}), env = process.en
       if (!from) continue
       try {
         mkdirSync(dataDir, { recursive: true })
-        copyFileSync(join(from, file), dest)
+        // Los respaldos viejos (antes de la 0.8) podían traer la clave cifrada o la bienvenida hecha
+        if (file === 'config.json') writeFileSync(dest, JSON.stringify(portableConfig(JSON.parse(readFileSync(join(from, file), 'utf8'))), null, 2))
+        else copyFileSync(join(from, file), dest)
         restored.push({ file, from: from === localDir ? 'la compu' : cloud?.name ?? 'la nube' })
       } catch {
         // si no se puede, Pixie arranca de cero
