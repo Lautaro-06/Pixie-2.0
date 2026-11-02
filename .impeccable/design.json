@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-02T00:52:51.154Z",
+  "generatedAt": "2026-11-02T01:39:47.224Z",
   "title": "Design System: Pixie",
   "extensions": {
     "colorMeta": {
@@ -88,20 +88,6 @@
           "#eceff2"
         ]
       },
-      "ice-ink-hover": {
-        "role": "primary",
-        "displayName": "Tinta Hielo en hover",
-        "tonalRamp": [
-          "#040c15",
-          "#142538",
-          "#2c4159",
-          "#4a6079",
-          "#68809a",
-          "#89a1bd",
-          "#b7c6d7",
-          "#ebeff4"
-        ]
-      },
       "ice-line": {
         "role": "neutral",
         "displayName": "Línea Hielo",
@@ -116,9 +102,9 @@
           "#e7f0f7"
         ]
       },
-      "ice-tint": {
+      "ice-wash": {
         "role": "neutral",
-        "displayName": "Tinte Hielo",
+        "displayName": "Velo Hielo",
         "tonalRamp": [
           "#000c19",
           "#002640",
@@ -158,37 +144,107 @@
           "#eceff2"
         ]
       },
-      "amber": {
+      "aurora-blue": {
         "role": "secondary",
-        "displayName": "Ámbar Mañana",
+        "displayName": "Aurora Azul",
         "tonalRamp": [
-          "#130900",
-          "#331f01",
-          "#583803",
-          "#7f5303",
-          "#a77013",
-          "#cb923f",
-          "#e1be90",
-          "#f7ede0"
+          "#03091f",
+          "#0b2158",
+          "#1e3d84",
+          "#375bad",
+          "#587dce",
+          "#7fa0e5",
+          "#acc7ff",
+          "#e7effe"
         ]
       },
-      "amber-ink": {
+      "aurora-periwinkle": {
         "role": "secondary",
-        "displayName": "Tinta Ámbar",
+        "displayName": "Aurora Pervinca",
         "tonalRamp": [
-          "#100a04",
-          "#2e2112",
-          "#4c3c2a",
-          "#6b5a47",
-          "#8c7a65",
-          "#ae9b86",
-          "#cec2b5",
-          "#f1eeea"
+          "#07081f",
+          "#1b1d58",
+          "#323784",
+          "#4c54b2",
+          "#6c77cd",
+          "#8f9be5",
+          "#b8c3fe",
+          "#eaeefe"
+        ]
+      },
+      "morning-deep": {
+        "role": "tertiary",
+        "displayName": "Mañana profundo",
+        "tonalRamp": [
+          "#020b1c",
+          "#102646",
+          "#2b4366",
+          "#496186",
+          "#6782a8",
+          "#88a3cb",
+          "#adc9f3",
+          "#e6effe"
+        ]
+      },
+      "morning-light": {
+        "role": "tertiary",
+        "displayName": "Mañana claro",
+        "tonalRamp": [
+          "#000b1c",
+          "#022749",
+          "#214469",
+          "#3f638a",
+          "#5e84ac",
+          "#7ea5cf",
+          "#a3ccf7",
+          "#e3f0ff"
+        ]
+      },
+      "afternoon-deep": {
+        "role": "tertiary",
+        "displayName": "Tarde profundo",
+        "tonalRamp": [
+          "#000c1c",
+          "#052747",
+          "#234466",
+          "#416387",
+          "#6083a9",
+          "#81a5cc",
+          "#a6cbf4",
+          "#e3f0ff"
+        ]
+      },
+      "afternoon-light": {
+        "role": "tertiary",
+        "displayName": "Tarde claro",
+        "tonalRamp": [
+          "#000d19",
+          "#012942",
+          "#01476d",
+          "#2b668e",
+          "#4c87b0",
+          "#6ea9d4",
+          "#96cff9",
+          "#e0f1ff"
+        ]
+      },
+      "night-deep": {
+        "role": "tertiary",
+        "displayName": "Noche profunda",
+        "tonalRamp": [
+          "#070a17",
+          "#1e253d",
+          "#3a415b",
+          "#575f7b",
+          "#767f9c",
+          "#97a0bf",
+          "#bcc6e6",
+          "#e9eeff"
         ]
       },
       "night": {
         "role": "tertiary",
-        "displayName": "Azul Noche",
+        "displayName": "Noche",
         "tonalRamp": [
           "#060a19",
           "#192240",
@@ -198,6 +254,20 @@
           "#8e9dc9",
           "#bac3df",
           "#ebeef6"
+        ]
+      },
+      "top-glass": {
+        "role": "neutral",
+        "displayName": "Vidrio Superior",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#212429",
+          "#3c4046",
+          "#5a5e64",
+          "#797e84",
+          "#9a9fa6",
+          "#c1c4c9",
+          "#eeeef0"
         ]
       },
       "reply-surface": {
@@ -260,11 +330,15 @@
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Solo el título del hero, en celeste."
+        "purpose": "Títulos del hero y del cierre, en celeste."
       },
-      "display-closing": {
-        "displayName": "Display de cierre",
-        "purpose": "El título del campo celeste final."
+      "clock": {
+        "displayName": "Reloj",
+        "purpose": "Hora gigante de la escena fijada."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Números de los pasos de instalación."
       },
       "headline": {
         "displayName": "Headline",
@@ -273,6 +347,10 @@
       "title-name": {
         "displayName": "Title de nombre",
         "purpose": "Nombres de las IA."
+      },
+      "title-part": {
+        "displayName": "Title de parte",
+        "purpose": "Partes de la anatomía."
       },
       "title": {
         "displayName": "Title",
@@ -292,19 +370,19 @@
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Pedidos de ejemplo, notas, navegación y pie."
+        "purpose": "Notas, navegación, burbuja y pie."
       }
     },
     "shadows": [
       {
         "name": "device",
         "value": "0 18px 50px rgba(0, 0, 0, 0.5)",
-        "purpose": "Marco grande en el hero y el cierre."
+        "purpose": "Marco grande de la anatomía."
       },
       {
         "name": "device-small",
         "value": "0 6px 18px rgba(0, 0, 0, 0.35)",
-        "purpose": "Marco en la esquina del escritorio simulado."
+        "purpose": "Marco de la Pixie de la esquina y de los paneles del día."
       },
       {
         "name": "desk-window",
@@ -326,7 +404,7 @@
       {
         "name": "state-color",
         "value": "160ms ease",
-        "purpose": "Cambios de color y borde en hover."
+        "purpose": "Cambios de color en hover."
       },
       {
         "name": "press",
@@ -336,17 +414,42 @@
       {
         "name": "disclosure",
         "value": "200ms cubic-bezier(0.23, 1, 0.32, 1)",
-        "purpose": "Rotación del chevron y entrada de la burbuja."
+        "purpose": "Rotación del chevron y entrada de la burbuja de la esquina."
       },
       {
         "name": "hero-rise",
-        "value": "600ms, ascenso de 14px, retardos de 0 a 260ms",
-        "purpose": "Entrada escalonada del hero."
+        "value": "600ms, ascenso de 14px, retardos de 0 a 150ms",
+        "purpose": "Entrada del hero."
+      },
+      {
+        "name": "reveal",
+        "value": "550ms, desenfoque de 6px, ascenso de 14px, una sola vez al 25 % visible",
+        "purpose": "Aparición de bloques al scrollear."
+      },
+      {
+        "name": "face-float",
+        "value": "7s ease-in-out infinite alternate, ±7px",
+        "purpose": "Flotación de la cara sin marco."
+      },
+      {
+        "name": "shimmer",
+        "value": "3.5s linear infinite",
+        "purpose": "Destello que recorre el borde del botón principal."
+      },
+      {
+        "name": "aurora",
+        "value": "20 cuadros por segundo, a un quinto de la resolución",
+        "purpose": "Deriva lenta de la aurora de fondo."
+      },
+      {
+        "name": "companion-descent",
+        "value": "de escala 2.4 a 1, scrub 0.4, durante el hero",
+        "purpose": "Baja de la Pixie a la esquina."
       },
       {
         "name": "day-scrub",
         "value": "280% de scroll, scrub 0.4",
-        "purpose": "Escena fijada: achica la cara y funde los campos de color."
+        "purpose": "Escena fijada: funde los degradados y los textos del día."
       }
     ],
     "breakpoints": [
@@ -359,6 +462,18 @@
         "value": "900px"
       },
       {
+        "name": "companion",
+        "value": "900px"
+      },
+      {
+        "name": "anatomy",
+        "value": "1100px"
+      },
+      {
+        "name": "desk-window",
+        "value": "1280px"
+      },
+      {
         "name": "pinned-scene",
         "value": "900px x 620px"
       }
@@ -369,57 +484,57 @@
       "name": "Botón de descarga",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "La acción principal de la página.",
-      "html": "<a class=\"ds-btn-primary\" href=\"#\"><svg aria-hidden=\"true\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/><path d=\"M12 15V3\"/></svg>Descargar gratis</a>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.625rem; min-height: 3.5rem; padding: 0 1.75rem; border-radius: 12px; background: var(--ice); color: var(--ice-ink); font-family: var(--font-pixel); font-size: 1.375rem; font-weight: 600; white-space: nowrap; font-variant-ligatures: none; text-decoration: none; transition: background-color 160ms ease, transform 120ms var(--ease-out); } .ds-btn-primary:hover { background: #c4e5ff; } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
+      "description": "La acción principal de la página, en el hero y el cierre, con destello en el borde.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\"><span class=\"ds-shimmer\" aria-hidden=\"true\"><span></span></span><svg aria-hidden=\"true\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/><path d=\"M12 15V3\"/></svg>Descargar gratis</a>",
+      "css": ".ds-btn-primary { position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 0.625rem; min-height: 3.5rem; padding: 0 1.75rem; border-radius: 12px; background: var(--ice); color: var(--ice-ink); font-family: var(--font-pixel); font-size: 1.375rem; font-weight: 600; white-space: nowrap; font-variant-ligatures: none; text-decoration: none; transition: background-color 160ms ease, transform 120ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-primary::after { content: \"\"; position: absolute; inset: 2px; z-index: -1; border-radius: 10px; background: var(--ice); transition: background-color 160ms ease; } .ds-shimmer { position: absolute; inset: 0; z-index: -2; background: var(--ice); container-type: size; } .ds-shimmer span { position: absolute; left: 50%; top: 50%; width: 140cqw; aspect-ratio: 1; margin: -70cqw 0 0 -70cqw; background: conic-gradient(from 225deg, transparent 0, #fff 90deg, transparent 90deg); animation: ds-shimmer-spin 3.5s linear infinite; } @keyframes ds-shimmer-spin { to { transform: rotate(360deg); } } .ds-btn-primary:hover::after { background: #c4e5ff; } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-shimmer span { animation: none; opacity: 0; } .ds-btn-primary:active { transform: none; } }"
     },
     {
       "name": "Botón compacto",
       "kind": "button",
       "refersTo": "button-compact",
-      "description": "Descarga en el encabezado.",
+      "description": "Descarga en el encabezado, sin destello.",
       "html": "<a class=\"ds-btn-compact\" href=\"#\">Descargar</a>",
-      "css": ".ds-btn-compact { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; min-height: 2.75rem; padding: 0 0.875rem; border-radius: 9px; background: var(--ice); color: var(--ice-ink); font-family: var(--font-pixel); font-size: 1rem; font-weight: 600; font-variant-ligatures: none; text-decoration: none; transition: background-color 160ms ease, transform 120ms var(--ease-out); } .ds-btn-compact:hover { background: #c4e5ff; } .ds-btn-compact:active { transform: scale(0.97); } .ds-btn-compact:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
-    },
-    {
-      "name": "Botón de cierre",
-      "kind": "button",
-      "refersTo": "button-closing",
-      "description": "El par invertido sobre el campo celeste.",
-      "html": "<div class=\"ds-closing\"><a class=\"ds-btn-closing\" href=\"#\">Descargar gratis</a></div>",
-      "css": ".ds-closing { padding: 2rem; background: var(--ice); } .ds-btn-closing { display: inline-flex; align-items: center; min-height: 3.5rem; padding: 0 1.75rem; border-radius: 12px; background: var(--ice-ink); color: var(--ice); font-family: var(--font-pixel); font-size: 1.375rem; font-weight: 600; font-variant-ligatures: none; text-decoration: none; transition: background-color 160ms ease, transform 120ms var(--ease-out); } .ds-btn-closing:hover { background: #12263c; } .ds-btn-closing:active { transform: scale(0.97); } .ds-btn-closing:focus-visible { outline: 2px solid var(--ice-ink); outline-offset: 2px; }"
-    },
-    {
-      "name": "Pedido de ejemplo",
-      "kind": "chip",
-      "refersTo": "chip-request",
-      "description": "Dispara una respuesta de ejemplo de la cara.",
-      "html": "<button type=\"button\" class=\"ds-chip\">«juguemos al pong»</button> <button type=\"button\" class=\"ds-chip is-active\" aria-pressed=\"true\">«abrí YouTube y subí el volumen»</button>",
-      "css": ".ds-chip { min-height: 2.75rem; padding: 0.25rem 0.875rem; border: 1px solid var(--ice-line); border-radius: 10px; background: transparent; color: var(--text); font-family: var(--font-body); font-size: 0.9375rem; text-align: left; cursor: pointer; transition: border-color 160ms ease, background-color 160ms ease; } .ds-chip:hover { border-color: var(--ice); } .ds-chip.is-active { border-color: var(--ice); background: rgba(156, 211, 255, 0.1); } .ds-chip:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
+      "css": ".ds-btn-compact { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; min-height: 2.75rem; padding: 0 0.875rem; border-radius: 9px; background: var(--ice); color: var(--ice-ink); font-family: var(--font-pixel); font-size: 1rem; font-weight: 600; font-variant-ligatures: none; text-decoration: none; transition: background-color 160ms ease, transform 120ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-compact:hover { background: #c4e5ff; } .ds-btn-compact:active { transform: scale(0.97); } .ds-btn-compact:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
     },
     {
       "name": "Encabezado",
       "kind": "nav",
       "refersTo": "top-bar",
-      "description": "Barra fija con marca, secciones y descarga.",
-      "html": "<header class=\"ds-top\"><a class=\"ds-brand\" href=\"#\">Pixie</a><nav class=\"ds-nav\"><a href=\"#\">IA</a><a href=\"#\">Privacidad</a><a href=\"#\">Instalar</a></nav></header>",
-      "css": ".ds-top { display: flex; align-items: center; justify-content: space-between; height: 3.75rem; padding: 0 var(--gutter); background: var(--screen); border-bottom: 1px solid var(--ice-line); } .ds-brand { font-family: var(--font-pixel); font-size: 1.375rem; font-weight: 600; color: var(--ice); text-decoration: none; } .ds-nav { display: flex; gap: 1.5rem; font-family: var(--font-body); font-size: 0.9375rem; } .ds-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--muted); text-decoration: none; transition: color 160ms ease; } .ds-nav a:hover { color: var(--text); } .ds-nav a:focus-visible, .ds-brand:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
+      "description": "Barra pegada arriba, de vidrio oscuro, con marca, secciones y descarga.",
+      "html": "<header class=\"ds-top\"><a class=\"ds-brand\" href=\"#\">Pixie</a><nav class=\"ds-nav\"><a href=\"#\">Qué hace</a><a href=\"#\">IA</a><a href=\"#\">Privacidad</a><a href=\"#\">Instalar</a></nav></header>",
+      "css": ".ds-top { display: flex; align-items: center; justify-content: space-between; height: 3.75rem; padding: 0 var(--gutter); background: rgba(4, 6, 10, 0.72); backdrop-filter: blur(10px); border-bottom: 1px solid var(--ice-line); } .ds-brand { font-family: var(--font-pixel); font-size: 1.375rem; font-weight: 600; color: var(--ice); text-decoration: none; } .ds-nav { display: flex; gap: 1.5rem; font-family: var(--font-body); font-size: 0.9375rem; } .ds-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--muted); text-decoration: none; transition: color 160ms ease; } .ds-nav a:hover { color: var(--text); } .ds-nav a:focus-visible, .ds-brand:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }"
     },
     {
       "name": "Dispositivo",
       "kind": "custom",
       "refersTo": "device-bezel",
-      "description": "Marco con la pantalla. En la página el canvas corre la cara viva; este fragmento muestra solo el marco y la pantalla apagada.",
+      "description": "Marco con la pantalla, en la anatomía. En la página el canvas corre la cara viva; este fragmento muestra solo el marco y la pantalla apagada.",
       "html": "<div class=\"ds-bezel\"><div class=\"ds-screen\"></div></div>",
       "css": ".ds-bezel { width: fit-content; padding: 22px; border: 1px solid var(--ice-line); border-radius: 36px; background: var(--bezel); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); } .ds-screen { width: 320px; height: 160px; border-radius: 4px; background: var(--screen); }"
+    },
+    {
+      "name": "Pixie de la esquina",
+      "kind": "custom",
+      "refersTo": "device-bezel-small",
+      "description": "Dispositivo chico fijo con su burbuja, desde 900 px. El canvas real mide 128 CSS px de ancho.",
+      "html": "<div class=\"ds-companion\"><p class=\"ds-reply\">Esa soy yo, parte por parte.</p><div class=\"ds-bezel-small\"><div class=\"ds-screen-small\"></div></div></div>",
+      "css": ".ds-companion { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; width: fit-content; } .ds-bezel-small { padding: 10px; border: 1px solid var(--ice-line); border-radius: 18px; background: var(--bezel); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); } .ds-screen-small { width: 128px; height: 64px; border-radius: 4px; background: var(--screen); } .ds-companion .ds-reply { max-width: 19rem; margin: 0; padding: 0.5rem 0.875rem; border: 1px solid var(--ice-line); border-radius: 14px; background: rgba(13, 17, 24, 0.96); color: var(--text); font-family: var(--font-body); font-size: 0.9375rem; line-height: 1.3; }"
     },
     {
       "name": "Burbuja de respuesta",
       "kind": "custom",
       "refersTo": "reply-bubble",
       "description": "Lo que dice Pixie.",
-      "html": "<p class=\"ds-reply\">Dale, en 5 minutos te aviso.</p>",
-      "css": ".ds-reply { width: fit-content; max-width: 19rem; margin: 0; padding: 0.5rem 0.875rem; border: 1px solid var(--ice-line); border-radius: 14px; background: rgba(13, 17, 24, 0.96); color: var(--text); font-family: var(--font-body); font-size: 0.9375rem; line-height: 1.3; }"
+      "html": "<p class=\"ds-reply-solo\">Buen día. Hoy tenés dentista a las 17.</p>",
+      "css": ".ds-reply-solo { width: fit-content; max-width: 19rem; margin: 0; padding: 0.5rem 0.875rem; border: 1px solid var(--ice-line); border-radius: 14px; background: rgba(13, 17, 24, 0.96); color: var(--text); font-family: var(--font-body); font-size: 0.9375rem; line-height: 1.3; }"
+    },
+    {
+      "name": "Hora gigante",
+      "kind": "custom",
+      "refersTo": "day-clock",
+      "description": "Dígitos decorativos sobre el degradado del momento; el fragmento los limita al panel.",
+      "html": "<div class=\"ds-day\"><p class=\"ds-clock\" aria-hidden=\"true\">15:10</p></div>",
+      "css": ".ds-day { position: relative; height: 14rem; overflow: hidden; background: linear-gradient(170deg, #1a3b5c, #2f6a92); } .ds-clock { position: absolute; top: 1rem; right: 1.5rem; margin: 0; color: var(--ice); font-family: var(--font-pixel); font-size: 8rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; opacity: 0.16; }"
     },
     {
       "name": "Ventana de apuntes",
@@ -427,18 +542,20 @@
       "refersTo": "desk-window",
       "description": "Ventana del escritorio simulado.",
       "html": "<div class=\"ds-desk-window\"><p class=\"ds-desk-title\">apuntes.txt</p><p>Física, unidad 3</p><p>F = m · a</p></div>",
-      "css": ".ds-desk-window { width: 22rem; padding: 0 1rem 1rem; border-radius: 10px; background: #f7f9fc; color: #1b2430; font-family: var(--font-body); font-size: 0.9375rem; box-shadow: 0 14px 34px rgba(4, 6, 10, 0.3); } .ds-desk-window p { margin: 0; } .ds-desk-window .ds-desk-title { margin: 0 -1rem 0.625rem; padding: 0.375rem 1rem; border-bottom: 1px solid #dde3ea; color: #566273; font-size: 0.8125rem; }"
+      "css": ".ds-desk-window { width: 20rem; padding: 0 1rem 1rem; border-radius: 10px; background: #f7f9fc; color: #1b2430; font-family: var(--font-body); font-size: 0.9375rem; box-shadow: 0 14px 34px rgba(4, 6, 10, 0.3); } .ds-desk-window p { margin: 0; } .ds-desk-window .ds-desk-title { margin: 0 -1rem 0.625rem; padding: 0.375rem 1rem; border-bottom: 1px solid #dde3ea; color: #566273; font-size: 0.8125rem; }"
     }
   ],
   "narrative": {
     "northStar": "La pantallita encendida",
-    "overview": "El sistema sale de un objeto: la pantalla OLED de 64 por 32 píxeles que Pixie heredó de un reloj con ESP32, dentro de su marco. La página no ilustra ese objeto. Lo corre: el canvas usa el mismo código de dibujo y animación que la app, la cara mira al puntero, pestañea y responde a los pedidos de ejemplo.\n\nTodo lo demás se ordena alrededor de la cara. La base es la negrura de la pantalla, con bandas planas separadas por una línea fina celeste. En los dos momentos donde la página cambia de escala, el negro cede a campos de color llenos: el escritorio pasa de ámbar a celeste y a noche durante el scroll, y el cierre es un campo celeste completo. La densidad es baja, con títulos grandes en Pixelify Sans y texto en Atkinson Hyperlegible Next, hecho para leerse sin esfuerzo.\n\nLa dirección rechaza el hero de texto más captura de producto: la cara ocupa ese lugar y funciona.",
+    "overview": "El sistema sale de un objeto: la pantalla OLED de 64 por 32 píxeles que Pixie heredó de un reloj con ESP32. La página no ilustra ese objeto. Lo corre: el canvas usa el mismo código de dibujo y animación que la app, y la cara mira al puntero, pestañea y reacciona a lo que tocás. En el hero y el cierre los píxeles salen del marco y flotan sobre la oscuridad; el marco queda para cuando Pixie se presenta como dispositivo.\n\nTodo lo demás es luz fría sobre negro. Detrás de la página hay una aurora azul hielo fija y muy tenue, y las secciones no tienen fondo propio: el contenido flota sobre esa capa. El único cambio grande de atmósfera es la escena del día, con degradados azules que se funden entre sí y una hora gigante casi transparente. La densidad es baja, con títulos grandes en Pixelify Sans y texto en Atkinson Hyperlegible Next, hecho para leerse sin esfuerzo.\n\nPixie no se queda en el hero: desde 900 px de ancho baja a la esquina de la ventana y acompaña el scroll comentando las secciones, igual que en el escritorio. La dirección rechaza el hero de texto más captura de producto: la cara ocupa ese lugar y funciona.",
     "keyCharacteristics": [
       "Una cara real en canvas como pieza central, en múltiplos enteros de su grilla de 64 × 32.",
-      "Base OLED casi negra, con un único acento celeste en controles, títulos del hero y nombres.",
-      "Campos de color de página completa, cada uno con su propia tinta.",
+      "Base OLED casi negra con aurora azul hielo fija; las secciones son transparentes.",
+      "Un único acento celeste en controles, títulos grandes y nombres.",
+      "Solo azules fríos: el color de fondo llega como luz o degradado, nunca como campo plano.",
       "Dos voces tipográficas: píxel para nombrar y actuar, Atkinson para leer.",
-      "Profundidad reservada a los objetos; las bandas son planas.",
+      "Pixie acompaña desde la esquina a partir de 900 px.",
+      "Los bloques aparecen una vez, con fundido y desenfoque suave.",
       "Toda simulación queda rotulada en pantalla."
     ],
     "rules": [
@@ -448,8 +565,8 @@
         "section": "colors"
       },
       {
-        "name": "The Field With Its Ink Rule",
-        "body": "Ámbar, noche y celeste funcionan como campos de página completa, cada uno con su tinta. Ámbar y noche no aparecen como acentos sueltos en botones, títulos o enlaces.",
+        "name": "The Cold Light Rule",
+        "body": "El color de fondo llega como luz o degradado azul: la aurora, los tres momentos del día y el velo de privacidad. No hay campos planos de color a página completa ni ámbar en la paleta.",
         "section": "colors"
       },
       {
@@ -459,33 +576,36 @@
       },
       {
         "name": "The Two Voices Rule",
-        "body": "Pixelify nombra y actúa: títulos, marca, botones, nombres de IA y números de paso. Atkinson explica: toda oración que haya que leer va en Atkinson.",
+        "body": "Pixelify nombra y actúa: títulos, marca, botones, nombres, números y la hora gigante. Atkinson explica: toda oración que haya que leer va en Atkinson.",
         "section": "typography"
       },
       {
         "name": "The Objects Only Rule",
-        "body": "Tienen sombra el dispositivo y las ventanas. Botones, pedidos, burbujas y bandas no.",
+        "body": "Tienen sombra el dispositivo y las ventanas. Botones, burbujas y secciones no. La cara sin marco tampoco: son píxeles de luz, no un objeto.",
         "section": "elevation"
       }
     ],
     "dos": [
       "Do usar la cara real con `PixieScreen` cuando Pixie aparece viva en una superficie.",
+      "Do usar la cara sin marco en los momentos grandes, y el dispositivo cuando Pixie se presenta como objeto o vive en la esquina.",
       "Do mantener el canvas en múltiplos enteros de 64 × 32, con `image-rendering: pixelated`.",
-      "Do rotular todo lo simulado dentro de la propia pieza, como «Escena ilustrativa», «demo con respuestas de ejemplo» o «Recreación del aviso de Windows».",
-      "Do dar a cada campo de color su tinta: tinta hielo sobre celeste, tinta ámbar sobre ámbar y Papel Frío sobre noche.",
+      "Do dejar que la aurora se vea: las secciones van sin fondo propio o con un velo translúcido.",
+      "Do rotular todo lo simulado dentro de la propia pieza, como «Escena ilustrativa» o «Recreación del aviso de Windows».",
+      "Do poner Papel Frío de Pantalla sobre los degradados azules y Tinta Hielo sobre celeste.",
       "Do hacer que los controles midan al menos 2.75rem de alto.",
       "Do usar `cubic-bezier(0.23, 1, 0.32, 1)` en movimientos de entrada y respuesta, y 160ms para cambios de color.",
       "Do limitar los hover a `(hover: hover) and (pointer: fine)`.",
-      "Do ofrecer con movimiento reducido una versión estática con el mismo contenido, como los paneles apilados del día.",
-      "Do adaptar el contorno de foco al campo: celeste sobre oscuro, tinta sobre celeste."
+      "Do ofrecer con movimiento reducido una versión quieta con el mismo contenido: aurora detenida, cara sin flotar, botón sin destello y paneles apilados."
     ],
     "donts": [
       "Don't reemplazar la cara viva por una captura o un video. El logo de ojos y la imagen para compartir sí son estáticos, porque son marca.",
       "Don't escalar el canvas a tamaños fraccionarios ni suavizar sus píxeles.",
       "Don't poner oraciones de lectura en Pixelify ni usarla a otro peso que no sea 600.",
-      "Don't poner sombra en botones, pedidos, burbujas o bandas.",
+      "Don't usar campos planos de color a página completa ni volver al ámbar.",
+      "Don't poner sombra en botones, burbujas o secciones, ni en la cara sin marco.",
       "Don't usar el azul del aviso de Windows ni el papel de apuntes como colores de la página.",
-      "Don't mostrar una simulación sin rótulo."
+      "Don't mostrar una simulación sin rótulo.",
+      "Don't extender el destello más allá de los botones de descarga principales."
     ]
   }
 }

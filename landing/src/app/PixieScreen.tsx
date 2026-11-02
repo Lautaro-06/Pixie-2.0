@@ -7,6 +7,7 @@ const PIXEL_DOT = '#0c131c';
 const SCREEN = '#04060a';
 const FOLLOW_MS = 4000;
 const SMALL_WIDTH = 192;
+const TINY_WIDTH = 128;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 export type Mood = 'idle' | 'listening' | 'thinking' | 'sleeping';
@@ -16,10 +17,11 @@ interface Props {
   reaction?: { type: string; id: number } | null;
   speech?: { id: number; ms: number } | null;
   label?: string;
+  bare?: boolean;
 }
 
 // La misma cara de la app: dibuja con renderFace y anima con REACTIONS.
-export default function PixieScreen({ mood = 'idle', reaction = null, speech = null, label = 'Cara de Pixie' }: Props) {
+export default function PixieScreen({ mood = 'idle', reaction = null, speech = null, label = 'Cara de Pixie', bare = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = useRef({
     mood,
@@ -98,14 +100,22 @@ export default function PixieScreen({ mood = 'idle', reaction = null, speech = n
     let cell = 2;
     let visible = true;
     let last: Uint8Array | null = null;
+    const host = canvas.parentElement!;
 
     const fit = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       // Múltiplo entero del tamaño de la grilla: si no, los píxeles quedan desparejos.
-      const bezel = canvas.closest('.bezel') as HTMLElement;
-      const box = getComputedStyle(bezel);
-      const frame = parseFloat(box.paddingLeft) * 2 + parseFloat(box.borderLeftWidth) * 2;
-      const room = bezel.classList.contains('is-small') ? SMALL_WIDTH : bezel.parentElement!.clientWidth - frame;
+      let room: number;
+      if (bare) {
+        room = host.parentElement!.clientWidth;
+      } else {
+        const bezel = canvas.closest('.bezel') as HTMLElement;
+        const box = getComputedStyle(bezel);
+        const frame = parseFloat(box.paddingLeft) * 2 + parseFloat(box.borderLeftWidth) * 2;
+        room = bezel.classList.contains('is-tiny') ? TINY_WIDTH
+          : bezel.classList.contains('is-small') ? SMALL_WIDTH
+          : bezel.parentElement!.clientWidth - frame;
+      }
       cell = Math.max(2, Math.floor((room * dpr) / WIDTH));
       canvas.width = cell * WIDTH;
       canvas.height = cell * HEIGHT;
@@ -115,12 +125,14 @@ export default function PixieScreen({ mood = 'idle', reaction = null, speech = n
       grid.width = canvas.width;
       grid.height = canvas.height;
       const g = grid.getContext('2d')!;
-      g.fillStyle = SCREEN;
-      g.fillRect(0, 0, grid.width, grid.height);
-      if (cell >= 5) {
-        g.fillStyle = PIXEL_DOT;
-        for (let y = 0; y < HEIGHT; y++) {
-          for (let x = 0; x < WIDTH; x++) g.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+      if (!bare) {
+        g.fillStyle = SCREEN;
+        g.fillRect(0, 0, grid.width, grid.height);
+        if (cell >= 5) {
+          g.fillStyle = PIXEL_DOT;
+          for (let y = 0; y < HEIGHT; y++) {
+            for (let x = 0; x < WIDTH; x++) g.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+          }
         }
       }
       last = null;
@@ -135,6 +147,7 @@ export default function PixieScreen({ mood = 'idle', reaction = null, speech = n
       const bits: Uint8Array = renderFace(compose(e.mood, e.moodStart, e.overlays, now, { still, follow }));
       if (last && last.every((v, i) => v === bits[i])) return;
       last = bits;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(grid, 0, 0);
       const gap = cell >= 5 ? 1 : 0;
       ctx.fillStyle = PIXEL_ON;
@@ -146,7 +159,7 @@ export default function PixieScreen({ mood = 'idle', reaction = null, speech = n
     };
 
     const sized = new ResizeObserver(fit);
-    sized.observe(canvas.closest('.bezel')!.parentElement!);
+    sized.observe(bare ? host.parentElement! : canvas.closest('.bezel')!.parentElement!);
     const seen = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; });
     seen.observe(canvas);
     fit();

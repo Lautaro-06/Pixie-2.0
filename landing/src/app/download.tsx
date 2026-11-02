@@ -80,8 +80,9 @@ export function DownloadButton({ release, compact = false }: { release: Release 
 
   return (
     <div className="cta">
-      <a href={release?.url ?? RELEASES_URL} className="cta-button" onClick={() => setStarted(true)}>
-        <Download aria-hidden size={20} /> Descargar gratis
+      <a href={release?.url ?? RELEASES_URL} className="cta-button has-shimmer" onClick={() => setStarted(true)}>
+        <span className="shimmer" aria-hidden><span /></span>
+        <Download aria-hidden size={20} className="shrink-0" /> Descargar gratis
       </a>
       <p className="cta-note">
         {release
