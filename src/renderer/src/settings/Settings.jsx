@@ -8,6 +8,7 @@ const SECTIONS = [
   ['personalizacion', 'Personalización'],
   ['agenda', 'Agenda'],
   ['pomodoro', 'Pomodoro'],
+  ['estudio', 'Mi estudio'],
   ['noticias', 'Noticias'],
   ['apps', 'Apps'],
   ['mapas', 'Mapas y colectivos'],
@@ -72,6 +73,7 @@ export default function Settings({ section: initial = 'general' }) {
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
         {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
         {section === 'pomodoro' && <PomodoroSection s={s} setS={setS} change={change} say={say} />}
+        {section === 'estudio' && <StudySection s={s} setS={setS} change={change} say={say} />}
         {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
         {section === 'apps' && <AppsSection s={s} setS={setS} change={change} say={say} />}
         {section === 'mapas' && <MapsSection s={s} change={change} />}
@@ -187,6 +189,12 @@ function PomodoroSection({ s, setS, change, say }) {
             {ses.fase === 'estudio' ? `Bloque ${ses.bloque} de ${ses.bloques}` : 'Descanso'}
             {ses.materia ? ` de ${ses.materia}` : ''}: {ses.pausado ? 'en pausa, ' : ''}faltan {leftLabel(ses.restanteMs)}.
           </p>
+          {ses.estudiadoMin > 0 && (
+            <p className="pomo-progress">
+              Llevás {minutesLabel(ses.estudiadoMin)} de {minutesLabel(ses.planeadoMin)} de estudio
+              {ses.foco !== null && <> · foco {ses.foco}%</>}
+            </p>
+          )}
           <PlanBlocks bloques={ses.plan} current={ses.indice} times={false} />
           <div className="buttons">
             <button type="button" className="button" disabled={Boolean(busy)} onClick={() => control(ses.pausado ? 'seguir' : 'pausar')}>
@@ -196,7 +204,7 @@ function PomodoroSection({ s, setS, change, say }) {
               {ses.fase === 'estudio' ? 'Pasar al descanso' : 'Saltar el descanso'}
             </button>
             <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => control('terminar')}>
-              Terminar
+              Terminar por hoy
             </button>
           </div>
           <p className="note">También podés tocar el temporizador en mi pantallita para pausarlo.</p>
@@ -237,6 +245,23 @@ function PomodoroSection({ s, setS, change, say }) {
         <Row label="Materia o tema" hint="Opcional: así te recomiendo cómo estudiarla." htmlFor="pomodoro-materia">
           <TextSetting id="pomodoro-materia" value={p.materia} placeholder="Química, Historia, Inglés…" onSave={(pomodoroMateria) => change({ pomodoroMateria })} />
         </Row>
+        <h3 className="pomo-sub">¿Qué vas a hacer?</h3>
+        <div className="choices pomo-types" role="radiogroup" aria-label="Qué vas a hacer">
+          {p.tipos.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={p.tipo === t.id}
+              className={`choice${p.tipo === t.id ? ' selected' : ''}`}
+              onClick={() => change({ pomodoroTipo: p.tipo === t.id ? '' : t.id })}
+            >
+              <span className="choice-title">{t.nombre}</span>
+              <span className="choice-text">{t.texto}</span>
+            </button>
+          ))}
+        </div>
+        <h3 className="pomo-sub">Método</h3>
         <div className="choices pomo-methods" role="radiogroup" aria-label="Método">
           {p.metodos.map((m) => (
             <button key={m.id} type="button" role="radio" aria-checked={p.metodo === m.id} className={`choice${p.metodo === m.id ? ' selected' : ''}`} onClick={() => change({ pomodoroMetodo: m.id })}>
@@ -245,6 +270,7 @@ function PomodoroSection({ s, setS, change, say }) {
             </button>
           ))}
         </div>
+        {p.porque && <p className="note pomo-why">{p.porque}</p>}
         {p.plan.bloques.length ? (
           <>
             <p className="pomo-summary">
@@ -291,6 +317,320 @@ function PomodoroSection({ s, setS, change, say }) {
         <Row label="Avisarte si te distraés" hint="Si en un bloque entrás a Instagram, YouTube, una red social o un juego.">
           <Toggle on={p.distracciones} label="Avisarte si te distraés" onChange={(pomodoroDistracciones) => change({ pomodoroDistracciones })} />
         </Row>
+      </Card>
+    </>
+  )
+}
+
+// ── Mi estudio: el seguimiento (como un habit tracker) y el temario ──
+const GOALS = [30, 60, 90, 120, 180]
+const MONTH_TABS = [
+  ['mes', 'Este mes'],
+  ['mesAnterior', 'Mes anterior']
+]
+const TEXT_FILE = /\.(txt|md|csv|text)$/i
+
+// Los ciclos del día como tomatitos
+function Cycles({ n }) {
+  if (!n) return <span className="muted-dash">—</span>
+  return (
+    <span className="cycles" aria-label={`${n} ${n === 1 ? 'ciclo' : 'ciclos'}`}>
+      {Array.from({ length: Math.min(n, 8) }, (_, i) => (
+        <span key={i} className="cycle" />
+      ))}
+      {n > 8 && <span className="cycle-more">+{n - 8}</span>}
+    </span>
+  )
+}
+
+function MonthGrid({ month }) {
+  const days = Array.from({ length: month.dias }, (_, i) => i + 1)
+  const cell = (min) => (min >= 90 ? 'lots' : min >= 45 ? 'some' : min > 0 ? 'little' : '')
+  if (!month.filas.length) return <p className="note">Este mes todavía no hay estudio anotado.</p>
+  return (
+    <div className="month-wrap">
+      <table className="month">
+        <thead>
+          <tr>
+            <th scope="col" className="month-name">Materia</th>
+            {days.map((d) => (
+              <th key={d} scope="col" className={month.hoy === d ? 'today' : ''}>
+                {d}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {month.filas.map((f) => (
+            <tr key={f.materia}>
+              <th scope="row" className="month-name" title={`${f.materia}: ${minutesLabel(f.total)}`}>
+                {f.materia}
+              </th>
+              {days.map((d) => (
+                <td key={d} className={`${cell(f.dias[d] ?? 0)}${month.hoy === d ? ' today' : ''}`} title={f.dias[d] ? `${d}: ${minutesLabel(f.dias[d])}` : undefined}>
+                  {f.dias[d] ? '✓' : ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr className="month-total">
+            <th scope="row" className="month-name">Total</th>
+            {days.map((d) => (
+              <td key={d} className={`${cell(month.total[d] ?? 0)}${month.hoy === d ? ' today' : ''}`} title={month.total[d] ? `${d}: ${minutesLabel(month.total[d])}` : undefined}>
+                {month.total[d] ? Math.round(month.total[d]) : ''}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Syllabus({ temario, setS, say }) {
+  const [over, setOver] = useState(false)
+  const [text, setText] = useState('')
+  const [materia, setMateria] = useState('')
+  const [editing, setEditing] = useState(!temario)
+  useEffect(() => setEditing(!temario), [Boolean(temario)])
+
+  const save = async (texto, nombre = materia) => {
+    const r = await api.settings.syllabus({ accion: 'guardar', texto, materia: nombre })
+    setS(r)
+    if (r?.mensaje) say(r.mensaje)
+    if (r?.estudio?.temario) {
+      setText('')
+      setEditing(false)
+    }
+  }
+  const act = async (req) => setS(await api.settings.syllabus(req))
+
+  // Soltaste un archivo (o texto): se leen solo los títulos de los temas
+  const onDrop = async (e) => {
+    e.preventDefault()
+    setOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      if (!TEXT_FILE.test(file.name) && !file.type.startsWith('text/')) {
+        say('Por ahora leo listas de texto (.txt o .md). Si tu temario está en Word o PDF, copiá los temas y pegalos acá.')
+        return
+      }
+      if (file.size > 50000) {
+        say('Ese archivo es muy grande: soltá solo la lista de temas, no los apuntes.')
+        return
+      }
+      const nombre = materia || file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\btemario\b/i, '').trim()
+      return save(await file.text(), nombre)
+    }
+    const dropped = e.dataTransfer.getData('text/plain')
+    if (dropped) setText(dropped.slice(0, 20000))
+  }
+
+  const temas = temario?.temas ?? []
+  const seen = temas.filter((t) => t.visto).length
+  return (
+    <Card
+      title={temario?.materia ? `Temario de ${temario.materia}` : 'Temario'}
+      note="Solo guardo los títulos de los temas (no tus apuntes). Mientras estudiás con el Pomodoro, tacho los temas que veo en lo que tenés abierto; también los podés tachar vos."
+    >
+      {temas.length > 0 && (
+        <>
+          <div className="syllabus-progress">
+            <span>
+              {seen} de {temas.length} temas vistos
+            </span>
+            <span className="bar">
+              <span style={{ width: `${Math.round((seen / temas.length) * 100)}%` }} />
+            </span>
+          </div>
+          <ul className="syllabus">
+            {temas.map((t, i) => (
+              <li key={`${i}-${t.texto}`} className={t.visto ? 'done' : ''}>
+                <label>
+                  <input type="checkbox" checked={t.visto} onChange={(e) => act({ accion: 'marcar', indice: i, visto: e.target.checked })} />
+                  <span>{t.texto}</span>
+                </label>
+                {t.visto && t.auto && <span className="syllabus-auto" title="Lo tachó Pixie al verte estudiarlo">visto por Pixie</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {editing ? (
+        <div
+          className={`dropzone${over ? ' over' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setOver(true)
+          }}
+          onDragLeave={() => setOver(false)}
+          onDrop={onDrop}
+        >
+          <p className="dropzone-title">Soltá acá tu temario</p>
+          <p className="hint">Un archivo .txt con un tema por renglón, o pegá la lista acá abajo.</p>
+          <input className="field" value={materia} onChange={(e) => setMateria(e.target.value)} placeholder="Materia (opcional): Biología" aria-label="Materia del temario" />
+          <textarea
+            className="field syllabus-text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={'La célula\nFotosíntesis\nRespiración celular\nMitosis y meiosis'}
+            aria-label="Temas, uno por renglón"
+            rows={5}
+          />
+          <div className="buttons">
+            <button type="button" className="button" disabled={!text.trim()} onClick={() => save(text)}>
+              Guardar temario
+            </button>
+            {temario && (
+              <button type="button" className="button secondary" onClick={() => setEditing(false)}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="buttons">
+          <button type="button" className="button secondary" onClick={() => setEditing(true)}>
+            Cambiar el temario
+          </button>
+          <button type="button" className="button secondary" onClick={() => act({ accion: 'borrar' })}>
+            Borrar el temario
+          </button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function StudySection({ s, setS, change, say }) {
+  const e = s.estudio
+  const [tab, setTab] = useState('mes')
+  const [confirmClear, setConfirmClear] = useState(false)
+  if (!e) return <Header title="Mi estudio" text="Todavía estoy arrancando." />
+  const r = e.resumen
+  const month = e[tab]
+  const clear = async () => {
+    const res = await api.settings.clearStudy()
+    setS(res)
+    setConfirmClear(false)
+    if (res?.mensaje) say(res.mensaje)
+  }
+  return (
+    <>
+      <Header title="Mi estudio" text="Tu seguimiento de los Pomodoros: cuánto estudiás cada día, los ciclos, la adherencia y la racha. Preguntame «¿cuánto estudié esta semana?» cuando quieras." />
+      <div className="study-tiles">
+        <div className="tile">
+          <span className="tile-value">🔥 {r.racha}</span>
+          <span className="tile-label">{r.racha === 1 ? 'día de racha' : 'días seguidos'}</span>
+        </div>
+        <div className="tile">
+          <span className="tile-value">{minutesLabel(r.hoyMin)}</span>
+          <span className="tile-label">
+            hoy · {r.hoyCiclos} {r.hoyCiclos === 1 ? 'ciclo' : 'ciclos'}
+          </span>
+        </div>
+        <div className="tile">
+          <span className="tile-value">{minutesLabel(r.semanaMin)}</span>
+          <span className="tile-label">esta semana</span>
+        </div>
+        <div className="tile">
+          <span className="tile-value">{r.adherencia === null ? '—' : `${r.adherencia}%`}</span>
+          <span className="tile-label">adherencia (2 semanas)</span>
+        </div>
+      </div>
+
+      <Card title="Esta semana" note="Adherencia: de lo que planeaste estudiar, cuánto estudiaste sin distraerte.">
+        <div className="week-wrap">
+          <table className="week">
+            <thead>
+              <tr>
+                <th scope="col">Día</th>
+                <th scope="col">Progreso</th>
+                <th scope="col">Ciclos</th>
+                <th scope="col">Adherencia</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Temas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {e.semana.map((d) => (
+                <tr key={d.fecha} className={`${d.hoy ? 'today' : ''}${d.futuro ? ' future' : ''}`}>
+                  <th scope="row">{d.dia}</th>
+                  <td>
+                    <span className="progress" title={`${minutesLabel(d.minutos)} de ${minutesLabel(e.meta)}`}>
+                      <span className="bar">
+                        <span style={{ width: `${Math.round(d.progreso * 100)}%` }} />
+                      </span>
+                      <span className="pct">{d.futuro ? '' : minutesLabel(d.minutos)}</span>
+                    </span>
+                  </td>
+                  <td>{d.futuro ? '' : <Cycles n={d.ciclos} />}</td>
+                  <td>{d.adherencia === null ? <span className="muted-dash">—</span> : `${d.adherencia}%`}</td>
+                  <td>{d.estado ? `${d.estado.emoji} ${d.estado.texto}` : d.futuro ? '' : <span className="muted-dash">—</span>}</td>
+                  <td className="topics">{d.temas.join(', ') || (d.materias.join(', ') || '')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Row label="Meta diaria" hint="Con cuánto estudio por día marco el día como «Bien hecho».">
+          <div className="segmented" role="radiogroup" aria-label="Meta diaria">
+            {GOALS.map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={e.meta === m} className={e.meta === m ? 'selected' : ''} onClick={() => change({ metaDiaria: m })}>
+                {minutesLabel(m)}
+              </button>
+            ))}
+          </div>
+        </Row>
+      </Card>
+
+      {e.materias.length > 0 && (
+        <Card title="Por materia">
+          <div className="subjects">
+            {e.materias.map((m) => (
+              <div key={m.materia} className="subject">
+                <strong>{m.materia}</strong>
+                <span>{m.racha >= 1 ? `🔥 ${m.racha === 1 ? '1 día' : `${m.racha} días seguidos`}` : m.semanaMin ? '✅ esta semana' : '❌ no estudiaste esta semana'}</span>
+                <span className="muted">{m.semanaMin ? `${minutesLabel(m.semanaMin)} esta semana` : `Última vez: ${m.ultima ? m.ultima.split('-').reverse().slice(0, 2).join('/') : '—'}`}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Card title={month.titulo.charAt(0).toUpperCase() + month.titulo.slice(1)}>
+        <div className="segmented month-tabs" role="tablist" aria-label="Mes">
+          {MONTH_TABS.map(([id, name]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'selected' : ''} onClick={() => setTab(id)}>
+              {name}
+            </button>
+          ))}
+        </div>
+        <p className="pomo-summary">
+          {minutesLabel(month.minutos)} de estudio · {month.diasEstudiados} {month.diasEstudiados === 1 ? 'día' : 'días'} con estudio
+        </p>
+        <MonthGrid month={month} />
+      </Card>
+
+      <Syllabus temario={e.temario} setS={setS} say={say} />
+
+      <Card title="Tu historial" note="Todo esto queda solo en tu compu (en estudio.json, en la carpeta de Pixie).">
+        <div className="buttons">
+          {confirmClear ? (
+            <>
+              <button type="button" className="button danger" onClick={clear}>
+                Sí, borrar todo
+              </button>
+              <button type="button" className="button secondary" onClick={() => setConfirmClear(false)}>
+                No
+              </button>
+            </>
+          ) : (
+            <button type="button" className="button secondary" onClick={() => setConfirmClear(true)} disabled={!r.sesiones}>
+              Borrar mi historial de estudio
+            </button>
+          )}
+        </div>
       </Card>
     </>
   )
@@ -434,6 +774,9 @@ function General({ s, change }) {
         </Row>
         <Row label="Avisos al celular" hint="Si no estás frente a la compu, los recordatorios te llegan por WhatsApp (si lo configuraste).">
           <Toggle label="Avisos al celular" on={g.avisosAlCelular} onChange={(v) => change({ avisosAlCelular: v })} />
+        </Row>
+        <Row label="Correrme si dejás el mouse encima" hint="Así no tapo un botón que tenés que tocar. Para llamarme usá el atajo; para moverme a mano, llamame y arrastrame.">
+          <Toggle label="Correrme si dejás el mouse encima" on={g.esquivarMouse} onChange={(v) => change({ esquivarMouse: v })} />
         </Row>
       </Card>
     </>

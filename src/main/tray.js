@@ -24,6 +24,7 @@ export function createMenus({
   wake,
   hasAI,
   openHistory,
+  pomodoro = null, // { status, run(accion) }: los botones del Pomodoro mientras anda
   quit
 }) {
   // En la app instalada, los íconos quedan fuera del paquete (app.asar.unpacked).
@@ -45,15 +46,29 @@ export function createMenus({
     return { label: 'Escuchar «Pixie, ¿estás?»', type: 'checkbox', checked: w.activa, click: (item) => wake.setActive(item.checked) }
   }
 
+  // Mientras hay un Pomodoro: pausar o seguir, saltar el descanso (o pasar a él) y terminar por hoy
+  const pomodoroItems = () => {
+    const st = pomodoro?.status()
+    if (!st?.activo) return []
+    return [
+      { label: st.pausado ? 'Seguir el Pomodoro' : 'Pausar el Pomodoro', click: () => pomodoro.run(st.pausado ? 'seguir' : 'pausar') },
+      { label: st.fase === 'estudio' ? 'Pasar al descanso' : 'Saltar el descanso', click: () => pomodoro.run('saltar') },
+      { label: 'Terminar por hoy', click: () => pomodoro.run('terminar') },
+      { type: 'separator' }
+    ]
+  }
+
   const template = (where) => {
     const win = getWindow()
     const standby = getConfig?.().pantallaReposo ?? 'cara'
     return [
+      ...pomodoroItems(),
       where === 'tray' && { label: `Hablar con Pixie (${shortcutLabel()})`, click: onTalk },
       where === 'tray'
         ? { label: 'Mostrar u ocultar', click: () => (win?.isVisible() ? win.hide() : win?.showInactive()) }
         : { label: 'Esconderme un rato', click: () => win?.hide() },
       { label: 'Ajustes…', click: () => openSettings?.('ajustes') },
+      { label: 'Mi estudio (seguimiento y temario)…', click: () => openSettings?.('ajustes/estudio') },
       {
         label: 'En reposo muestro',
         submenu: STANDBY.map(([id, label]) => ({ label, type: 'radio', checked: standby === id, click: () => setStandby?.(id) }))

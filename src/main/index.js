@@ -5,11 +5,13 @@ import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction, needsConfirm } from './actions/index.js'
 import { createPomodoro } from './pomodoro.js'
-import { studyIntent, subjectFrom, topicFromTitle, minutesText } from './study.js'
+import { studyIntent, subjectFrom, subjectIn, topicFromTitle, topicsFromTitles, taskTypeFrom, minutesFrom, focusKind } from './study.js'
+import { createStudyLog, endSummaryText, DEFAULT_GOAL } from './study-log.js'
+import { createDodger } from './dodge.js'
 import { setPomodoroProbe, onTimersChange, timersState, toggleTimer } from './actions/timers.js'
 import { studyWindow } from './scenes.js'
 import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } from './config.js'
-import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
+import { createPixieWindow, getWindow, getMode, setMode, showAndFocus, sendEvent } from './window.js'
 import { createMenus } from './tray.js'
 import { createMind } from './mind.js'
 import { createAI, aiErrorText, voiceErrorText, describeAI } from './ai.js'
@@ -343,11 +345,72 @@ function offerMailAlerts() {
 
 // ───────────── Modo Pomodoro ─────────────
 let pomodoro = null
-// Qué estás estudiando (los títulos de lo que tenés abierto en cada bloque): solo en memoria, para el
-// mini test, y se borra cuando termina el Pomodoro
+let studyLog = null // estudio.json: las sesiones terminadas y el temario
+// Qué estás estudiando (los títulos de lo que tenés abierto en cada bloque): en memoria mientras dura
+// el Pomodoro; al terminar quedan solo los temas (limpios) en estudio.json
 const studySpy = new Map()
 let lastStudyOffer = 0
-const FOCUS_SPY_MS = 10000
+const FOCUS_SPY_MS = 5000
+const CHAT_GRACE_MS = 3 * 60 * 1000 // un chat distrae si te quedás más de 3 minutos
+let focusNow = null // { tipo, app, distraido } de lo que tenés adelante en el bloque
+let chatSince = null
+let studyQuestion = null // «¿qué vas a estudiar?»: esperando la respuesta
+let lastSummary = null // el resumen de la última sesión que terminaste a mano
+
+// Mira qué tenés adelante en un bloque de estudio: si te distrae, lo descuenta del foco; si es lo que
+// estudiás, anota el título (para el mini test, los temas vistos y el temario)
+function watchFocus() {
+  if (!pomodoro?.enFoco()) {
+    focusNow = null
+    chatSince = null
+    return
+  }
+  const w = mind?.lastWindow()
+  const f = focusKind(w, { materia: pomodoro.status().materia })
+  if (f?.tipo === 'chat') chatSince ??= Date.now()
+  else chatSince = null
+  const distraido = f?.tipo === 'distraccion' || (f?.tipo === 'chat' && Date.now() - chatSince >= CHAT_GRACE_MS)
+  focusNow = f ? { ...f, distraido } : null
+  if (distraido) {
+    pomodoro.noteDistraction(FOCUS_SPY_MS)
+    return
+  }
+  if (f?.tipo !== 'estudio' || !studyWindow(w)) return
+  const before = studySpy.get(w.titulo) ?? 0
+  studySpy.set(w.titulo, before + FOCUS_SPY_MS)
+  // Lo estudiaste un minuto: si está en el temario, lo tacha
+  if (before < 60000 && before + FOCUS_SPY_MS >= 60000) {
+    const seen = studyLog?.markSeen([w.titulo, topicFromTitle(w.titulo)]) ?? []
+    if (seen.length) logAction(`temario: visto ${seen.join(', ')}`)
+  }
+}
+
+// Los botones de Ajustes → Pomodoro y del menú: Pixie lo hace y lo dice en voz alta
+async function runPomodoroButton(accion) {
+  const cfg = getConfig()
+  const r = await runAction('pomodoro', { accion, minutos: cfg.pomodoroMinutos, materia: cfg.pomodoroMateria, metodo: cfg.pomodoroMetodo, tipo: cfg.pomodoroTipo, directo: true }, ctx)
+  sendEvent({ type: 'notice', text: r.text, face: r.face, suggestions: r.suggestions })
+  trayMenu?.refresh()
+  return r.text
+}
+
+// «¿Qué vas a estudiar?»: la respuesta («química», «memorizar fechas», «armalo igual») arma el plan
+async function answerStudyQuestion(input) {
+  const q = studyQuestion
+  studyQuestion = null
+  const t = input.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+  const params = { accion: 'plan', minutos: q.minutos ?? minutesFrom(input) ?? undefined, metodo: q.metodo, directo: true }
+  if (/^(armalo igual|da igual|cualquiera|no se|nose|no importa|lo que sea|igual|dale)\b/.test(t)) return runAction('pomodoro', params, ctx)
+  const tipo = taskTypeFrom(input)
+  let materia = subjectIn(input) ?? subjectFrom(input)
+  if (!tipo && !materia) {
+    // Una respuesta corta que no es otro pedido («Construcción de la ciudadanía») es la materia
+    const other = interpretAll(input)?.[0]
+    if ((other && !['charla', 'buscar'].includes(other.action)) || t.split(/\s+/).length > 5) return null
+    materia = input.trim().replace(/[.!?]+$/, '').slice(0, 40)
+  }
+  return runAction('pomodoro', { ...params, materia, tipo }, ctx)
+}
 
 function studyTopic() {
   const top = [...studySpy.entries()].sort((a, b) => b[1] - a[1])[0]
@@ -377,7 +440,8 @@ function onPomodoro(event, st) {
       mind?.say({
         kind: 'pomodoro',
         text: `Arranca el bloque ${st.bloque} de ${st.bloques}: ${Math.round(st.totalMs / 60000)} minutos sin distracciones. Vuelvo en el descanso. No te voy a molestar, pero sigo acá si necesitás ayuda con lo que estudiás.`,
-        face: 'happy'
+        face: 'happy',
+        suggestions: ['terminar por hoy']
       })
     }
   } else if (event === 'ultimos2') {
@@ -395,26 +459,31 @@ function onPomodoro(event, st) {
       kind: 'pomodoro',
       text: `¡Bloque ${st.bloque} terminado! ${min} minutos de descanso: estirate, tomá agua y mirá lejos de la pantalla.${held ? ` ${held}` : ''}`,
       face: 'proud',
-      suggestions: ['saltá el descanso']
+      suggestions: ['saltá el descanso', 'terminar por hoy']
     })
     logAction(`pomodoro: descanso de ${min} minutos`)
   } else if (event === 'fin') {
     const held = mind?.releaseHeld() ?? ''
+    // Los temas que estuviste viendo (limpios) quedan en la sesión; los títulos se borran
+    const temas = topicsFromTitles([...studySpy.entries()])
+    studyLog?.markSeen([...studySpy.keys()])
     studySpy.clear()
+    focusNow = null
+    const sesion = { ...st, temas }
+    studyLog?.record(sesion)
+    const text = endSummaryText({ sesion, hoy: studyLog?.today() ?? { minutos: st.estudiadoMin, ciclos: st.ciclos }, racha: studyLog?.streak() ?? 0, temario: studyLog?.temario() })
     sendEvent({ type: 'pomodoro-fin', completo: st.completo })
-    if (st.completo) {
-      mind?.say({ kind: 'pomodoro', text: `¡Terminaste el Pomodoro! Estudiaste ${minutesText(st.estudiadoMin)} en ${st.bloquesHechos} ${st.bloquesHechos === 1 ? 'bloque' : 'bloques'}. ¡Bien ahí!${held ? ` ${held}` : ''}`, face: 'proud' })
-    } else if (held) {
-      mind?.say({ kind: 'pomodoro', text: held, face: 'happy' })
-    }
+    // Si terminó solo, lo cuenta Pixie; si lo terminaste vos, lo contesta lo que le pediste
+    lastSummary = st.completo ? null : `${text}${held ? ` ${held}` : ''}`
+    if (st.completo) mind?.say({ kind: 'pomodoro', text: `${text}${held ? ` ${held}` : ''}`, face: 'proud', suggestions: ['mostrame mi seguimiento'] })
     mind?.memory.markDone?.('pomodoro', new Date())
-    logAction(`pomodoro: terminado (${st.estudiadoMin} minutos de estudio)`)
+    logAction(`pomodoro: terminado (${st.estudiadoMin} minutos de estudio, ${st.ciclos} ciclos, adherencia ${st.adherencia}%)`)
   }
 }
 
 // Si hablás de estudiar y no hay un Pomodoro andando, te lo ofrece (como mucho cada 20 minutos)
 function offerPomodoro(input, result) {
-  if (!result || result.confirm || getConfig().pomodoroOfrecer === false) return result
+  if (!result || result.confirm || result.noOffer || getConfig().pomodoroOfrecer === false) return result
   if (pomodoro?.activo() || !studyIntent(input) || /\bpomodoro\b/i.test(input)) return result
   if (Date.now() - lastStudyOffer < 20 * 60 * 1000) return result
   lastStudyOffer = Date.now()
@@ -428,7 +497,14 @@ function offerPomodoro(input, result) {
 }
 
 async function ask(text) {
-  return offerPomodoro(String(text ?? ''), await askInner(text))
+  const input = String(text ?? '').slice(0, 500)
+  // Le preguntó «¿qué vas a estudiar?» hace poco: esto es la respuesta (si no es otro pedido)
+  if (studyQuestion && Date.now() - studyQuestion.at < 5 * 60 * 1000) {
+    const r = await answerStudyQuestion(input)
+    if (r) return r
+  }
+  studyQuestion = null
+  return offerPomodoro(input, await askInner(text))
 }
 
 async function askInner(text) {
@@ -479,8 +555,10 @@ async function askInner(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de', 'destino', 'direccion', 'materia']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de', 'destino', 'direccion', 'materia', 'temas']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
+    // Los temas del temario, como los escribiste (con comas y tildes)
+    if (it.action === 'temario' && it.params.temas) it.params.temas = /\bson\b[:\s]*(.+)$/i.exec(input)?.[1] ?? it.params.temas
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
       pending = it
@@ -517,12 +595,21 @@ function mergeResults(results) {
 }
 
 // Le pasa a la cara dónde está el mouse, para que lo siga con la mirada.
+// Y si dejás el mouse encima de Pixie, se corre (para no tapar lo que ibas a tocar).
 function followCursor() {
   let last = ''
+  const dodger = createDodger({
+    getWindow,
+    getMode,
+    workArea: (b) => screen.getDisplayMatching(b).workArea,
+    enabled: () => getConfig().esquivarMouse !== false,
+    log: logAction
+  })
   setInterval(() => {
     const win = getWindow()
     if (!win || win.isDestroyed() || !win.isVisible()) return
     const { x, y } = screen.getCursorScreenPoint()
+    dodger.check({ x, y })
     const key = `${x},${y}`
     if (key === last) return
     last = key
@@ -721,11 +808,8 @@ if (!app.requestSingleInstanceLock()) {
     pomodoro = createPomodoro({ on: onPomodoro })
     setPomodoroProbe(() => pomodoro.enFoco())
     onTimersChange((list) => sendEvent({ type: 'timers', timers: list }))
-    setInterval(() => {
-      if (!pomodoro.enFoco()) return
-      const w = mind?.lastWindow()
-      if (studyWindow(w)) studySpy.set(w.titulo, (studySpy.get(w.titulo) ?? 0) + FOCUS_SPY_MS)
-    }, FOCUS_SPY_MS)
+    studyLog = createStudyLog(join(app.getPath('userData'), 'estudio.json'))
+    setInterval(watchFocus, FOCUS_SPY_MS)
     ipcMain.handle('pixie:timer-toggle', (e) => {
       if (!fromPixie(e)) return null
       if (pomodoro.activo()) return pomodoro.toggle()
@@ -735,7 +819,16 @@ if (!app.requestSingleInstanceLock()) {
       hands,
       pomodoro,
       studyTopic,
+      studyLog,
       missedNotices: () => mind?.missedNotices() ?? [],
+      askStudy: ({ minutos, metodo } = {}) => (studyQuestion = { at: Date.now(), minutos, metodo }),
+      lastStudySummary: () => {
+        const t = lastSummary
+        lastSummary = null
+        return t
+      },
+      // Para los avisos de distracciones en un bloque: lo que tenés adelante y si te distrae
+      pomodoroFocus: () => focusNow,
       contextText: () => contextForAI(),
       targetWindow,
       withPixieHidden,
@@ -849,13 +942,8 @@ if (!app.requestSingleInstanceLock()) {
       mail,
       apps,
       pomodoro,
-      // Los botones de Ajustes → Pomodoro: Pixie lo hace y lo dice en voz alta
-      runPomodoro: async (accion) => {
-        const cfg = getConfig()
-        const r = await runAction('pomodoro', { accion, minutos: cfg.pomodoroMinutos, materia: cfg.pomodoroMateria, metodo: cfg.pomodoroMetodo }, ctx)
-        sendEvent({ type: 'notice', text: r.text, face: r.face })
-        return r.text
-      },
+      studyLog,
+      runPomodoro: runPomodoroButton,
       extension: () => ({
         carpeta: extensionFiles?.carpeta ?? null,
         version: extensionFiles?.version ?? null,
@@ -916,6 +1004,8 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:apps-buscar', () => settings.searchApps())
     handle('ajustes:pomodoro', (accion) => settings.pomodoroControl(String(accion ?? '')))
     handle('ajustes:pomodoro-consejos', () => settings.pomodoroAdvice())
+    handle('ajustes:temario', (req) => settings.syllabus(req && typeof req === 'object' ? req : {}))
+    handle('ajustes:estudio-borrar', () => settings.clearStudy())
     handle('ajustes:abrir-registro-transporte', () => shell.openExternal(TRANSIT_SIGNUP))
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
@@ -974,6 +1064,7 @@ if (!app.requestSingleInstanceLock()) {
       wake,
       hasAI: () => Boolean(ai?.enabled()),
       openHistory,
+      pomodoro: { status: () => pomodoro?.status(), run: (accion) => runPomodoroButton(accion) },
       quit: quitPixie
     })
     mind.start()

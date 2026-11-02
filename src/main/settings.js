@@ -6,7 +6,8 @@ import { entriesBetween } from './changelog.js'
 import { maskSecret } from './secrets.js'
 import { parseShortcut, shortcutText } from './shortcut.js'
 import { findCalendarUrl } from './calendars.js'
-import { buildPlan, blockTips, advicePrompt, pomodoroView, clampMinutes, METHODS } from './study.js'
+import { buildPlan, blockTips, advicePrompt, pomodoroView, clampMinutes, METHODS, TASK_TYPES } from './study.js'
+import { DEFAULT_GOAL } from './study-log.js'
 
 export const STANDBY_MODES = ['cara', 'reloj', 'resumen']
 export const NEWS_SOURCES = ['infobae', 'tn']
@@ -54,6 +55,7 @@ export function createSettings({
   mail = null,
   apps = null,
   pomodoro = null, // la sesión (pomodoro.js)
+  studyLog = null, // el seguimiento de estudio y el temario (study-log.js)
   runPomodoro = null, // async (accion) → lo que dice Pixie (arrancar, pausar, seguir, saltar, terminar)
   extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
@@ -66,9 +68,16 @@ export function createSettings({
   function pomodoroSnapshot() {
     const cfg = getConfig()
     return pomodoroView(
-      { minutos: cfg.pomodoroMinutos, metodo: cfg.pomodoroMetodo, materia: cfg.pomodoroMateria, ofrecer: cfg.pomodoroOfrecer, distracciones: cfg.pomodoroDistracciones },
+      { minutos: cfg.pomodoroMinutos, metodo: cfg.pomodoroMetodo, materia: cfg.pomodoroMateria, tipo: cfg.pomodoroTipo, ofrecer: cfg.pomodoroOfrecer, distracciones: cfg.pomodoroDistracciones },
       pomodoro?.status()
     )
+  }
+
+  // Ajustes → Mi estudio: el seguimiento (como un habit tracker) y el temario
+  const goalOf = (cfg) => Math.min(600, Math.max(15, Math.round(Number(cfg.metaDiaria) || DEFAULT_GOAL)))
+  function studySnapshot() {
+    const goal = goalOf(getConfig())
+    return studyLog ? studyLog.view(goal) : null
   }
 
   function snapshot() {
@@ -83,7 +92,8 @@ export function createSettings({
         atajo: shortcutLabel(),
         arrancarConWindows: Boolean(loginItem.get()),
         recordatoriosSalud: cfg.recordatoriosSalud !== false,
-        avisosAlCelular: cfg.avisosAlCelular !== false
+        avisosAlCelular: cfg.avisosAlCelular !== false,
+        esquivarMouse: cfg.esquivarMouse !== false
       },
       apariencia: { pantallaReposo: STANDBY_MODES.includes(cfg.pantallaReposo) ? cfg.pantallaReposo : 'cara' },
       ia: {
@@ -106,6 +116,7 @@ export function createSettings({
       },
       apps: apps ? { lista: apps.list(), actualizado: apps.updated(), buscando: apps.searching() } : null,
       pomodoro: pomodoroSnapshot(),
+      estudio: studySnapshot(),
       mapas: {
         casa: cfg.direccionCasa ?? '',
         transporteId: cfg.transporte?.id ?? '',
@@ -134,6 +145,7 @@ export function createSettings({
     if ('arrancarConWindows' in patch) loginItem.set(Boolean(patch.arrancarConWindows))
     if ('recordatoriosSalud' in patch) saveConfig({ recordatoriosSalud: Boolean(patch.recordatoriosSalud) })
     if ('avisosAlCelular' in patch) saveConfig({ avisosAlCelular: Boolean(patch.avisosAlCelular) })
+    if ('esquivarMouse' in patch) saveConfig({ esquivarMouse: Boolean(patch.esquivarMouse) })
     if (STANDBY_MODES.includes(patch.pantallaReposo)) {
       saveConfig({ pantallaReposo: patch.pantallaReposo })
       onStandby(patch.pantallaReposo)
@@ -165,7 +177,9 @@ export function createSettings({
     }
     // Ajustes → Pomodoro
     if ('pomodoroMinutos' in patch) saveConfig({ pomodoroMinutos: clampMinutes(patch.pomodoroMinutos) })
-    if (typeof patch.pomodoroMetodo === 'string' && METHODS[patch.pomodoroMetodo]) saveConfig({ pomodoroMetodo: patch.pomodoroMetodo })
+    if (typeof patch.pomodoroMetodo === 'string' && (METHODS[patch.pomodoroMetodo] || patch.pomodoroMetodo === 'auto')) saveConfig({ pomodoroMetodo: patch.pomodoroMetodo })
+    if (typeof patch.pomodoroTipo === 'string') saveConfig({ pomodoroTipo: TASK_TYPES[patch.pomodoroTipo] ? patch.pomodoroTipo : undefined })
+    if ('metaDiaria' in patch) saveConfig({ metaDiaria: goalOf({ metaDiaria: patch.metaDiaria }) })
     if (typeof patch.pomodoroMateria === 'string') saveConfig({ pomodoroMateria: patch.pomodoroMateria.trim().slice(0, 40) || undefined })
     if ('pomodoroOfrecer' in patch) saveConfig({ pomodoroOfrecer: Boolean(patch.pomodoroOfrecer) })
     if ('pomodoroDistracciones' in patch) saveConfig({ pomodoroDistracciones: Boolean(patch.pomodoroDistracciones) })
@@ -312,7 +326,7 @@ export function createSettings({
   // Consejos para cada bloque: con IA, a medida; sin IA (o si falla), los de siempre
   async function pomodoroAdvice() {
     const p = pomodoroSnapshot()
-    const plan = buildPlan({ minutos: p.minutos, metodo: p.metodo, materia: p.materia || null })
+    const plan = buildPlan({ minutos: p.minutos, metodo: p.metodo, materia: p.materia || null, tipo: p.tipo || null })
     if (ai?.enabled?.() && ai.advise) {
       try {
         const text = await ai.advise(advicePrompt(plan))
@@ -322,6 +336,26 @@ export function createSettings({
       }
     }
     return { ia: false, consejos: blockTips(plan) }
+  }
+
+  // El temario: guardarlo (del texto que soltaste), tachar o destachar un tema, o borrarlo
+  function syllabus({ accion, materia, texto, indice, visto } = {}) {
+    if (!studyLog) return { ...snapshot(), mensaje: null }
+    if (accion === 'guardar') {
+      const t = studyLog.setTemario(materia, String(texto ?? '').slice(0, 20000))
+      return {
+        ...snapshot(),
+        mensaje: t ? `Anoté ${t.temas.length === 1 ? '1 tema' : `${t.temas.length} temas`}. Mientras estudiás voy tachando los que veo.` : 'No encontré temas: poné uno por renglón (solo los títulos, no el contenido).'
+      }
+    }
+    if (accion === 'marcar') studyLog.markTopic(Number(indice), Boolean(visto))
+    if (accion === 'borrar') studyLog.clearTemario()
+    return { ...snapshot(), mensaje: null }
+  }
+
+  function clearStudy() {
+    studyLog?.clear()
+    return { ...snapshot(), mensaje: 'Borré tu historial de estudio.' }
   }
 
   // Los últimos titulares, para ver cómo quedan
@@ -353,6 +387,8 @@ export function createSettings({
     previewNews,
     readClassroom,
     pomodoroControl,
-    pomodoroAdvice
+    pomodoroAdvice,
+    syllabus,
+    clearStudy
   }
 }

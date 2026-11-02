@@ -6,6 +6,33 @@
 
 export const CHANGELOG = [
   {
+    version: '0.15.0',
+    nuevo: [
+      {
+        corto: 'te cuento cuánto estudiaste al terminar: los ciclos, tu racha de días seguidos y la adherencia',
+        detalle:
+          'Al terminar un Pomodoro te cuento cuánto estudiaste hoy («Hoy hiciste 4 ciclos, 1 hora y 40 de estudio»), cuántos días seguidos llevás, tu adherencia (de lo que planeaste, cuánto estudiaste sin distraerte) y los temas que vimos. Preguntame «¿cuánto estudié esta semana?» o «¿cuál es mi racha?».'
+      },
+      {
+        corto: 'tenés tu seguimiento de estudio en Ajustes → Mi estudio',
+        detalle: 'En Ajustes → Mi estudio tenés tu seguimiento, como un habit tracker: la semana día por día (progreso, ciclos, adherencia y estado), el mes por materia y tu racha.'
+      },
+      {
+        corto: 'soltás tu temario y voy tachando los temas que estudiás',
+        detalle: 'Soltá la lista de temas en Ajustes → Mi estudio (o decime «los temas son: …») y, mientras estudiás, voy tachando los que veo en lo que tenés abierto. Al final te digo cuáles faltan.'
+      },
+      {
+        corto: 'te recomiendo el método según lo que vas a estudiar',
+        detalle: 'Te recomiendo el método según lo que vas a hacer: para memorizar, repaso activo y repetición espaciada; para ejercicios o programación, bloques largos; para leer teoría, resumen propio y técnica Feynman. Si no sé qué vas a estudiar, te pregunto.'
+      },
+      { corto: 'si dejás el mouse encima mío, me corro', detalle: 'Si dejás el mouse encima mío, me corro para no taparte un botón (se apaga en Ajustes → General). Para llamarme, usá el atajo.' }
+    ],
+    mejoras: [
+      { corto: 'sé mejor qué te distrae: la música no, un video de una clase tampoco', detalle: 'Sé mejor qué te distrae en un bloque: la música no; un video de YouTube de una clase tampoco; las redes, el streaming, los juegos y las compras sí; un chat, si te quedás más de 3 minutos.' },
+      { corto: 'podés saltar el descanso o terminar por hoy desde el aviso o mi menú', detalle: '«Saltar el descanso» y «Terminar por hoy» están en mis avisos, en mi menú (clic derecho) y en Ajustes.' }
+    ]
+  },
+  {
     version: '0.14.0',
     nuevo: [
       {

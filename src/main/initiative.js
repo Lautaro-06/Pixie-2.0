@@ -160,12 +160,18 @@ export function createInitiative(times = TIMES, rng = Math.random) {
 
       // Distracciones
       const act = snap.actividad
-      // En un bloque de Pomodoro también cuentan los juegos; avisa al entrar (y de nuevo cada 5 minutos)
-      if (act && snap.pomodoro && snap.pomodoroAvisos !== false && (DISTRACTIONS.has(act.categoria) || act.categoria === 'juego') && t - (s.pomodoroAvisado || 0) > 5 * MIN) {
+      // En un bloque de Pomodoro: lo que Pixie decidió que distrae (snap.foco); si no lo sabe, por el tipo de app.
+      // Avisa al entrar (y de nuevo cada 5 minutos)
+      const foco = snap.foco !== undefined ? snap.foco : act && (DISTRACTIONS.has(act.categoria) || act.categoria === 'juego') ? { tipo: 'distraccion', app: act.app, distraido: true } : null
+      const distracted = Boolean(snap.pomodoro && foco?.distraido)
+      if (distracted && snap.pomodoroAvisos !== false && t - (s.pomodoroAvisado || 0) > 5 * MIN) {
         s.pomodoroAvisado = t
         notices.push({
           kind: 'distraccion',
-          text: `Estás en el bloque de estudio y te veo en ${act.app}. Lo mejor es priorizar lo tuyo: ya vas a tener tiempo para eso en el descanso.`,
+          text:
+            foco.tipo === 'chat'
+              ? `Hace un rato que estás en ${foco.app} y estás en el bloque de estudio. Contestá lo urgente y volvé: en el descanso tenés tiempo.`
+              : `Estás en el bloque de estudio y te veo en ${foco.app}. Lo mejor es priorizar lo tuyo: ya vas a tener tiempo para eso en el descanso.`,
           face: 'surprised'
         })
       }
@@ -185,7 +191,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
       } else if (act) {
         s.racha = { categoria: null, desde: 0, avisada: false }
       }
-      if (!snap.pomodoro || !act || !(DISTRACTIONS.has(act.categoria) || act.categoria === 'juego')) s.pomodoroAvisado = 0
+      if (!distracted) s.pomodoroAvisado = 0
 
       // A la noche jugando o con videos, y mañana entregás algo: te lo recuerda una vez
       const h = now.getHours() + now.getMinutes() / 60

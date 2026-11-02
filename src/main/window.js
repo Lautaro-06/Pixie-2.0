@@ -17,6 +17,10 @@ export function getWindow() {
   return win
 }
 
+export function getMode() {
+  return mode
+}
+
 // Si la cara se cuelga o se cierra, se vuelve a cargar sola (como mucho 5 veces cada 10 minutos)
 const RELOADS_ALLOWED = 5
 const RELOAD_WINDOW_MS = 10 * 60 * 1000

@@ -115,6 +115,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
         silencioHasta: quietUntil,
         pomodoro: isPomodoroRunning(),
         pomodoroAvisos: ctx.getConfig().pomodoroDistracciones !== false,
+        // En un bloque: lo que tenés adelante según Pixie (la música no distrae; un video de una clase, tampoco)
+        foco: ctx.pomodoroFocus ? ctx.pomodoroFocus() : undefined,
         salud: ctx.getConfig().recordatoriosSalud !== false,
         noticias: ctx.getConfig().noticiasAvisos ?? 'aveces',
         // Cuántos mails llegaron desde un momento (si pediste los avisos de mails)

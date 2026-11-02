@@ -2,16 +2,38 @@
 // Si abrís la interfaz en el navegador (para diseñar), se usa esta versión de prueba.
 
 import { pomodoroView, blockTips, buildPlan } from '../../main/study.js'
+import { trackerView, parseSyllabus } from '../../main/study-stats.js'
 
 // Ajustes de prueba: se guardan solo mientras está abierta la página
-let fakePomodoro = { minutos: 120, metodo: 'clasico', materia: '', ofrecer: true, distracciones: true }
+let fakePomodoro = { minutos: 120, metodo: 'auto', materia: '', tipo: '', ofrecer: true, distracciones: true }
+// Unas semanas de estudio de ejemplo para ver Ajustes → Mi estudio
+const fakeSessions = (() => {
+  const out = []
+  const subjects = [['Biología', ['Fotosíntesis', 'Respiración celular']], ['Química', ['Estequiometría']], ['Historia', ['Revolución de Mayo']]]
+  for (let back = 24; back >= 0; back--) {
+    if (back % 4 === 3) continue
+    const d = new Date()
+    d.setDate(d.getDate() - back)
+    d.setHours(17, 0, 0, 0)
+    const [materia, temas] = subjects[back % 3]
+    const ciclos = 1 + (back % 4)
+    const estudiadoMin = ciclos * 25
+    const distraidoMin = back % 5
+    out.push({ inicio: d.toISOString(), materia, estudiadoMin, ciclos, planeadoMin: 100, focoMin: estudiadoMin - distraidoMin, distraidoMin, adherencia: Math.round(((estudiadoMin - distraidoMin) / 100) * 100), temas })
+  }
+  return out
+})()
+let fakeTemario = { materia: 'Biología', temas: ['La célula', 'Fotosíntesis', 'Respiración celular', 'Mitosis y meiosis', 'ADN y genética'].map((texto, i) => ({ texto, visto: i === 1 || i === 2, auto: i === 1, cuando: null })) }
+let fakeGoal = 60
+const fakeStudy = () => trackerView(fakeSessions, { goal: fakeGoal, temario: fakeTemario })
 let fakeSettings = {
   version: 'navegador',
   bienvenidaHecha: false,
-  general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
+  general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true, esquivarMouse: true },
   apariencia: { pantallaReposo: 'cara' },
   mapas: { casa: '', transporteId: '', transporteSecreto: '', transporte: false },
   pomodoro: pomodoroView(fakePomodoro),
+  estudio: fakeStudy(),
   apps: {
     actualizado: Date.now(),
     buscando: false,
@@ -39,19 +61,21 @@ const previewSettings = {
   get: async () => fakeSettings,
   set: async (patch) => {
     const g = { ...fakeSettings.general }
-    for (const k of ['nombre', 'ciudad', 'arrancarConWindows', 'recordatoriosSalud', 'avisosAlCelular']) if (k in patch) g[k] = patch[k]
+    for (const k of ['nombre', 'ciudad', 'arrancarConWindows', 'recordatoriosSalud', 'avisosAlCelular', 'esquivarMouse']) if (k in patch) g[k] = patch[k]
     if (patch.atajo) g.atajo = patch.atajo.replace('Control', 'Ctrl').replace('Space', 'Espacio')
     // Apps: los permisos en la vista previa
     let apps = fakeSettings.apps
     if (patch.appPermiso) apps = { ...apps, lista: apps.lista.map((x) => (x.id === patch.appPermiso.id ? { ...x, ...patch.appPermiso } : x)) }
     if (typeof patch.appsTodas === 'boolean') apps = { ...apps, lista: apps.lista.map((x) => ({ ...x, abrir: patch.appsTodas, usar: patch.appsTodas })) }
     // Pomodoro: lo elegido y el plan que sale
-    const pomo = { pomodoroMinutos: 'minutos', pomodoroMetodo: 'metodo', pomodoroMateria: 'materia', pomodoroOfrecer: 'ofrecer', pomodoroDistracciones: 'distracciones' }
+    const pomo = { pomodoroMinutos: 'minutos', pomodoroMetodo: 'metodo', pomodoroMateria: 'materia', pomodoroTipo: 'tipo', pomodoroOfrecer: 'ofrecer', pomodoroDistracciones: 'distracciones' }
+    if (patch.metaDiaria) fakeGoal = patch.metaDiaria
     for (const [k, v] of Object.entries(pomo)) if (k in patch) fakePomodoro = { ...fakePomodoro, [v]: patch[k] }
     fakeSettings = {
       ...fakeSettings,
       apps,
       pomodoro: pomodoroView(fakePomodoro),
+      estudio: fakeStudy(),
       general: g,
       apariencia: patch.pantallaReposo ? { pantallaReposo: patch.pantallaReposo } : fakeSettings.apariencia,
       voz: {
@@ -112,6 +136,21 @@ const previewSettings = {
   },
   openTransitSignup: async () => window.open('https://api-transporte.buenosaires.gob.ar/registro', '_blank'),
   pomodoro: async (accion) => ({ ...fakeSettings, mensaje: `En la app de escritorio haría «${accion}».` }),
+  syllabus: async ({ accion, materia, texto, indice, visto } = {}) => {
+    if (accion === 'guardar') {
+      const temas = parseSyllabus(texto)
+      if (temas.length) fakeTemario = { materia: materia || null, temas: temas.map((t) => ({ texto: t, visto: false, auto: false, cuando: null })) }
+    }
+    if (accion === 'marcar' && fakeTemario?.temas[indice]) fakeTemario.temas[indice] = { ...fakeTemario.temas[indice], visto, auto: false }
+    if (accion === 'borrar') fakeTemario = null
+    fakeSettings = { ...fakeSettings, estudio: fakeStudy() }
+    return { ...fakeSettings, mensaje: accion === 'guardar' ? `Anoté ${fakeTemario?.temas.length ?? 0} temas.` : null }
+  },
+  clearStudy: async () => {
+    fakeSessions.length = 0
+    fakeSettings = { ...fakeSettings, estudio: fakeStudy() }
+    return { ...fakeSettings, mensaje: 'Borré tu historial de estudio.' }
+  },
   pomodoroAdvice: async () => {
     await wait(700)
     return { ia: false, consejos: blockTips(buildPlan({ minutos: fakePomodoro.minutos, metodo: fakePomodoro.metodo, materia: fakePomodoro.materia || null })) }

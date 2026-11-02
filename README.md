@@ -64,20 +64,39 @@ Pixie suma tu calendario y tus tareas de Classroom a su agenda: «¿qué tengo h
 
 Decile «quiero estudiar química 2 horas», «armá un pomodoro» o «tengo 1 hora y media para estudiar historia» (o armalo en **Ajustes → Pomodoro**). Si le contás que tenés que estudiar o que tenés una prueba, ella misma te lo ofrece.
 
-- **El plan:** con el tiempo que tenés arma los bloques de estudio y los descansos (cada tantos, uno largo), con el horario de cada uno y qué conviene hacer en cada bloque según la materia (ejercicios para Matemática, recuperación activa para Historia, fichas para Inglés…). Hay dos métodos: **Pomodoro clásico** (25 de estudio y 5 de descanso) y **Bloques largos** (50 y 10). Todo esto anda **sin IA**; con IA, «Pedir consejos a la IA» te da consejos a medida para cada bloque. Te pregunta «¿Arrancamos?» y con un sí arranca («arrancá un pomodoro» lo arranca directo).
+- **¿Qué vas a estudiar?** Si no le dijiste la materia ni qué vas a hacer, te pregunta, y con eso elige el método: para **memorizar** (fechas, vocabulario, fórmulas), bloques cortos con repaso activo y repetición espaciada; para **ejercicios** (cálculo, problemas, programación), **bloques largos** para no cortar el ritmo; para **leer teoría**, resumen propio y técnica Feynman. Si le decís la materia, se imagina el tipo (Química es de ejercicios, Inglés de memorizar, Historia de teoría). «¿Qué método me conviene para memorizar?» te lo explica.
+- **El plan:** con el tiempo que tenés arma los bloques de estudio y los descansos (cada tantos, uno largo), con el horario de cada uno y qué conviene hacer en cada bloque. Hay dos métodos: **Pomodoro clásico** (25 de estudio y 5 de descanso) y **Bloques largos** (50 y 10); por defecto lo elige ella según la tarea. Todo esto anda **sin IA**; con IA, «Pedir consejos a la IA» te da consejos a medida para cada bloque. Te pregunta «¿Arrancamos?» y con un sí arranca («arrancá un pomodoro» lo arranca directo).
 - **En la pantallita:** mientras estudiás, Pixie no hace animaciones: se ve el plan en fila (los bloques de estudio son cuadrados rojos y los descansos, rectángulos verdes angostos). Los que ya hiciste quedan prendidos con una tilde, el de ahora se va llenando de abajo hacia arriba y los que faltan están apagados. Abajo, chiquito, en qué bloque vas, el tiempo que falta (en los últimos 2 minutos se pone naranja) y el porcentaje. Si el plan es muy largo, la fila se corre para que siempre se vea el bloque de ahora. **Tocá la pantallita para pausar o seguir.** Los timers comunes («timer de 10 minutos») también se ven ahí, con el tiempo grande y una barra, y se pausan igual.
 - **Al arrancar cada bloque** te dice que es momento de que no haya distracciones, que vuelve en el descanso y que, aunque no te va a molestar, sigue ahí si necesitás ayuda.
-- **Sin distracciones:** en un bloque no te pasa avisos (mails, noticias, charlas): te los guarda y en el descanso te dice cuántos son. «¿Qué me perdí?» te los cuenta. Los recordatorios de tu agenda y la batería baja te los dice igual. Si entrás a Instagram, YouTube, una red social o un juego, te dice que estás en el bloque de estudio y que ya vas a tener tiempo para eso en el descanso (como mucho cada 5 minutos).
-- **Mini test:** en los últimos 2 minutos de cada bloque te ofrece un mini test de repaso. Para saber de qué, mira el título de lo que tenés abierto mientras estudiás (solo en memoria, se borra al terminar). Con IA te hace 3 preguntas de a una, sobre la página que tenés abierta en Chrome si es del tema; sin IA, preguntas para repasar solo.
-- **En el descanso** suena un sonido de victoria y vuelve Pixie con anteojos de sol y un mate, con una rayita abajo de lo que falta.
-- «pausá el pomodoro», «seguí», «saltá el descanso», «¿cuánto falta?», «terminá el pomodoro». En **Ajustes → Pomodoro** también podés apagar que te lo ofrezca y los avisos de distracciones.
+- **Sin distracciones:** en un bloque no te pasa avisos (mails, noticias, charlas): te los guarda y en el descanso te dice cuántos son. «¿Qué me perdí?» te los cuenta. Los recordatorios de tu agenda y la batería baja te los dice igual.
+- **Qué distrae, a criterio de Pixie:** las redes (Instagram, TikTok, X), el streaming (Netflix, Twitch, Kick, páginas de películas), los juegos, las compras y las noticias, sí; un video de YouTube, salvo que sea una clase o un tutorial (o de tu materia). La música (Spotify, YouTube Music) no. Un chat (WhatsApp, Discord), solo si te quedás más de 3 minutos. Cuando te distraés te dice que estás en el bloque de estudio y que ya vas a tener tiempo en el descanso (como mucho cada 5 minutos), y ese tiempo no cuenta como foco.
+- **Mini test:** en los últimos 2 minutos de cada bloque te ofrece un mini test de repaso. Para saber de qué, mira el título de lo que tenés abierto mientras estudiás. Con IA te hace 3 preguntas de a una, sobre la página que tenés abierta en Chrome si es del tema; sin IA, preguntas para repasar solo.
+- **En el descanso** suena un sonido de victoria y vuelve Pixie con anteojos de sol y un mate, con una rayita abajo de lo que falta. El aviso trae **Saltar el descanso** y **Terminar por hoy** (también están en su menú, clic derecho, y en Ajustes).
+- **El resumen del final:** «¡Listo por hoy! Hoy hiciste 4 ciclos: 1 hora y 40 minutos de estudio. Llevás 3 días seguidos estudiando. Adherencia: 92%. Vimos: Fotosíntesis y Respiración celular. Del temario te faltan…». Un **ciclo** es un bloque de estudio terminado; la **racha** cuenta los días seguidos con al menos un ciclo (o 15 minutos); la **adherencia** es cuánto de lo que planeaste estudiaste sin distraerte (si planeaste 100 minutos y estudiaste 80, 5 de ellos en Instagram, es 75%). Los **temas vistos** salen de los títulos de lo que tuviste abierto más de un minuto.
+- «pausá el pomodoro», «seguí», «saltá el descanso», «¿cuánto falta?», «terminar por hoy», «¿cuánto estudié esta semana?», «¿cuál es mi racha?». En **Ajustes → Pomodoro** también podés apagar que te lo ofrezca y los avisos de distracciones.
+
+### Mi estudio: seguimiento y temario
+
+En **Ajustes → Mi estudio** (o «mostrame mi seguimiento») tenés tu seguimiento, como un habit tracker:
+
+- Arriba, tu **racha**, lo de hoy, lo de la semana y la adherencia de las últimas dos semanas.
+- **Esta semana**, día por día: una barra con el progreso hacia tu **meta diaria** (la elegís ahí: 30 minutos a 3 horas), los ciclos (cuadraditos rojos), la adherencia, el estado (💪 Dale que podés, 👍 Bien hecho, 🔥 ¡Imparable!) y los temas que viste.
+- **Por materia:** cuántos días seguidos llevás con cada una y cuánto estudiaste esta semana.
+- **El mes**, con una fila por materia y una columna por día (este mes y el anterior).
+- **El temario:** soltá un archivo `.txt` con un tema por renglón (o pegá la lista, o decile «los temas de biología son: célula, mitosis y meiosis»). Guarda **solo los títulos de los temas**, no tus apuntes, así no se carga de más. Mientras estudiás con el Pomodoro tacha los temas que aparecen en lo que tenés abierto (también los podés tachar vos), y al final te dice cuáles faltan. «¿Qué temas me faltan?» te lo dice cuando quieras. Si tu temario está en Word o PDF, copiá los temas y pegalos.
+
+Todo queda en `estudio.json`, en la carpeta de Pixie, y se borra con **Borrar mi historial de estudio**.
+
+### Pixie se corre si le dejás el mouse encima
+
+Si dejás el mouse quieto encima de Pixie (cuando está chiquita), se corre un poco para no taparte un botón. Para llamarla usá el atajo o «Pixie, ¿estás?»; para moverla a mano, llamala y arrastrala con la barra abierta. Se apaga en **Ajustes → General → Correrme si dejás el mouse encima**.
 
 ### Ajustes
 
 Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
 
-- **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud y avisos al celular.
-- **Agenda**, **Pomodoro** y **Noticias** (ver arriba).
+- **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud, avisos al celular y si se corre cuando le dejás el mouse encima.
+- **Agenda**, **Pomodoro**, **Mi estudio** y **Noticias** (ver arriba).
 - **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
 - **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
 - **Voz:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
@@ -93,7 +112,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.14)
+## Qué hace (versión 0.15)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -111,7 +130,8 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «subí el volumen», «volumen al 50», «más fuerte», «silenciá» | Volumen |
 | «poné música», «pasá de tema», «otra canción» | Controla la música que esté sonando |
 | «timer de 10 minutos», «avisame en 5 minutos que saque la pizza», «pausá el timer» | Timers con aviso, sonido y voz (se ven en la pantallita; tocala para pausar) |
-| «quiero estudiar química 2 horas», «armá un pomodoro», «tomame un mini test», «¿qué me perdí?» | [Modo Pomodoro](#modo-pomodoro-para-estudiar) |
+| «quiero estudiar química 2 horas», «armá un pomodoro», «tomame un mini test», «¿qué me perdí?», «terminar por hoy» | [Modo Pomodoro](#modo-pomodoro-para-estudiar) |
+| «¿cuánto estudié esta semana?», «¿cuál es mi racha?», «mostrame mi seguimiento», «¿qué temas me faltan?» | [Mi estudio](#mi-estudio-seguimiento-y-temario) |
 | «¿cuánto es 25 por 4?», «20% de 300» | Cuentas |
 | «bloqueá la compu», «me voy», «apagá la compu» | Bloquear, apagar o reiniciar (pregunta antes) |
 | «sacá una captura», «¿cómo está la compu?» | Recorte de pantalla y uso de CPU y memoria |
@@ -173,7 +193,7 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu. Para los disfraces, Pixie mira el programa y el título de la ventana que tenés adelante, pero no los guarda. Tu casa queda en `config.json`; cuando le pedís un recorrido, la dirección va a OpenStreetMap y a Google Maps para calcularlo. La clave de los colectivos queda cifrada.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu. Para los disfraces, Pixie mira el programa y el título de la ventana que tenés adelante, pero no los guarda. En un Pomodoro sí anota, en `estudio.json`, los temas (los títulos limpios de lo que estudiaste, como «Fotosíntesis») para el resumen y el seguimiento; nunca los de lo que te distrajo. Tu casa queda en `config.json`; cuando le pedís un recorrido, la dirección va a OpenStreetMap y a Google Maps para calcularlo. La clave de los colectivos queda cifrada.
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 

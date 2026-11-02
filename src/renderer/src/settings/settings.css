@@ -765,3 +765,287 @@ body.ventana-ajustes #root {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Pomodoro: qué vas a hacer y cómo vas ── */
+.ventana-ajustes .pomo-types {
+  grid-template-columns: repeat(3, 1fr);
+}
+.ventana-ajustes .pomo-methods {
+  grid-template-columns: repeat(3, 1fr);
+}
+.ventana-ajustes .pomo-why {
+  margin: 8px 0 0;
+}
+.ventana-ajustes .pomo-progress {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mi estudio (como un habit tracker) ── */
+.ventana-ajustes .study-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.ventana-ajustes .tile {
+  display: grid;
+  gap: 2px;
+  padding: 14px 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: center;
+}
+.ventana-ajustes .tile-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ventana-ajustes .tile-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ventana-ajustes .week-wrap,
+.ventana-ajustes .month-wrap {
+  overflow-x: auto;
+  margin: 4px 0 8px;
+}
+.ventana-ajustes .week {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ventana-ajustes .week th,
+.ventana-ajustes .week td {
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--card-line);
+  text-align: left;
+  white-space: nowrap;
+}
+.ventana-ajustes .week thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+}
+.ventana-ajustes .week tbody th {
+  font-weight: 600;
+}
+.ventana-ajustes .week tr.today th,
+.ventana-ajustes .week tr.today td {
+  background: rgba(156, 211, 255, 0.07);
+}
+.ventana-ajustes .week tr.future {
+  opacity: 0.45;
+}
+.ventana-ajustes .week td.topics {
+  white-space: normal;
+  color: var(--muted);
+  max-width: 220px;
+}
+.ventana-ajustes .progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ventana-ajustes .bar {
+  display: inline-block;
+  position: relative;
+  width: 90px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--field);
+  border: 1px solid var(--card-line);
+  overflow: hidden;
+}
+.ventana-ajustes .bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.ventana-ajustes .pct {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+}
+.ventana-ajustes .cycles {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ventana-ajustes .cycle {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: #ff4d5e;
+}
+.ventana-ajustes .cycle-more,
+.ventana-ajustes .muted-dash,
+.ventana-ajustes .muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ventana-ajustes .subjects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.ventana-ajustes .subject {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  background: var(--field);
+  font-size: 13px;
+}
+.ventana-ajustes .month-tabs {
+  display: inline-flex;
+  margin-bottom: 4px;
+}
+.ventana-ajustes .month {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ventana-ajustes .month th,
+.ventana-ajustes .month td {
+  min-width: 18px;
+  height: 20px;
+  padding: 0 2px;
+  text-align: center;
+  color: var(--muted);
+}
+.ventana-ajustes .month td {
+  border-radius: 4px;
+  background: var(--field);
+}
+.ventana-ajustes .month .month-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 110px;
+  max-width: 140px;
+  padding-right: 8px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ventana-ajustes .month thead th.today {
+  color: var(--accent);
+  font-weight: 700;
+}
+.ventana-ajustes .month td.today {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.ventana-ajustes .month td.little {
+  background: rgba(255, 77, 94, 0.25);
+  color: var(--text);
+}
+.ventana-ajustes .month td.some {
+  background: rgba(255, 77, 94, 0.5);
+  color: var(--text);
+}
+.ventana-ajustes .month td.lots {
+  background: rgba(255, 77, 94, 0.85);
+  color: #fff;
+}
+.ventana-ajustes .month-total th,
+.ventana-ajustes .month-total td {
+  font-weight: 700;
+}
+.ventana-ajustes .syllabus-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.ventana-ajustes .syllabus-progress .bar {
+  flex: 1;
+  width: auto;
+}
+.ventana-ajustes .syllabus-progress .bar > span {
+  background: var(--ok);
+}
+.ventana-ajustes .syllabus {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.ventana-ajustes .syllabus li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 8px;
+  background: var(--field);
+}
+.ventana-ajustes .syllabus label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.ventana-ajustes .syllabus input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ok);
+}
+.ventana-ajustes .syllabus li.done span:not(.syllabus-auto) {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.ventana-ajustes .syllabus-auto {
+  color: var(--ok);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ventana-ajustes .dropzone {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  background: rgba(156, 211, 255, 0.03);
+}
+.ventana-ajustes .dropzone.over {
+  border-color: var(--accent);
+  background: rgba(156, 211, 255, 0.1);
+}
+.ventana-ajustes .dropzone-title {
+  margin: 0;
+  font-weight: 700;
+}
+.ventana-ajustes .dropzone .hint {
+  margin: 0;
+}
+.ventana-ajustes .syllabus-text {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+}
+@media (max-width: 720px) {
+  .ventana-ajustes .study-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ventana-ajustes .pomo-types,
+  .ventana-ajustes .pomo-methods {
+    grid-template-columns: 1fr;
+  }
+}
+.ventana-ajustes .dropzone .field {
+  width: 100%;
+}

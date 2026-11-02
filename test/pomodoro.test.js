@@ -12,7 +12,11 @@ import {
   minutesFrom,
   topicFromTitle,
   selfTest,
-  quizPrompt
+  quizPrompt,
+  taskTypeFrom,
+  subjectIn,
+  topicsFromTitles,
+  focusKind
 } from '../src/main/study.js'
 import { createPomodoro } from '../src/main/pomodoro.js'
 import { runAction } from '../src/main/actions/index.js'
@@ -88,10 +92,33 @@ test('con poco tiempo entra un solo bloque, y el tiempo se acota entre 15 minuto
 })
 
 test('el plan se dice corto, con la materia y una técnica para estudiarla', () => {
-  const text = planText(buildPlan({ minutos: 120, materia: 'química', inicio: new Date('2026-11-02T16:00:00') }))
-  assert.match(text, /^Te armé 4 bloques de 25 minutos de química con descansos de 5 minutos: de 16:00 a 17:55/)
+  const text = planText(buildPlan({ minutos: 120, materia: 'historia', inicio: new Date('2026-11-02T16:00:00') }))
+  assert.match(text, /^Para leer teoría conviene .* Te armé 4 bloques de 25 minutos de historia con descansos de 5 minutos: de 16:00 a 17:55/)
   assert.match(text, /1 hora y 40 minutos de estudio/)
-  assert.match(text, /práctica con ejercicios/i, 'química se estudia con ejercicios')
+  assert.match(text, /resumen propio/i)
+  // Con el método elegido a mano no explica por qué
+  assert.match(planText(buildPlan({ minutos: 120, materia: 'historia', metodo: 'clasico' })), /^Te armé 4 bloques/)
+})
+
+test('el método sale del tipo de tarea: ejercicios con bloques largos, memorizar y teoría con el clásico', () => {
+  const ex = buildPlan({ minutos: 120, tipo: 'practica', inicio: new Date('2026-11-02T16:00:00') })
+  assert.deepEqual([ex.metodo, ex.auto, ex.tipo], ['largo', true, 'practica'])
+  assert.match(planText(ex), /^Para resolver ejercicios conviene bloques largos.* Te armé 2 bloques de 50 minutos con un descanso de 10 minutos/)
+  assert.equal(buildPlan({ tipo: 'memorizar' }).metodo, 'clasico')
+  assert.equal(buildPlan({ tipo: 'teoria' }).metodo, 'clasico')
+  // Sin tipo, sale de la materia: química es de ejercicios, inglés de memorizar
+  assert.deepEqual([buildPlan({ materia: 'química' }).tipo, buildPlan({ materia: 'química' }).metodo], ['practica', 'largo'])
+  assert.equal(buildPlan({ materia: 'Inglés' }).tipo, 'memorizar')
+  // Si elegís el método a mano, manda lo tuyo
+  assert.equal(buildPlan({ materia: 'química', metodo: 'clasico' }).metodo, 'clasico')
+  assert.equal(taskTypeFrom('tengo que resolver ejercicios de física'), 'practica')
+  assert.equal(taskTypeFrom('me tengo que aprender de memoria las fechas'), 'memorizar')
+  assert.equal(taskTypeFrom('leer el capítulo 3'), 'teoria')
+  assert.equal(taskTypeFrom('hola'), null)
+  assert.deepEqual(recommendTechniques(null, 'memorizar').map((t) => t.nombre), ['Recuperación activa', 'Repaso espaciado', 'Fichas de pregunta y respuesta'])
+  assert.deepEqual(recommendTechniques('historia', 'teoria').map((t) => t.nombre), ['Resumen propio', 'Técnica Feynman', 'Mapa conceptual'])
+  assert.equal(subjectIn('mañana tengo prueba de Química'), 'química')
+  assert.equal(subjectIn('nada que ver'), null)
 })
 
 test('recomienda técnicas según la materia', () => {
@@ -105,7 +132,7 @@ test('sin IA dice qué hacer en cada bloque; con IA le pide consejos a medida', 
   const plan = buildPlan({ minutos: 120, materia: 'historia' })
   const tips = blockTips(plan)
   assert.equal(tips.length, 4)
-  assert.match(tips[0], /^Bloque 1: leé la teoría/)
+  assert.match(tips[0], /^Bloque 1: leé y marcá lo más importante/)
   assert.match(tips[3], /^Bloque 4: .*mini test/)
   assert.equal(blockTips(buildPlan({ minutos: 20 })).length, 1)
   const prompt = advicePrompt(plan)
@@ -179,8 +206,47 @@ test('al terminar todo cuenta cuánto estudiaste', () => {
   p.start(buildPlan({ minutos: 120, materia: 'historia' }))
   clock.advance(120 * MIN)
   const fin = events.find(([e]) => e === 'fin')[1]
-  assert.deepEqual(fin, { completo: true, estudiadoMin: 100, bloquesHechos: 4, materia: 'historia' })
+  assert.deepEqual(
+    { ...fin, inicio: undefined, fin: undefined },
+    { completo: true, estudiadoMin: 100, bloquesHechos: 4, materia: 'historia', tipo: 'teoria', metodo: 'clasico', inicio: undefined, fin: undefined, ciclos: 4, ciclosPlaneados: 4, planeadoMin: 100, distraidoMin: 0, focoMin: 100, adherencia: 100 }
+  )
   assert.deepEqual(p.status(), { activo: false })
+})
+
+test('la adherencia descuenta el tiempo distraído y lo que no llegaste a estudiar', () => {
+  const { p, clock, events } = session()
+  p.start(buildPlan({ minutos: 60, metodo: 'clasico' })) // 2 bloques de 25: 50 planeados
+  clock.advance(10 * MIN)
+  p.noteDistraction(5 * MIN) // 5 minutos en Instagram
+  clock.advance(15 * MIN)
+  p.noteDistraction(MIN) // en el descanso no cuenta
+  clock.advance(5 * MIN)
+  const st = p.status()
+  assert.equal(st.ciclos, 1)
+  assert.equal(st.distraidoMs, 5 * MIN)
+  assert.equal(st.planeadoMs, 50 * MIN)
+  p.pause()
+  p.noteDistraction(MIN) // en pausa tampoco
+  p.resume()
+  clock.advance(10 * MIN)
+  p.stop() // «terminar por hoy» con 35 estudiados
+  const fin = events.find(([e]) => e === 'fin')[1]
+  assert.equal(fin.estudiadoMin, 35)
+  assert.equal(fin.distraidoMin, 5)
+  assert.equal(fin.focoMin, 30)
+  assert.equal(fin.ciclos, 1)
+  assert.equal(fin.adherencia, 60, '30 con foco de 50 planeados')
+})
+
+test('saltar un bloque casi terminado cuenta como ciclo; recién empezado, no', () => {
+  const { p, clock } = session()
+  p.start(buildPlan({ minutos: 60, metodo: 'clasico' }))
+  clock.advance(21 * MIN)
+  p.skip()
+  assert.equal(p.status().ciclos, 1)
+  p.skip()
+  clock.advance(5 * MIN)
+  assert.equal(p.status().ciclos, 1, 'el segundo recién empezado todavía no cuenta')
 })
 
 test('en pausa el tiempo no corre; al seguir, retoma donde estaba', () => {
@@ -209,7 +275,7 @@ test('saltar pasa al siguiente bloque y terminar a mitad cuenta lo que llevabas'
   assert.equal(p.skip().fase, 'estudio', 'saltear el descanso')
   clock.advance(5 * MIN)
   const r = p.stop()
-  assert.deepEqual(r, { completo: false, estudiadoMin: 15, bloquesHechos: 1, materia: null })
+  assert.deepEqual([r.completo, r.estudiadoMin, r.bloquesHechos, r.materia, r.ciclos], [false, 15, 1, null, 0])
   assert.equal(events.filter(([e]) => e === 'fin').length, 1)
   assert.equal(p.stop(), null, 'si ya terminó, no hace nada')
 })
@@ -241,14 +307,14 @@ function studyCtx(extra = {}) {
 
 test('«armá un pomodoro» muestra el plan y pregunta; al decir que sí, arranca', async () => {
   const { ctx, p, pending } = studyCtx()
-  const r = await runAction('pomodoro', { accion: 'plan', materia: 'química' }, ctx)
+  const r = await runAction('pomodoro', { accion: 'plan', materia: 'historia' }, ctx)
   assert.equal(r.confirm, true)
-  assert.match(r.text, /^Te armé 2 bloques de 25 minutos de química/)
+  assert.match(r.text, /Te armé 2 bloques de 25 minutos de historia/)
   assert.match(r.text, /¿Arrancamos\?$/)
-  assert.deepEqual(pending(), { action: 'pomodoro', params: { accion: 'empezar', minutos: 55, materia: 'química', metodo: 'clasico' } })
+  assert.deepEqual(pending(), { action: 'pomodoro', params: { accion: 'empezar', minutos: 55, materia: 'historia', metodo: 'clasico', tipo: 'teoria' } })
   assert.equal(p.activo(), false, 'todavía no arrancó')
   const go = await runAction('pomodoro', pending().params, ctx)
-  assert.match(go.text, /^¡Arrancamos de química! Bloque 1 de 2: 25 minutos\. Es momento de que no haya distracciones: vuelvo en el descanso\./)
+  assert.match(go.text, /^¡Arrancamos de historia! Bloque 1 de 2: 25 minutos\. Es momento de que no haya distracciones: vuelvo en el descanso\./)
   assert.match(go.text, /sigo acá si necesitás ayuda/)
   assert.equal(p.activo(), true)
 })
@@ -258,7 +324,7 @@ test('pausar, seguir, estado, saltar y terminar por voz', async () => {
   assert.match((await runAction('pomodoro', { accion: 'estado' }, ctx)).text, /No hay un Pomodoro andando/)
   await runAction('pomodoro', { accion: 'empezar' }, ctx)
   clock.advance(5 * MIN)
-  assert.match((await runAction('pomodoro', { accion: 'estado' }, ctx)).text, /^Estás en el bloque 1 de 2: faltan 20 minutos\.$/)
+  assert.equal((await runAction('pomodoro', { accion: 'estado' }, ctx)).text, 'Estás en el bloque 1 de 2: faltan 20 minutos. Llevás 5 minutos de 50 minutos, con 100% de foco.')
   assert.match((await runAction('pomodoro', { accion: 'pausar' }, ctx)).text, /^Pausé el Pomodoro \(faltan 20 minutos\)/)
   assert.equal((await runAction('pomodoro', { accion: 'seguir' }, ctx)).text, '¡Seguimos!')
   assert.match((await runAction('pomodoro', { accion: 'plan' }, ctx)).text, /^Ya hay un Pomodoro andando/)
@@ -426,7 +492,9 @@ test('Ajustes → Pomodoro muestra el plan con lo que elegiste', async () => {
   const { s, cfg } = settings()
   let v = s.snapshot().pomodoro
   assert.equal(v.minutos, 120)
-  assert.equal(v.metodo, 'clasico')
+  assert.equal(v.metodo, 'auto', 'por defecto elige el método según la tarea')
+  assert.equal(v.metodoUsado, 'clasico')
+  assert.equal(v.tipos.length, 3)
   assert.equal(v.ofrecer, true)
   assert.equal(v.distracciones, true)
   assert.equal(v.plan.bloques.length, 7)
@@ -437,10 +505,16 @@ test('Ajustes → Pomodoro muestra el plan con lo que elegiste', async () => {
   assert.equal(v.metodo, 'largo')
   assert.equal(v.materia, 'Biología')
   assert.equal(v.ofrecer, false)
-  assert.equal(v.tecnicas[0].nombre, 'Recuperación activa')
+  assert.equal(v.tecnicas[0].nombre, 'Resumen propio', 'biología es leer teoría')
   await s.apply({ pomodoroMetodo: 'inventado', pomodoroMateria: '' })
   assert.equal(cfg().pomodoroMetodo, 'largo', 'un método que no existe no se guarda')
   assert.equal('pomodoroMateria' in cfg(), false)
+  // Qué vas a hacer: con «según la tarea», ejercicios elige bloques largos y dice por qué
+  v = (await s.apply({ pomodoroMetodo: 'auto', pomodoroTipo: 'practica' })).pomodoro
+  assert.equal(v.tipo, 'practica')
+  assert.equal(v.metodoUsado, 'largo')
+  assert.match(v.porque, /bloques largos/)
+  assert.equal((await s.apply({ pomodoroTipo: '' })).pomodoro.tipo, '')
 })
 
 test('los botones de Ajustes arrancan el Pomodoro y muestran cómo va', async () => {
@@ -469,7 +543,7 @@ test('los consejos para cada bloque: con IA a medida, sin IA (o si falla) los de
 test('la vista del Pomodoro se arma igual para Ajustes y para la vista previa', () => {
   const v = pomodoroView({ minutos: 90, materia: 'historia' })
   assert.equal(v.plan.estudioMin, 75)
-  assert.equal(v.metodos.length, 2)
+  assert.equal(v.metodos.length, 3, 'según la tarea, clásico y largo')
   assert.match(v.plan.texto, /3 bloques de 25 minutos de historia/)
 })
 

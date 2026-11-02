@@ -210,12 +210,13 @@ export const AI_TOOLS = [
   {
     name: 'pomodoro',
     description:
-      'Modo Pomodoro para estudiar. plan: arma los bloques según el tiempo disponible y pregunta si arranca (usala cuando quiere estudiar). empezar: lo arranca ya. pausar, seguir, saltar (el descanso o el bloque), terminar, estado.',
+      'Modo Pomodoro para estudiar. plan: arma los bloques según el tiempo disponible y pregunta si arranca (usala cuando quiere estudiar; si no sabés qué va a estudiar, no pongas materia ni tipo y Pixie se lo pregunta). empezar: lo arranca ya. pausar, seguir, saltar (el descanso o el bloque), terminar (terminar por hoy, con el resumen), estado.',
     input_schema: obj({
       accion: oneOf(['plan', 'empezar', 'pausar', 'seguir', 'saltar', 'terminar', 'estado']),
       minutos: int('Tiempo disponible para estudiar, en minutos', 15, 480),
       materia: str('La materia o el tema (por ejemplo «química»)'),
-      metodo: oneOf(['clasico', 'largo'], 'clasico: 25 de estudio y 5 de descanso; largo: 50 y 10')
+      tipo: oneOf(['memorizar', 'practica', 'teoria'], 'Qué va a hacer: memorizar (fechas, vocabulario, fórmulas), practica (ejercicios, problemas, programación) o teoria (leer). Elige el método solo.'),
+      metodo: oneOf(['clasico', 'largo'], 'Solo si lo pidió: clasico es 25 de estudio y 5 de descanso; largo, 50 y 10')
     }, ['accion'])
   },
   {
@@ -225,8 +226,23 @@ export const AI_TOOLS = [
   },
   {
     name: 'tecnicas_estudio',
-    description: 'Recomienda técnicas de estudio según la materia',
-    input_schema: obj({ materia: str('La materia') })
+    description: 'Recomienda el método y las técnicas de estudio según lo que va a hacer (memorizar, ejercicios, leer teoría) o la materia',
+    input_schema: obj({ materia: str('La materia'), tipo: oneOf(['memorizar', 'practica', 'teoria']) })
+  },
+  {
+    name: 'estudio_resumen',
+    description: 'Cuánto estudió con el Pomodoro (hoy, esta semana, este mes) o su racha de días seguidos',
+    input_schema: obj({ periodo: oneOf(['hoy', 'semana', 'mes', 'racha']) })
+  },
+  {
+    name: 'ver_seguimiento',
+    description: 'Abre el seguimiento de estudio (días, ciclos, adherencia, racha y temario)',
+    input_schema: obj()
+  },
+  {
+    name: 'temario',
+    description: 'Sin temas: dice qué temas del temario ya vio y cuáles faltan. Con temas: guarda la lista de temas que tiene que estudiar.',
+    input_schema: obj({ temas: str('Los temas separados por comas'), materia: str('La materia del temario') })
   },
   {
     name: 'que_me_perdi',
