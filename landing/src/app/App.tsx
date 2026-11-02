@@ -1,12 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { LazyMotion, domAnimation } from 'motion/react';
-import { ChevronDown, ExternalLink } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import logo from '../images/PIXIE-LogoEyes.png';
 import Aurora from './Aurora';
 import Hero, { Closing } from './Hero';
 import Reveal from './Reveal';
 import PixieScreen from './PixieScreen';
-import { DownloadButton, REPO_URL, useLatestRelease } from './download';
+import { DownloadButton, useLatestRelease } from './download';
 
 const DayScene = lazy(() => import('./DayScene'));
 const Companion = lazy(() => import('./Companion'));
@@ -35,8 +35,8 @@ const STEPS = [
 ];
 
 const FAQ = [
-  { q: '¿Es gratis?', a: 'Sí, Pixie es gratis y de código abierto. Para conversar con IA ponés tu propia clave: la de Gemini es gratis y alcanza para unos 500 pedidos por día.' },
-  { q: '¿Es seguro? ¿Por qué Windows me avisa?', a: 'El aviso aparece porque el instalador todavía no tiene firma digital, un certificado pago. El código es abierto y lo podés revisar en GitHub.' },
+  { q: '¿Es gratis?', a: 'Sí, Pixie es gratis. Para conversar con IA ponés tu propia clave: la de Gemini es gratis y alcanza para unos 500 pedidos por día.' },
+  { q: '¿Es seguro? ¿Por qué Windows me avisa?', a: 'El aviso aparece porque el instalador todavía no tiene firma digital, un certificado pago.' },
   { q: '¿Funciona sin internet?', a: 'En parte. Sin IA entiende las órdenes que conoce, como «abrí Spotify» o «subí el volumen», sin internet. Para conversar de todo necesita una IA: en línea, o Ollama en tu compu.' },
   { q: '¿Me escucha todo el tiempo?', a: 'Solo si activás «Pixie, ¿estás?». Compara lo que oye con tu voz en la compu y no manda audio a ningún lado hasta que la llamás. Mientras está prendido, Windows muestra el ícono del micrófono.' },
   { q: '¿Tengo que actualizarla a mano?', a: 'No. Busca versiones nuevas al arrancar y cada 6 horas, y te pregunta si te actualizás ahora. Si decís que no, se instala sola la próxima vez que se cierre.' },
@@ -209,10 +209,6 @@ export default function App() {
 
       <footer className="foot">
         <p>Pixie empezó como un reloj de escritorio con ESP32 y una pantalla OLED. Hecha por estudiantes de Buenos Aires: {TEAM.join(', ')}.</p>
-        <div>
-          <a href={REPO_URL}>Código fuente <ExternalLink aria-hidden size={14} /></a>
-          <a href={`${REPO_URL}/releases`}>Todas las versiones <ExternalLink aria-hidden size={14} /></a>
-        </div>
       </footer>
     </LazyMotion>
   );

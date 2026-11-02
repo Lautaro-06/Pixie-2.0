@@ -3,13 +3,11 @@ import { AnimatePresence, m as motion, useReducedMotion } from 'motion/react';
 import { Check, Copy, Download } from 'lucide-react';
 
 const REPO = 'Lautaro-06/Pixie-2.0';
-export const REPO_URL = `https://github.com/${REPO}`;
-export const RELEASES_URL = `${REPO_URL}/releases/latest`;
 
 export interface Release {
   version: string;
   url: string;
-  sizeMb: number | null;
+  sizeMb: number;
 }
 
 declare const __FALLBACK_RELEASE__: Release | null;
@@ -21,10 +19,11 @@ export function useLatestRelease() {
       .then(r => (r.ok ? r.json() : Promise.reject()))
       .then(data => {
         const exe = (data.assets ?? []).find((a: { name: string }) => a.name.endsWith('.exe'));
+        if (!exe) return;
         setRelease({
           version: data.tag_name,
-          url: exe?.browser_download_url ?? RELEASES_URL,
-          sizeMb: exe ? Math.round(exe.size / 1_048_576) : null,
+          url: exe.browser_download_url,
+          sizeMb: Math.round(exe.size / 1_048_576),
         });
       })
       .catch(() => {});
@@ -70,9 +69,14 @@ export function DownloadButton({ release, compact = false }: { release: Release 
     );
   }
 
+  if (!release) {
+    if (compact) return null;
+    return <p className="cta-note">No pudimos encontrar el instalador. Probá de nuevo en un rato.</p>;
+  }
+
   if (compact) {
     return (
-      <a href={release?.url ?? RELEASES_URL} className="cta-button is-compact">
+      <a href={release.url} className="cta-button is-compact">
         <Download aria-hidden size={16} /> Descargar
       </a>
     );
@@ -80,15 +84,11 @@ export function DownloadButton({ release, compact = false }: { release: Release 
 
   return (
     <div className="cta">
-      <a href={release?.url ?? RELEASES_URL} className="cta-button has-shimmer" onClick={() => setStarted(true)}>
+      <a href={release.url} className="cta-button has-shimmer" onClick={() => setStarted(true)}>
         <span className="shimmer" aria-hidden><span /></span>
         <Download aria-hidden size={20} className="shrink-0" /> Descargar gratis
       </a>
-      <p className="cta-note">
-        {release
-          ? `${release.version}${release.sizeMb ? ` · ${release.sizeMb} MB` : ''} · Windows 10 y 11`
-          : 'Windows 10 y 11 · gratis y de código abierto'}
-      </p>
+      <p className="cta-note">{`${release.version} · ${release.sizeMb} MB · Windows 10 y 11`}</p>
       <div aria-live="polite">
         <AnimatePresence>
           {started && (

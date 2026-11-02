@@ -4,7 +4,7 @@ import PixieScreen from './PixieScreen';
 import { DownloadButton, Release } from './download';
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
-const FACTS = ['Gratis', 'Código abierto', 'Windows 10 y 11', 'Se actualiza sola'];
+const FACTS = ['Gratis', 'Windows 10 y 11', 'Se actualiza sola'];
 
 function useRise() {
   const reduce = useReducedMotion();

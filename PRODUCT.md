@@ -22,7 +22,7 @@ La página es el lugar público donde bajar la app.
 
 ## Positioning
 
-Pixie tiene cara y personalidad. Es gratis y de código abierto, y cada persona elige qué IA usar.
+Pixie tiene cara y personalidad. Es gratis, y cada persona elige qué IA usar.
 
 ## Operating Context
 
@@ -41,7 +41,7 @@ La persona llega desde un link compartido y decide en segundos si la baja. Puede
 
 ## Evidence on Hand
 
-No hay testimonios, logos de clientes ni métricas públicas. No se inventan. La prueba disponible es el código abierto y el producto funcionando.
+No hay testimonios, logos de clientes ni métricas públicas. No se inventan. La prueba disponible es el producto funcionando.
 
 ## Product Principles
 
