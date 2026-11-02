@@ -7,6 +7,7 @@ const SECTIONS = [
   ['general', 'General'],
   ['personalizacion', 'Personalización'],
   ['agenda', 'Agenda'],
+  ['pomodoro', 'Pomodoro'],
   ['noticias', 'Noticias'],
   ['apps', 'Apps'],
   ['mapas', 'Mapas y colectivos'],
@@ -70,6 +71,7 @@ export default function Settings({ section: initial = 'general' }) {
         {section === 'general' && <General s={s} change={change} />}
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
         {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
+        {section === 'pomodoro' && <PomodoroSection s={s} setS={setS} change={change} say={say} />}
         {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
         {section === 'apps' && <AppsSection s={s} setS={setS} change={change} say={say} />}
         {section === 'mapas' && <MapsSection s={s} change={change} />}
@@ -94,6 +96,203 @@ function Header({ title, text }) {
       <h1>{title}</h1>
       {text && <p>{text}</p>}
     </header>
+  )
+}
+
+// ── Pomodoro: el plan de estudio en bloques ──
+const POMODORO_TIMES = [30, 60, 90, 120, 180, 240]
+const hhmm = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const minutesLabel = (m) => (m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`)
+const leftLabel = (ms) => {
+  const min = Math.ceil(ms / 60000)
+  return min <= 1 ? 'menos de un minuto' : `${min} minutos`
+}
+const BLOCK_NAMES = { estudio: 'Estudio', descanso: 'Descanso', largo: 'Descanso largo' }
+
+// Los bloques en una barra (cada uno del largo de lo que dura) y la lista con los horarios
+function PlanBlocks({ bloques, current = null, times = true }) {
+  const total = bloques.reduce((s, b) => s + b.minutos, 0) || 1
+  return (
+    <div className="pomo-plan">
+      <div className="pomo-bar" role="img" aria-label={`${bloques.filter((b) => b.tipo === 'estudio').length} bloques de estudio con sus descansos`}>
+        {bloques.map((b, i) => (
+          <span
+            key={i}
+            className={`pomo-seg ${b.tipo}${current === i ? ' current' : ''}${current !== null && i < current ? ' done' : ''}`}
+            style={{ flexGrow: b.minutos / total }}
+            title={`${BLOCK_NAMES[b.tipo]} · ${b.minutos} min`}
+          />
+        ))}
+      </div>
+      <ol className="pomo-list">
+        {bloques.map((b, i) => (
+          <li key={i} className={`${b.tipo}${current === i ? ' current' : ''}${current !== null && i < current ? ' done' : ''}`}>
+            {times && <span className="pomo-time">{hhmm(b.desde)}</span>}
+            <span>{b.tipo === 'estudio' ? `Bloque ${b.n}` : BLOCK_NAMES[b.tipo]}</span>
+            <span className="pomo-min">{b.minutos} min</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+function PomodoroSection({ s, setS, change, say }) {
+  const p = s.pomodoro
+  const ses = p.sesion
+  const [busy, setBusy] = useState(null)
+  const [advice, setAdvice] = useState(null) // { ia, consejos } para este plan
+  const [custom, setCustom] = useState(String(p.minutos))
+  const planKey = `${p.minutos}-${p.metodo}-${p.materia}`
+  useEffect(() => {
+    setAdvice(null)
+    setCustom(String(p.minutos))
+  }, [planKey, p.minutos])
+
+  const control = async (accion) => {
+    setBusy(accion)
+    try {
+      const r = await api.settings.pomodoro(accion)
+      setS(r)
+      if (r?.mensaje) say(r.mensaje)
+    } finally {
+      setBusy(null)
+    }
+  }
+  const askAdvice = async () => {
+    setBusy('consejos')
+    try {
+      setAdvice(await api.settings.pomodoroAdvice())
+    } finally {
+      setBusy(null)
+    }
+  }
+  const saveCustom = () => {
+    const n = Number.parseInt(custom, 10)
+    if (n && n !== p.minutos) change({ pomodoroMinutos: n })
+    else setCustom(String(p.minutos))
+  }
+  const last = p.plan.bloques.at(-1)
+  const tips = advice?.consejos ?? p.plan.consejos
+
+  return (
+    <>
+      <Header
+        title="Pomodoro"
+        text="Para estudiar en bloques. Decime «quiero estudiar química 2 horas» o armalo acá. Mientras estudiás no te molesto, te aviso si te distraés y en los últimos 2 minutos de cada bloque te ofrezco un mini test."
+      />
+      {ses.activo && (
+        <Card title="Ahora">
+          <p className="big-status">
+            {ses.fase === 'estudio' ? `Bloque ${ses.bloque} de ${ses.bloques}` : 'Descanso'}
+            {ses.materia ? ` de ${ses.materia}` : ''}: {ses.pausado ? 'en pausa, ' : ''}faltan {leftLabel(ses.restanteMs)}.
+          </p>
+          <PlanBlocks bloques={ses.plan} current={ses.indice} times={false} />
+          <div className="buttons">
+            <button type="button" className="button" disabled={Boolean(busy)} onClick={() => control(ses.pausado ? 'seguir' : 'pausar')}>
+              {ses.pausado ? 'Seguir' : 'Pausar'}
+            </button>
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => control('saltar')}>
+              {ses.fase === 'estudio' ? 'Pasar al descanso' : 'Saltar el descanso'}
+            </button>
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => control('terminar')}>
+              Terminar
+            </button>
+          </div>
+          <p className="note">También podés tocar el temporizador en mi pantallita para pausarlo.</p>
+        </Card>
+      )}
+      <Card title={ses.activo ? 'El próximo plan' : 'Tu plan'} note="El plan lo armo sin IA. Con IA, además te doy consejos a medida para cada bloque.">
+        <div className="pomo-field">
+          <div className="row-text">
+            <label>Tiempo que tenés</label>
+            <p className="hint">Lo que tenés libre para estudiar, con los descansos incluidos.</p>
+          </div>
+          <div className="pomo-times">
+            <div className="segmented" role="radiogroup" aria-label="Tiempo que tenés">
+              {POMODORO_TIMES.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={p.minutos === m} className={p.minutos === m ? 'selected' : ''} onClick={() => change({ pomodoroMinutos: m })}>
+                  {minutesLabel(m)}
+                </button>
+              ))}
+            </div>
+            <label className="pomo-custom">
+              <span>Otro:</span>
+              <input
+                className="field"
+                type="number"
+                min="15"
+                max="480"
+                step="5"
+                value={custom}
+                aria-label="Minutos que tenés para estudiar"
+                onChange={(e) => setCustom(e.target.value)}
+                onBlur={saveCustom}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              />
+              <span>min</span>
+            </label>
+          </div>
+        </div>
+        <Row label="Materia o tema" hint="Opcional: así te recomiendo cómo estudiarla." htmlFor="pomodoro-materia">
+          <TextSetting id="pomodoro-materia" value={p.materia} placeholder="Química, Historia, Inglés…" onSave={(pomodoroMateria) => change({ pomodoroMateria })} />
+        </Row>
+        <div className="choices pomo-methods" role="radiogroup" aria-label="Método">
+          {p.metodos.map((m) => (
+            <button key={m.id} type="button" role="radio" aria-checked={p.metodo === m.id} className={`choice${p.metodo === m.id ? ' selected' : ''}`} onClick={() => change({ pomodoroMetodo: m.id })}>
+              <span className="choice-title">{m.nombre}</span>
+              <span className="choice-text">{m.texto}</span>
+            </button>
+          ))}
+        </div>
+        {p.plan.bloques.length ? (
+          <>
+            <p className="pomo-summary">
+              {p.plan.bloques.filter((b) => b.tipo === 'estudio').length} bloques · {minutesLabel(p.plan.estudioMin)} de estudio · si arrancás ahora, terminás a las {hhmm(last.hasta)}
+            </p>
+            <PlanBlocks bloques={p.plan.bloques} />
+          </>
+        ) : (
+          <p className="big-status">{p.plan.texto}</p>
+        )}
+        <h3 className="pomo-sub">{advice?.ia ? 'Consejos de la IA para cada bloque' : 'Qué hacer en cada bloque'}</h3>
+        <ul className="news-list">
+          {tips.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+        <div className="buttons">
+          {!ses.activo && (
+            <button type="button" className="button" disabled={Boolean(busy) || !p.plan.bloques.length} onClick={() => control('empezar')}>
+              {busy === 'empezar' ? 'Arrancando…' : 'Arrancar ahora'}
+            </button>
+          )}
+          {s.ia.tieneClave && s.ia.activa && (
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={askAdvice}>
+              {busy === 'consejos' ? 'Pensando…' : 'Pedir consejos a la IA'}
+            </button>
+          )}
+        </div>
+      </Card>
+      <Card title={p.materia ? `Cómo estudiar ${p.materia}` : 'Cómo estudiar mejor'}>
+        <ul className="pomo-techniques">
+          {p.tecnicas.map((t) => (
+            <li key={t.nombre}>
+              <strong>{t.nombre}</strong>
+              <span>{t.como}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card title="Mientras estudiás" note="En los bloques no te paso avisos (mails, noticias, charlas): te los cuento en el descanso. Los recordatorios de tu agenda y la batería baja, sí.">
+        <Row label="Ofrecerte un Pomodoro" hint="Cuando me contás que tenés que estudiar o que tenés una prueba.">
+          <Toggle on={p.ofrecer} label="Ofrecerte un Pomodoro" onChange={(pomodoroOfrecer) => change({ pomodoroOfrecer })} />
+        </Row>
+        <Row label="Avisarte si te distraés" hint="Si en un bloque entrás a Instagram, YouTube, una red social o un juego.">
+          <Toggle on={p.distracciones} label="Avisarte si te distraés" onChange={(pomodoroDistracciones) => change({ pomodoroDistracciones })} />
+        </Row>
+      </Card>
+    </>
   )
 }
 

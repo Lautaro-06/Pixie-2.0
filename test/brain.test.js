@@ -73,7 +73,7 @@ const CASES = [
   ['poné un timer de cinco minutos para los fideos', 'crear_timer', { segundos: 300, etiqueta: 'los fideos' }],
   ['despertame en 20 min', 'crear_timer', { segundos: 1200 }],
   ['poné una alarma', 'crear_timer', {}],
-  ['arrancá un pomodoro', 'crear_timer', { segundos: 1500, etiqueta: 'Pomodoro' }],
+  ['arrancá un pomodoro', 'pomodoro', { accion: 'empezar' }],
   ['cancelá el timer', 'cancelar_timers', {}],
   ['pará la alarma', 'cancelar_timers', {}],
   ['¿cuánto falta?', 'ver_timers', {}],

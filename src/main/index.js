@@ -4,6 +4,10 @@ import { release } from 'node:os'
 import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
 import { actions, runAction, needsConfirm } from './actions/index.js'
+import { createPomodoro } from './pomodoro.js'
+import { studyIntent, subjectFrom, topicFromTitle, minutesText } from './study.js'
+import { setPomodoroProbe, onTimersChange, timersState, toggleTimer } from './actions/timers.js'
+import { studyWindow } from './scenes.js'
 import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } from './config.js'
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createMenus } from './tray.js'
@@ -337,7 +341,97 @@ function offerMailAlerts() {
   })
 }
 
+// ───────────── Modo Pomodoro ─────────────
+let pomodoro = null
+// Qué estás estudiando (los títulos de lo que tenés abierto en cada bloque): solo en memoria, para el
+// mini test, y se borra cuando termina el Pomodoro
+const studySpy = new Map()
+let lastStudyOffer = 0
+const FOCUS_SPY_MS = 10000
+
+function studyTopic() {
+  const top = [...studySpy.entries()].sort((a, b) => b[1] - a[1])[0]
+  return top ? topicFromTitle(top[0]) || null : null
+}
+
+// Lo que necesita la ventanita para dibujar el temporizador
+function pomodoroForWindow() {
+  const st = pomodoro?.status()
+  if (!st?.activo) return { activo: false }
+  const { activo, fase, bloque, bloques, finAt, restanteMs, totalMs, pausado, materia, indice } = st
+  // El plan entero, para dibujar los bloques en fila
+  const plan = st.plan.bloques.map((b) => ({ tipo: b.tipo, minutos: b.minutos }))
+  return { activo, fase, bloque, bloques, finAt, restanteMs, totalMs, pausado, materia, indice, plan }
+}
+
+function onPomodoro(event, st) {
+  if (event === 'cambio') {
+    sendEvent({ type: 'pomodoro', ...pomodoroForWindow() })
+    trayMenu?.refresh()
+    return
+  }
+  if (event === 'bloque') {
+    logAction(`pomodoro: bloque ${st.bloque} de ${st.bloques}`)
+    // El primero lo cuenta la respuesta a «arrancá»; los demás, Pixie por su cuenta
+    if (st.bloque > 1) {
+      mind?.say({
+        kind: 'pomodoro',
+        text: `Arranca el bloque ${st.bloque} de ${st.bloques}: ${Math.round(st.totalMs / 60000)} minutos sin distracciones. Vuelvo en el descanso. No te voy a molestar, pero sigo acá si necesitás ayuda con lo que estudiás.`,
+        face: 'happy'
+      })
+    }
+  } else if (event === 'ultimos2') {
+    const tema = studyTopic() ?? st.materia
+    mind?.say({
+      kind: 'pomodoro',
+      text: `Quedan 2 minutos del bloque. ¿Hacemos un mini test de repaso${tema ? ` de «${tema}»` : ''}?`,
+      face: 'happy',
+      suggestions: ['dale, tomame', 'no, sigo']
+    })
+  } else if (event === 'descanso') {
+    const held = mind?.releaseHeld() ?? ''
+    const min = Math.round(st.totalMs / 60000)
+    mind?.say({
+      kind: 'pomodoro',
+      text: `¡Bloque ${st.bloque} terminado! ${min} minutos de descanso: estirate, tomá agua y mirá lejos de la pantalla.${held ? ` ${held}` : ''}`,
+      face: 'proud',
+      suggestions: ['saltá el descanso']
+    })
+    logAction(`pomodoro: descanso de ${min} minutos`)
+  } else if (event === 'fin') {
+    const held = mind?.releaseHeld() ?? ''
+    studySpy.clear()
+    sendEvent({ type: 'pomodoro-fin', completo: st.completo })
+    if (st.completo) {
+      mind?.say({ kind: 'pomodoro', text: `¡Terminaste el Pomodoro! Estudiaste ${minutesText(st.estudiadoMin)} en ${st.bloquesHechos} ${st.bloquesHechos === 1 ? 'bloque' : 'bloques'}. ¡Bien ahí!${held ? ` ${held}` : ''}`, face: 'proud' })
+    } else if (held) {
+      mind?.say({ kind: 'pomodoro', text: held, face: 'happy' })
+    }
+    mind?.memory.markDone?.('pomodoro', new Date())
+    logAction(`pomodoro: terminado (${st.estudiadoMin} minutos de estudio)`)
+  }
+}
+
+// Si hablás de estudiar y no hay un Pomodoro andando, te lo ofrece (como mucho cada 20 minutos)
+function offerPomodoro(input, result) {
+  if (!result || result.confirm || getConfig().pomodoroOfrecer === false) return result
+  if (pomodoro?.activo() || !studyIntent(input) || /\bpomodoro\b/i.test(input)) return result
+  if (Date.now() - lastStudyOffer < 20 * 60 * 1000) return result
+  lastStudyOffer = Date.now()
+  const materia = subjectFrom(input)
+  const chip = materia ? `armá un pomodoro de ${materia}` : 'armá un pomodoro'
+  return {
+    ...result,
+    text: `${result.text ?? ''} ¿Querés que armemos un Pomodoro para estudiar? Te muestro los bloques y no te molesto mientras estudiás.`.trim(),
+    suggestions: [chip, ...(result.suggestions ?? [])].slice(0, 4)
+  }
+}
+
 async function ask(text) {
+  return offerPomodoro(String(text ?? ''), await askInner(text))
+}
+
+async function askInner(text) {
   const input = String(text ?? '').slice(0, 500)
 
   if (pending) {
@@ -385,7 +479,7 @@ async function ask(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de', 'destino', 'direccion']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de', 'destino', 'direccion', 'materia']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
@@ -500,6 +594,8 @@ if (!app.requestSingleInstanceLock()) {
       ai: Boolean(ai?.enabled()),
       palabra: wake?.forWindow() ?? null,
       escena: mind?.scene() ?? null,
+      pomodoro: pomodoroForWindow(),
+      timers: timersState(),
       pantallaReposo: getConfig().pantallaReposo ?? 'cara',
       clima: weatherNow ? { temp: weatherNow.temp, icon: weatherNow.icon } : null
     }))
@@ -621,8 +717,26 @@ if (!app.requestSingleInstanceLock()) {
       logAction(`extensión de Chrome: no la pude copiar (${err.message})`)
     }
     hands = createHands({ log: logAction })
+    // El Pomodoro y los timers en la pantallita (tocarla los pausa)
+    pomodoro = createPomodoro({ on: onPomodoro })
+    setPomodoroProbe(() => pomodoro.enFoco())
+    onTimersChange((list) => sendEvent({ type: 'timers', timers: list }))
+    setInterval(() => {
+      if (!pomodoro.enFoco()) return
+      const w = mind?.lastWindow()
+      if (studyWindow(w)) studySpy.set(w.titulo, (studySpy.get(w.titulo) ?? 0) + FOCUS_SPY_MS)
+    }, FOCUS_SPY_MS)
+    ipcMain.handle('pixie:timer-toggle', (e) => {
+      if (!fromPixie(e)) return null
+      if (pomodoro.activo()) return pomodoro.toggle()
+      return toggleTimer()
+    })
     Object.assign(ctx, {
       hands,
+      pomodoro,
+      studyTopic,
+      missedNotices: () => mind?.missedNotices() ?? [],
+      contextText: () => contextForAI(),
       targetWindow,
       withPixieHidden,
       hidePixieFocus,
@@ -734,6 +848,14 @@ if (!app.requestSingleInstanceLock()) {
       classroom,
       mail,
       apps,
+      pomodoro,
+      // Los botones de Ajustes → Pomodoro: Pixie lo hace y lo dice en voz alta
+      runPomodoro: async (accion) => {
+        const cfg = getConfig()
+        const r = await runAction('pomodoro', { accion, minutos: cfg.pomodoroMinutos, materia: cfg.pomodoroMateria, metodo: cfg.pomodoroMetodo }, ctx)
+        sendEvent({ type: 'notice', text: r.text, face: r.face })
+        return r.text
+      },
       extension: () => ({
         carpeta: extensionFiles?.carpeta ?? null,
         version: extensionFiles?.version ?? null,
@@ -792,6 +914,8 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:classroom-leer', () => settings.readClassroom())
     handle('ajustes:mails-leer', () => settings.readMails())
     handle('ajustes:apps-buscar', () => settings.searchApps())
+    handle('ajustes:pomodoro', (accion) => settings.pomodoroControl(String(accion ?? '')))
+    handle('ajustes:pomodoro-consejos', () => settings.pomodoroAdvice())
     handle('ajustes:abrir-registro-transporte', () => shell.openExternal(TRANSIT_SIGNUP))
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra

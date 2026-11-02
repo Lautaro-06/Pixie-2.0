@@ -6,6 +6,21 @@
 
 export const CHANGELOG = [
   {
+    version: '0.14.0',
+    nuevo: [
+      {
+        corto: 'tengo modo Pomodoro para estudiar: armo el plan con el tiempo que tenés y no te molesto mientras estudiás',
+        detalle:
+          'Tengo modo Pomodoro para estudiar: decime «quiero estudiar química 2 horas» (o armalo en Ajustes → Pomodoro) y te armo los bloques con sus descansos y cómo conviene estudiar esa materia. Mientras estudiás no te paso avisos (te los cuento en el descanso: preguntame «¿qué me perdí?»), te aviso si te vas a Instagram o a un juego, y en los últimos 2 minutos de cada bloque te ofrezco un mini test de repaso. En el descanso me pongo anteojos de sol, tomo unos mates y suena un sonido de victoria.'
+      },
+      { corto: 'el Pomodoro y los timers se ven en mi pantallita y los pausás tocándola', detalle: 'El Pomodoro se ve en mi pantallita como bloques en fila (rojos para estudiar, verdes para descansar): el de ahora se va llenando y los que terminaste quedan con una tilde. Los timers se ven con el tiempo grande y una barrita. Tocala para pausarlos o seguir.' },
+      { corto: 'si me contás que tenés que estudiar, te ofrezco un Pomodoro', detalle: 'Si me contás que tenés que estudiar o que tenés una prueba, te ofrezco armar un Pomodoro (lo podés apagar en Ajustes → Pomodoro).' }
+    ],
+    mejoras: [
+      { corto: 'el Pomodoro ya no es un timer fijo de 25 minutos', detalle: 'El Pomodoro ya no es un timer fijo de 25 minutos: tiene bloques, descansos (y uno largo cada tanto), se pausa, se puede saltar el descanso y, con IA, te doy consejos a medida para cada bloque.' }
+    ]
+  },
+  {
     version: '0.13.0',
     nuevo: [
       { corto: 'me disfrazo según lo que hacés: anteojos 3D y pochoclos si mirás algo, auriculares si escuchás música y más', detalle: 'Me disfrazo según lo que estás haciendo: anteojos 3D y pochoclos si mirás YouTube, Netflix, Cuevana, Kick, Twitch o Instagram; anteojos y la compu si trabajás en Word, PowerPoint o VS Code; auriculares si escuchás música; un joystick si jugás; un libro si leés; el celu si chateás, y boina y pincel si dibujás.' },

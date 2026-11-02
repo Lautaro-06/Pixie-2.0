@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { renderFace, WIDTH, HEIGHT } from './draw.js'
 import { REACTIONS, IDLE_BY_FEELING, IDLE_BY_SCENE, compose, talking } from './animations.js'
-import { renderStandby } from './standby.js'
+import { renderStandby, renderTimer, drawBreakBar } from './standby.js'
 import { drawScene, drawNightcap, PALETTE } from './props.js'
 
 const SCALE = 2
@@ -23,13 +23,20 @@ const GLOW_MS = 55
 // standby: { mode: 'reloj' | 'resumen', weather } — en reposo muestra eso en vez de la cara
 //          (la cara vuelve sola mientras habla o reacciona)
 // scene: { escena, auris } — el disfraz según lo que estás haciendo (anteojos 3D, auriculares…)
-export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null, feeling = 'normal', standby = null, scene = null }) {
+// timer: { kind: 'pomodoro' | 'timer', fase, finAt, restanteMs, totalMs, pausado, bloque, bloques, etiqueta }
+//        — el temporizador en la pantallita. En un bloque de estudio se ve solo eso (sin animaciones);
+//        en el descanso vuelve la cara con una rayita abajo de lo que falta.
+export default function Face({ mood = 'idle', reaction = null, speech = null, cursor = null, feeling = 'normal', standby = null, scene = null, timer = null }) {
   const canvasRef = useRef(null)
-  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, feeling, standby, scene: null, prev: null })
+  const engine = useRef({ mood, moodStart: performance.now(), overlays: [], follow: null, feeling, standby, scene: null, prev: null, timer })
 
   useEffect(() => {
     engine.current.standby = standby
   }, [standby])
+
+  useEffect(() => {
+    engine.current.timer = timer
+  }, [timer])
 
   useEffect(() => {
     engine.current.feeling = feeling
@@ -156,7 +163,14 @@ export default function Face({ mood = 'idle', reaction = null, speech = null, cu
       const talkingNow = e.overlays.some((o) => o.kind === 'talk')
       const expressive = talkingNow || e.overlays.some((o) => o.kind === 'reaction')
       let bits = renderFace(params)
-      if (e.standby?.mode && !expressive) {
+      // El temporizador: cuánto falta ahora (si no está en pausa, se cuenta solo)
+      const timer = e.timer ? { ...e.timer, restanteMs: e.timer.finAt ? Math.max(0, e.timer.finAt - Date.now()) : e.timer.restanteMs } : null
+      const breakTime = timer?.kind === 'pomodoro' && timer.fase !== 'estudio'
+      // Mientras le hablás o te contesta se ve la cara; si no, el temporizador
+      const interacting = expressive || e.mood === 'listening' || e.mood === 'thinking'
+      if (timer && !breakTime && !interacting) {
+        bits = renderTimer(timer, Date.now())
+      } else if (e.standby?.mode && !expressive) {
         bits = renderStandby(e.standby.mode, bits, new Date(), e.standby.weather)
       } else if (e.mood === 'sleeping') {
         const h = new Date().getHours()
@@ -167,6 +181,7 @@ export default function Face({ mood = 'idle', reaction = null, speech = null, cu
         if (e.prev) drawScene(bits, { name: e.prev.name, auris: e.prev.auris, t: now - e.prev.exitAt, exit: true, props }, params)
         if (e.scene && now >= e.scene.start) drawScene(bits, { name: e.scene.name, auris: e.scene.auris, t: now - e.scene.start, props }, params)
       }
+      if (breakTime) drawBreakBar(bits, timer)
 
       // Brillo: lo que se prende, se prende enseguida; lo que se apaga, se apaga de a poco
       const fade = Math.exp(-dt / GLOW_MS)

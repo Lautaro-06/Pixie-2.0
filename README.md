@@ -60,12 +60,24 @@ Pixie suma tu calendario y tus tareas de Classroom a su agenda: «¿qué tengo h
 
 «¿Qué noticias hay?», «noticias de TN», «noticias sobre el dólar», «más noticias» y «abrí la segunda». Lee los titulares de **Infobae** y **TN** por RSS (si el de un diario no responde, usa Google Noticias de ese diario), sin clave y gratis. De vez en cuando te cuenta un titular nuevo por su cuenta (de 9 a 22, nunca mientras estudiás, jugás o estás en una reunión) y suma uno al resumen del día. En **Ajustes → Noticias** elegís los diarios y cada cuánto (**Nunca**, **A veces**: unas 2 por día, o **Más seguido**: unas 4). No lee titulares para adultos ni violentos.
 
+### Modo Pomodoro (para estudiar)
+
+Decile «quiero estudiar química 2 horas», «armá un pomodoro» o «tengo 1 hora y media para estudiar historia» (o armalo en **Ajustes → Pomodoro**). Si le contás que tenés que estudiar o que tenés una prueba, ella misma te lo ofrece.
+
+- **El plan:** con el tiempo que tenés arma los bloques de estudio y los descansos (cada tantos, uno largo), con el horario de cada uno y qué conviene hacer en cada bloque según la materia (ejercicios para Matemática, recuperación activa para Historia, fichas para Inglés…). Hay dos métodos: **Pomodoro clásico** (25 de estudio y 5 de descanso) y **Bloques largos** (50 y 10). Todo esto anda **sin IA**; con IA, «Pedir consejos a la IA» te da consejos a medida para cada bloque. Te pregunta «¿Arrancamos?» y con un sí arranca («arrancá un pomodoro» lo arranca directo).
+- **En la pantallita:** mientras estudiás, Pixie no hace animaciones: se ve el plan en fila (los bloques de estudio son cuadrados rojos y los descansos, rectángulos verdes angostos). Los que ya hiciste quedan prendidos con una tilde, el de ahora se va llenando de abajo hacia arriba y los que faltan están apagados. Abajo, chiquito, en qué bloque vas, el tiempo que falta (en los últimos 2 minutos se pone naranja) y el porcentaje. Si el plan es muy largo, la fila se corre para que siempre se vea el bloque de ahora. **Tocá la pantallita para pausar o seguir.** Los timers comunes («timer de 10 minutos») también se ven ahí, con el tiempo grande y una barra, y se pausan igual.
+- **Al arrancar cada bloque** te dice que es momento de que no haya distracciones, que vuelve en el descanso y que, aunque no te va a molestar, sigue ahí si necesitás ayuda.
+- **Sin distracciones:** en un bloque no te pasa avisos (mails, noticias, charlas): te los guarda y en el descanso te dice cuántos son. «¿Qué me perdí?» te los cuenta. Los recordatorios de tu agenda y la batería baja te los dice igual. Si entrás a Instagram, YouTube, una red social o un juego, te dice que estás en el bloque de estudio y que ya vas a tener tiempo para eso en el descanso (como mucho cada 5 minutos).
+- **Mini test:** en los últimos 2 minutos de cada bloque te ofrece un mini test de repaso. Para saber de qué, mira el título de lo que tenés abierto mientras estudiás (solo en memoria, se borra al terminar). Con IA te hace 3 preguntas de a una, sobre la página que tenés abierta en Chrome si es del tema; sin IA, preguntas para repasar solo.
+- **En el descanso** suena un sonido de victoria y vuelve Pixie con anteojos de sol y un mate, con una rayita abajo de lo que falta.
+- «pausá el pomodoro», «seguí», «saltá el descanso», «¿cuánto falta?», «terminá el pomodoro». En **Ajustes → Pomodoro** también podés apagar que te lo ofrezca y los avisos de distracciones.
+
 ### Ajustes
 
 Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
 
 - **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud y avisos al celular.
-- **Agenda** y **Noticias** (ver arriba).
+- **Agenda**, **Pomodoro** y **Noticias** (ver arriba).
 - **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
 - **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
 - **Voz:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
@@ -81,7 +93,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.13)
+## Qué hace (versión 0.14)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -98,7 +110,8 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «¿dónde queda Tucumán?» | Busca en Google Maps |
 | «subí el volumen», «volumen al 50», «más fuerte», «silenciá» | Volumen |
 | «poné música», «pasá de tema», «otra canción» | Controla la música que esté sonando |
-| «timer de 10 minutos», «avisame en 5 minutos que saque la pizza», «pomodoro» | Timers con aviso, sonido y voz |
+| «timer de 10 minutos», «avisame en 5 minutos que saque la pizza», «pausá el timer» | Timers con aviso, sonido y voz (se ven en la pantallita; tocala para pausar) |
+| «quiero estudiar química 2 horas», «armá un pomodoro», «tomame un mini test», «¿qué me perdí?» | [Modo Pomodoro](#modo-pomodoro-para-estudiar) |
 | «¿cuánto es 25 por 4?», «20% de 300» | Cuentas |
 | «bloqueá la compu», «me voy», «apagá la compu» | Bloquear, apagar o reiniciar (pregunta antes) |
 | «sacá una captura», «¿cómo está la compu?» | Recorte de pantalla y uso de CPU y memoria |
@@ -335,13 +348,25 @@ npm run build     # compila la app
 npm run dist:win  # arma el instalador en dist/
 ```
 
-### Publicar una versión nueva
+### Ramas: así no le llegan bugs a nadie
 
-GitHub Actions ([`.github/workflows/pixie.yml`](.github/workflows/pixie.yml)) corre las pruebas y arma el instalador en una compu con Windows con cada cambio en `main` (el instalador queda para bajar en la pestaña **Actions**). Para que les llegue a todos:
+- **`main`** es lo que tienen instalado todos: de ahí sale cada actualización. Solo se pasa a `main` lo que ya se probó y el equipo confirmó.
+- **`development`** junta lo nuevo de la próxima versión. Ahí se prueba.
+- **`feature/…`** (por ejemplo `feature/pomodoro`) es una idea en curso. Cuando anda, se pasa a `development`.
+
+```bash
+git checkout -b feature/mi-idea development   # empezar una idea
+git checkout development && git merge feature/mi-idea   # cuando anda
+git checkout main && git merge development    # solo con la confirmación del equipo
+```
+
+GitHub Actions ([`.github/workflows/pixie.yml`](.github/workflows/pixie.yml)) corre las pruebas y arma el instalador en una compu con Windows con cada cambio en `main`, `development` o una rama `feature/…` (el instalador queda para bajar en la pestaña **Actions**, para probarlo antes). **Solo publica desde `main`.**
+
+### Publicar una versión nueva
 
 1. Subí el número de `"version"` en `package.json` (por ejemplo, de 0.6.0 a 0.6.1).
 2. Sumá qué hay de nuevo y qué mejoró en [`src/main/changelog.js`](src/main/changelog.js), arriba de todo. Pixie lo cuenta sola la primera vez que arranca con la versión nueva, lo repite con «¿qué hay de nuevo?» y lo muestra en Ajustes → Actualizaciones. Si te lo olvidás, las pruebas fallan.
-3. Subí el cambio a `main`.
+3. Probalo en `development` y, con la confirmación del equipo, pasalo a `main`.
 
 GitHub Actions crea la etiqueta `v0.6.1`, publica la Release con el instalador y, en unas horas como mucho, cada Pixie instalada ofrece actualizarse. Si la versión no cambió, no publica nada: así un arreglo a medias no le llega a nadie.
 

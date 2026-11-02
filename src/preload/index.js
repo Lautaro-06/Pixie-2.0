@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('pixie', {
   wakeLog: (line) => ipcRenderer.send('pixie:wake-log', String(line).slice(0, 200)),
   wakeLearn: (frames) => ipcRenderer.send('pixie:wake-learn', frames),
   gameResult: (result) => ipcRenderer.send('pixie:game-result', result),
+  // Tocar el temporizador de la pantallita: pausa o sigue el Pomodoro (o el timer)
+  timerToggle: () => ipcRenderer.invoke('pixie:timer-toggle'),
   voice: (request) => ipcRenderer.invoke('pixie:voice', request),
   voiceStop: (id) => ipcRenderer.send('pixie:voice-stop', id),
   speaking: (on) => ipcRenderer.send('pixie:speaking', Boolean(on)),
@@ -52,6 +54,8 @@ contextBridge.exposeInMainWorld('pixie', {
     readClassroom: () => ipcRenderer.invoke('ajustes:classroom-leer'),
     readMails: () => ipcRenderer.invoke('ajustes:mails-leer'),
     searchApps: () => ipcRenderer.invoke('ajustes:apps-buscar'),
+    pomodoro: (accion) => ipcRenderer.invoke('ajustes:pomodoro', String(accion)),
+    pomodoroAdvice: () => ipcRenderer.invoke('ajustes:pomodoro-consejos'),
     openTransitSignup: () => ipcRenderer.invoke('ajustes:abrir-registro-transporte'),
     openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
     copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),

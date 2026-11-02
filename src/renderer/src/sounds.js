@@ -13,7 +13,11 @@ const SOUNDS = {
   wink: { wave: 'sine', notes: [[1175, 60], [1568, 80]] },
   music: { wave: 'triangle', notes: [[659, 90], [784, 90], [988, 140]] },
   notice: { wave: 'sine', notes: [[988, 90], [1319, 160]] },
-  wake: { wave: 'sine', notes: [[440, 120, 880]] }
+  wake: { wave: 'sine', notes: [[440, 120, 880]] },
+  // Pomodoro: terminaste un bloque (fanfarria), arranca uno (suave) y pausa
+  victory: { wave: 'square', notes: [[523, 90], [659, 90], [784, 90], [1047, 150], [784, 80], [1047, 300]] },
+  focus: { wave: 'sine', notes: [[659, 110], [880, 110], [784, 220]] },
+  pause: { wave: 'triangle', notes: [[660, 90, 440]] }
 }
 
 let ctx = null

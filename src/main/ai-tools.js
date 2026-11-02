@@ -208,6 +208,37 @@ export const AI_TOOLS = [
     input_schema: obj()
   },
   {
+    name: 'pomodoro',
+    description:
+      'Modo Pomodoro para estudiar. plan: arma los bloques según el tiempo disponible y pregunta si arranca (usala cuando quiere estudiar). empezar: lo arranca ya. pausar, seguir, saltar (el descanso o el bloque), terminar, estado.',
+    input_schema: obj({
+      accion: oneOf(['plan', 'empezar', 'pausar', 'seguir', 'saltar', 'terminar', 'estado']),
+      minutos: int('Tiempo disponible para estudiar, en minutos', 15, 480),
+      materia: str('La materia o el tema (por ejemplo «química»)'),
+      metodo: oneOf(['clasico', 'largo'], 'clasico: 25 de estudio y 5 de descanso; largo: 50 y 10')
+    }, ['accion'])
+  },
+  {
+    name: 'mini_test',
+    description: 'Toma un mini test de repaso de 3 preguntas sobre lo que está estudiando',
+    input_schema: obj({ tema: str('El tema, si lo sabés') })
+  },
+  {
+    name: 'tecnicas_estudio',
+    description: 'Recomienda técnicas de estudio según la materia',
+    input_schema: obj({ materia: str('La materia') })
+  },
+  {
+    name: 'que_me_perdi',
+    description: 'Cuenta los avisos que Pixie se guardó mientras el usuario estudiaba en un bloque de Pomodoro (mails, noticias, recordatorios)',
+    input_schema: obj()
+  },
+  {
+    name: 'pausar_timer',
+    description: 'Pausa o sigue el timer que está andando (no el Pomodoro)',
+    input_schema: obj()
+  },
+  {
     name: 'como_llego',
     description: 'Abre en Google Maps cómo llegar a un lugar y dice cuánto se tarda. modo: colectivo (también subte o tren), caminando, bici o auto. destino «casa» es la casa del usuario.',
     input_schema: obj({ destino: str('A dónde quiere ir (lugar o dirección)'), modo: oneOf(['colectivo', 'caminando', 'bici', 'auto']) }, ['destino'])

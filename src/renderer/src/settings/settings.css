@@ -648,3 +648,120 @@ body.ventana-ajustes #root {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Pomodoro ── */
+.ventana-ajustes .pomo-field {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+.ventana-ajustes .pomo-times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ventana-ajustes .pomo-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ventana-ajustes .pomo-custom .field {
+  width: 72px;
+}
+.ventana-ajustes .pomo-methods {
+  grid-template-columns: repeat(2, 1fr);
+}
+.ventana-ajustes .pomo-summary {
+  margin: 14px 0 8px;
+  font-weight: 600;
+}
+.ventana-ajustes .pomo-plan {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.ventana-ajustes .pomo-bar {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+}
+.ventana-ajustes .pomo-seg {
+  flex-basis: 0;
+  min-width: 4px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.ventana-ajustes .pomo-seg.descanso {
+  background: rgba(255, 216, 74, 0.55);
+}
+.ventana-ajustes .pomo-seg.largo {
+  background: rgba(83, 224, 138, 0.6);
+}
+.ventana-ajustes .pomo-seg.done {
+  opacity: 0.35;
+}
+.ventana-ajustes .pomo-seg.current {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.ventana-ajustes .pomo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ventana-ajustes .pomo-list li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  font-size: 12px;
+}
+.ventana-ajustes .pomo-list li.descanso,
+.ventana-ajustes .pomo-list li.largo {
+  color: var(--muted);
+}
+.ventana-ajustes .pomo-list li.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.ventana-ajustes .pomo-list li.done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.ventana-ajustes .pomo-time,
+.ventana-ajustes .pomo-min {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ventana-ajustes .pomo-sub {
+  margin: 16px 0 6px;
+  font-size: 14px;
+}
+.ventana-ajustes .pomo-techniques {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ventana-ajustes .pomo-techniques li {
+  display: grid;
+  gap: 2px;
+}
+.ventana-ajustes .pomo-techniques span {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .ventana-ajustes .pomo-methods {
+    grid-template-columns: 1fr;
+  }
+}

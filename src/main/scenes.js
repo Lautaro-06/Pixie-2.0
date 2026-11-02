@@ -86,6 +86,15 @@ export function sceneFor(ventana) {
   return null
 }
 
+// ¿Puede ser lo que estás estudiando? (para el mini test del Pomodoro): no Pixie ni el escritorio,
+// ni videos, juegos, música o chats
+const NOT_STUDY = new Set(['cine', 'jugando', 'musica', 'chateando', 'reunion'])
+export function studyWindow(ventana) {
+  const proceso = String(ventana?.proceso ?? '').toLowerCase().replace(/\.exe$/, '')
+  if (!String(ventana?.titulo ?? '').trim() || IGNORED.has(proceso)) return false
+  return !NOT_STUDY.has(sceneFor(ventana))
+}
+
 // ¿Lo que suena es música? (para ponerse los auriculares mientras hacés otra cosa)
 // media: { app, estado, artista } de lo que suena en Windows
 export function musicPlaying(media) {

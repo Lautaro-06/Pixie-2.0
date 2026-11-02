@@ -210,7 +210,8 @@ export function createAI({
       return { content: `Pixie le mostró al usuario botones Sí/No: «${question}». Todavía no se hizo.`, confirm: true, reply: { text: question, face: 'idle' } }
     }
     const result = await runAction(name, params, ctx)
-    return { content: String(result.text ?? 'Listo.'), game: result.game, reply: { text: result.text, face: result.face } }
+    // Una acción puede pedir «¿Arrancamos?» (por ejemplo, el plan del Pomodoro): se muestran los botones Sí/No
+    return { content: String(result.text ?? 'Listo.'), game: result.game, confirm: Boolean(result.confirm), reply: { text: result.text, face: result.face } }
   }
 
   // Después de contestar rápido, la IA sigue la charla: si era un solo paso solo lo anota; si faltaban
@@ -329,6 +330,16 @@ export function createAI({
       [d.user(`Resumí ${what} en 2 o 3 oraciones cortas para leer en voz alta, en español rioplatense. Si pide algo o tiene una fecha, decilo.\n\n<texto>\n${content}\n</texto>`)],
       { tools: false }
     )
+    if (r.stop === 'refusal') return null
+    return parseEmotion(r.text).text
+  }
+
+  // Un consejo de una sola vuelta (sin herramientas ni tocar la conversación): para el plan del Pomodoro
+  async function advise(prompt) {
+    const p = provider()
+    if (!p) return null
+    const d = driverFor(p)
+    const r = await d.step([d.user(String(prompt).slice(0, 4000))], { tools: false })
     if (r.stop === 'refusal') return null
     return parseEmotion(r.text).text
   }
@@ -454,6 +465,7 @@ export function createAI({
     ping,
     chat,
     summarize,
+    advise,
     look,
     transcribe,
     locate,

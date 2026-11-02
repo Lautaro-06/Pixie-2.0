@@ -189,6 +189,27 @@ const OPEN_VERBS = new Set([
 const ARTICLES = /^(?:el |la |los |las |mi |mis |un |una |al |a )+/
 const has = (re) => (t) => re.test(t)
 const intent = (action, params = {}) => ({ action, params })
+// Para el Pomodoro: la materia («estudiar química», «pomodoro de historia») y el tiempo («2 horas»)
+const SUBJECT = /\b(?:estudiar|repasar|pomodoro de|pomodoro para|plan de estudio de|plan de estudio para|tecnicas de estudio para|metodos de estudio para)\s+(?!(?:un|una|el|la|ya|ahora|mas|por|durante|\d+)\b)([a-zñ ]{3,30}?)(?:\s+(?:de\s+)?(?:\d+|una|un|dos|tres|cuatro|media|durante|por|para|el|la|hasta|mañana|manana|hoy)\b|$)/
+function subjectParam(t) {
+  // «pomodoro de 2 horas de historia»: la materia va al final
+  const m = SUBJECT.exec(t) ?? /\b(?:horas?|minutos?|media)\s+(?:de|para)\s+([a-zñ ]{3,30})$/.exec(t)
+  const s = m?.[1]?.trim()
+  return s && !/^(horas?|minutos?|rato|mucho|poco|algo|todo|estudiar|estudio|repasar)$/.test(s) ? { materia: s } : {}
+}
+function studyMinutes(t) {
+  const hm = /\b(\d{1,2}):(\d{2})\b/.exec(t)
+  if (hm) return +hm[1] * 60 + +hm[2]
+  const words = { una: 1, un: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5 }
+  let total = 0
+  const h = /\b(\d+|una|un|dos|tres|cuatro|cinco)\s+horas?\b/.exec(t)
+  if (h) total += (words[h[1]] ?? +h[1]) * 60
+  if (h && /\bhoras? y media\b/.test(t)) total += 30
+  if (/\bmedia hora\b/.test(t)) total += 30
+  const m = /\b(\d+)\s*(?:minutos?|min)\b/.exec(t)
+  if (m) total += +m[1]
+  return total || null
+}
 const modeOf = (t) =>
   /\b(a pie|caminando)\b/.test(t) ? 'caminando' : /\b(bici|bicicleta)\b/.test(t) ? 'bici' : /\b(auto|taxi|uber|remis|manejando)\b/.test(t) ? 'auto' : /\b(colectivo|bondi|subte|tren)\b/.test(t) ? 'colectivo' : null
 const chat = (tema) => intent('charla', { tema })
@@ -534,6 +555,28 @@ const RULES = [
     return expr ? intent('calcular', { expresion: expr }) : null
   },
 
+  // Modo Pomodoro: «armá un pomodoro», «quiero estudiar química 2 horas», «pausá el pomodoro», «tomame un mini test»
+  (t) => {
+    if (/\b(pausa|pausar|pausalo|frena|frenar|para|parar|deten)\b.*\bpomodoro\b/.test(t)) return intent('pomodoro', { accion: 'pausar' })
+    if (/\b(segui|seguir|continua|continuar|reanuda|reanudar|despausa)\b.*\bpomodoro\b/.test(t)) return intent('pomodoro', { accion: 'seguir' })
+    if (/\b(salta|saltar|saltea|saltear|saltate|pasa|pasar)\b.*\b(descanso|bloque)\b/.test(t)) return intent('pomodoro', { accion: 'saltar' })
+    if (/\b(termina|terminar|cancela|cancelar|corta|cortar|basta|deja|dejar|apaga|apagar|cerra|sali|salir)\b.*\bpomodoro\b|^(basta de estudiar|termine de estudiar|ya termine de estudiar)$/.test(t)) {
+      return intent('pomodoro', { accion: 'terminar' })
+    }
+    if (/\b(cuanto (falta|queda)|en que bloque (estoy|voy)|como voy)\b.*\b(bloque|descanso|pomodoro)\b|^en que bloque (estoy|voy)$/.test(t)) return intent('pomodoro', { accion: 'estado' })
+    if (/\b(mini ?test|tomame (un |una )?(test|prueba|examen|preguntas)|hace(me)? (un |una )?(test|prueba) de repaso|preguntame (sobre|de) lo que (estudie|estoy estudiando))\b|^dale,? tomame$/.test(t)) {
+      return intent('mini_test')
+    }
+    if (/\b(tecnicas?|metodos?|metodologias?) de estudio\b|\bcomo (puedo )?estudiar mejor\b/.test(t)) return intent('tecnicas_estudio', subjectParam(t))
+    if (/^(y )?que me (perdi|paso)\b|\bque me perdi\b|\bque avisos (me guardaste|tenes)\b/.test(t)) return intent('que_me_perdi')
+    const asks = /\bpomodoro\b|\bmodo (estudio|pomodoro)\b|\bplan de estudio\b|^(quiero|necesito|vamos a|voy a) estudiar\b|\bayudame a estudiar\b|\barmame un plan\b|\b(horas?|minutos?|media) (libres? )?para estudiar\b/.test(t)
+    if (!asks) return null
+    const params = { ...subjectParam(t), ...(studyMinutes(t) ? { minutos: studyMinutes(t) } : {}) }
+    // «arrancá un pomodoro»: lo empieza ya; «armá un pomodoro», «quiero estudiar 2 horas»: muestra el plan
+    if (/^(arranca|arrancame|empeza|empezar|inicia|iniciar|pone|poneme|activa|activar|dale con)\b/.test(t)) return intent('pomodoro', { accion: 'empezar', ...params })
+    return intent('pomodoro', { accion: 'plan', ...params })
+  },
+  (t) => (/\b(pausa|pausar|pausalo|frena|para|segui|seguir|continua|reanuda)\b.*\b(timer|temporizador|cronometro)\b/.test(t) ? intent('pausar_timer') : null),
   // Timers
   (t) => {
     const timerWord = /\b(timers?|temporizador(es)?|alarmas?|pomodoro|recordatorios?|cronometro)\b/.test(t)
@@ -542,7 +585,6 @@ const RULES = [
     return timerWord && (stopAtStart || cancelAnywhere) ? intent('cancelar_timers') : null
   },
   (t) => (/\b(cuanto (falta|queda)|cuanto tiempo (falta|queda)|timers? activos?|que timers?|mis timers?)\b/.test(t) ? intent('ver_timers') : null),
-  (t) => (/\bpomodoro\b/.test(t) ? intent('crear_timer', { segundos: 1500, etiqueta: 'Pomodoro' }) : null),
   (t) => {
     const d = parseDuration(t)
     if (TIMER_WORDS.test(t)) {
@@ -809,7 +851,7 @@ export function interpret(text, options) {
 }
 
 const SOCIAL = new Set(['saludo', 'gracias', 'charla'])
-const SPLIT = /\s*(?:,|\by despues\b|\by luego\b|\by tambien\b|\bdespues\b|\bluego\b|\by\b)\s*/
+const SPLIT = /\s*(?:,|\by despues\b|\by luego\b|\by tambien\b|\bdespues\b|\bluego\b|\by\b(?!\s+media\b))\s*/
 
 // "escribí hola, ¿cómo estás?" no se corta en la coma: todo es el texto. Solo se separa si al final
 // pediste otra cosa ("escribí hola y mandalo").

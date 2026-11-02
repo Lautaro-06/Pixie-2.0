@@ -64,6 +64,9 @@ export default function App() {
   const [voiceShortcut, setVoiceShortcut] = useState(null)
   const [scene, setScene] = useState(null) // el disfraz según lo que estás haciendo: { escena, auris }
   const sceneRef = useRef(null)
+  const [pomo, setPomo] = useState(null) // el Pomodoro que está andando: { fase, bloque, bloques, finAt, restanteMs, totalMs, pausado }
+  const pomoRef = useRef(null)
+  const [timers, setTimers] = useState([]) // los timers comunes: [{ etiqueta, finAt, restanteMs, totalMs, pausado }]
   const [wakeCfg, setWakeCfg] = useState(null) // «Pixie, ¿estás?»: { activa, plantillas, sensibilidad, pausada }
   const [wakeRestart, setWakeRestart] = useState(0)
   const inputRef = useRef(null)
@@ -199,6 +202,11 @@ export default function App() {
         sceneRef.current = info.escena
         setScene(info.escena)
       }
+      if (info.pomodoro?.activo) {
+        pomoRef.current = info.pomodoro
+        setPomo(info.pomodoro)
+      }
+      if (info.timers) setTimers(info.timers)
     }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
@@ -229,6 +237,19 @@ export default function App() {
         sceneRef.current = next
         setScene(next)
       }
+      // El Pomodoro cambió de fase, se pausó o terminó: termina un bloque → sonido de victoria
+      if (event.type === 'pomodoro') {
+        const prev = pomoRef.current
+        const next = event.activo ? event : null
+        if (next && prev?.fase === 'estudio' && next.fase !== 'estudio') sound('victory')
+        else if (next?.fase === 'estudio' && (!prev || prev.fase !== 'estudio')) sound('focus')
+        else if (next && prev && next.pausado !== prev.pausado) sound('pause')
+        pomoRef.current = next
+        setPomo(next)
+        if (next) wake()
+      }
+      if (event.type === 'pomodoro-fin' && event.completo) sound('victory')
+      if (event.type === 'timers') setTimers(event.timers ?? [])
       if (event.type === 'palabra') {
         wakePaused.current = Boolean(event.pausada)
         // Si es la misma voz grabada, no vuelve a abrir el micrófono
@@ -240,8 +261,8 @@ export default function App() {
         // Solo deja de esperar «Pixie, ¿estás?» con la compu bloqueada: si no tocás el teclado
         // (mirando un video, desde la cama) igual la tenés que poder llamar
         away.current = Boolean(event.away && event.bloqueada)
-        // Mirando una peli o escuchando música no tocás el teclado: igual te acompaña despierto
-        if (event.away && (event.bloqueada || !sceneRef.current?.escena)) {
+        // Mirando una peli, escuchando música o estudiando no tocás el teclado: igual te acompaña despierto
+        if (event.away && (event.bloqueada || (!sceneRef.current?.escena && !pomoRef.current))) {
           asleepRef.current = true
           setAsleep(true)
         } else {
@@ -283,7 +304,7 @@ export default function App() {
     const id = setInterval(() => {
       const after = feeling === 'cansado' ? SLEEP_WHEN_TIRED_MS : SLEEP_AFTER_MS
       // Si estás viendo algo, trabajando o jugando, te acompaña despierto (con su disfraz)
-      const company = Boolean(sceneRef.current?.escena || sceneRef.current?.auris) && !away.current
+      const company = Boolean(sceneRef.current?.escena || sceneRef.current?.auris || pomoRef.current) && !away.current
       if (!expanded && !notice && !game && !company && !asleepRef.current && Date.now() - lastActivity.current > after) {
         asleepRef.current = true
         setAsleep(true)
@@ -459,12 +480,34 @@ export default function App() {
   }
 
   const mood = busy ? 'thinking' : expanded ? 'listening' : asleep ? 'sleeping' : 'idle'
-  // En reposo puede mostrar la hora o el resumen; mientras la usás, siempre la cara
-  const resting = !expanded && !notice && !game && !listening && !busy
+  // El temporizador de la pantallita: el del Pomodoro, o si no el timer que termina primero
+  const screenTimer = useMemo(() => {
+    if (pomo) {
+      const { fase, bloque, bloques, finAt, restanteMs, totalMs, pausado, indice, plan } = pomo
+      return { kind: 'pomodoro', fase, bloque, bloques, finAt, restanteMs, totalMs, pausado, indice, plan }
+    }
+    const t = timers[0]
+    return t ? { kind: 'timer', etiqueta: t.etiqueta, finAt: t.finAt, restanteMs: t.restanteMs, totalMs: t.totalMs, pausado: t.pausado } : null
+  }, [pomo, timers])
+  // En el bloque de estudio, sin disfraces; en el descanso, anteojos de sol y un mate
+  const shownScene = useMemo(() => (pomo ? (pomo.fase === 'estudio' ? null : { escena: 'descanso', auris: false }) : scene), [pomo, scene])
+  // En reposo puede mostrar la hora o el resumen; mientras la usás (o hay un temporizador), siempre la cara
+  const resting = !expanded && !notice && !game && !listening && !busy && !screenTimer
   const standby = useMemo(
     () => (resting && standbyMode !== 'cara' ? { mode: standbyMode, weather } : null),
     [resting, standbyMode, weather]
   )
+  // Se puede tocar el temporizador cuando se ve (no mientras le hablás)
+  const timerTouchable = Boolean(screenTimer) && !(pomo && pomo.fase !== 'estudio') && !expanded && !busy && !listening
+
+  async function toggleTimer() {
+    lastActivity.current = Date.now()
+    try {
+      await api.timerToggle?.()
+    } catch {
+      // si no se pudo, queda como estaba
+    }
+  }
 
   async function send(text, { spoken = false } = {}) {
     const clean = text.trim()
@@ -744,7 +787,16 @@ export default function App() {
       )}
 
       <div className="face" ref={faceRef} title="Arrastrame para moverme · clic derecho: menú">
-        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} scene={scene} />
+        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} scene={shownScene} timer={screenTimer} />
+        {timerTouchable && (
+          <button
+            type="button"
+            className="timer-touch"
+            onClick={toggleTimer}
+            aria-label={screenTimer.pausado ? 'Seguir el temporizador' : 'Pausar el temporizador'}
+            title={screenTimer.pausado ? 'Tocá para seguir' : 'Tocá para pausar'}
+          />
+        )}
       </div>
 
       {!expanded && !notice && (

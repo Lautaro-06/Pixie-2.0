@@ -1,11 +1,13 @@
-# Con cada cambio en main: prueba Pixie, arma el instalador en Windows y,
-# si la versión de package.json es nueva, la publica como Release.
-# Las Pixie instaladas ven esa Release y muestran el botón «Actualizar».
+# Con cada cambio en main, development o una rama feature/…: prueba Pixie y arma el instalador
+# en Windows (queda para bajar en «Artifacts» y probarlo antes de publicarlo).
+# Solo en main, y si la versión de package.json es nueva, la publica como Release:
+# las Pixie instaladas ven esa Release y muestran el botón «Actualizar».
+# Por eso lo nuevo va primero a development y pasa a main recién cuando está probado.
 name: Pixie
 
 on:
   push:
-    branches: [main]
+    branches: [main, development, 'feature/**']
   pull_request:
   workflow_dispatch:
 
@@ -44,7 +46,8 @@ jobs:
       - name: Armar el instalador
         run: npx electron-builder --win --publish never
 
-      # Publica si esta versión todavía no tiene una Release completa (con latest.yml).
+      # Publica si es main y esta versión todavía no tiene una Release completa (con latest.yml).
+      # En development y en las ramas feature/ nunca publica.
       - name: ¿Es una versión nueva?
         id: version
         shell: bash
@@ -55,7 +58,7 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
           completas=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" \
             --jq "[.[] | select(.tag_name == \"v$v\" and .draft == false and ([.assets[].name] | index(\"latest.yml\")))] | length")
-          if [ "${{ github.event_name }}" = "push" ] && [ "$completas" = "0" ]; then
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ] && [ "$completas" = "0" ]; then
             echo "publicar=true" >> "$GITHUB_OUTPUT"
           else
             echo "publicar=false" >> "$GITHUB_OUTPUT"
@@ -86,7 +89,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pixie-instalador
+          name: pixie-instalador-${{ github.ref_name == 'main' && 'main' || 'prueba' }}
           path: |
             dist/*.exe
             dist/latest.yml

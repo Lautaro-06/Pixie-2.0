@@ -18,18 +18,21 @@ export const COLOR = {
   naranja: 12,
   azul: 13,
   rosa: 14,
-  grisOscuro: 15
+  grisOscuro: 15,
+  verdeOscuro: 16
 }
 // El 1 (la cara) toma el color de la pantallita (--pixel)
 export const PALETTE = [
   null, null,
   '#ff4d5e', '#36d6ff', '#5c1a24', '#0e3f55', '#eef4ff', '#ffd84a', '#8b9bb4',
-  '#53e08a', '#c38bff', '#b07a4a', '#ff9f43', '#6fa8ff', '#ff7ab8', '#4a5568'
+  '#53e08a', '#c38bff', '#b07a4a', '#ff9f43', '#6fa8ff', '#ff7ab8', '#4a5568',
+  '#1d5c3a'
 ]
 
-export const SCENES = ['cine', 'trabajando', 'programando', 'leyendo', 'musica', 'jugando', 'reunion', 'chateando', 'artista']
+// descanso: el del Pomodoro (lo pone la ventanita, no lo que estás haciendo)
+export const SCENES = ['cine', 'trabajando', 'programando', 'leyendo', 'musica', 'jugando', 'reunion', 'chateando', 'artista', 'descanso']
 // Lo que se lleva puesto (se ve también mientras te escucha) y lo que tiene en la mano (solo en reposo)
-const WEARABLE = { cine: 'anteojos3d', trabajando: 'anteojos', programando: 'anteojos', leyendo: 'redondos', musica: 'auris', reunion: 'headset', artista: 'boina' }
+const WEARABLE = { cine: 'anteojos3d', trabajando: 'anteojos', programando: 'anteojos', leyendo: 'redondos', musica: 'auris', reunion: 'headset', artista: 'boina', descanso: 'sol' }
 
 const LEGEND = {
   '.': 0, y: COLOR.amarillo, w: COLOR.blanco, r: COLOR.rojo, g: COLOR.gris, d: COLOR.grisOscuro, k: COLOR.marron,
@@ -91,6 +94,19 @@ const BERET = [
   '....pppppppppppppp....',
   '.pppppppppppppppppppp.',
   'pppppppppppppppppppppp'
+]
+// El mate del descanso (con la bombilla)
+const MATE = [
+  '.......g',
+  '......g.',
+  '.....g..',
+  '.vvvvgv.',
+  'kkkkkkkk',
+  'kkkkkkkk',
+  '.kkkkkk.',
+  '.kkkkkk.',
+  '..kkkk..',
+  '..dddd..'
 ]
 const CODE = [
   ['..#', '.#.', '#..', '.#.', '..#'],
@@ -186,6 +202,23 @@ const WEAR = {
     for (let i = 0; i <= 20; i++) p.put(2 + ox + i, 19 + oy + Math.round((i / 20) * 7), COLOR.gris)
     p.box(22 + ox, 25 + oy, 24 + ox, 27 + oy, COLOR.blanco)
   },
+  // Anteojos de sol (en el descanso del Pomodoro): lentes oscuras (no se le ven los ojos) con un brillito
+  sol(p, ox, oy) {
+    for (const [x0, x1] of [[5, 26], [37, 58]]) {
+      for (let y = 8; y <= 23; y++) {
+        // Abajo se angostan un poco
+        const cut = y >= 21 ? y - 20 : 0
+        for (let x = x0 + cut; x <= x1 - cut; x++) p.put(x + ox, y + oy, COLOR.grisOscuro)
+      }
+      p.box(x0 + ox, 7 + oy, x1 + ox, 7 + oy, COLOR.blanco)
+      // El brillito en diagonal
+      for (let i = 0; i < 4; i++) p.put(x0 + 3 + i + ox, 13 - i + oy, COLOR.blanco)
+      p.put(x0 + 9 + ox, 10 + oy, COLOR.blanco)
+    }
+    p.box(27 + ox, 9 + oy, 36 + ox, 10 + oy, COLOR.blanco)
+    p.box(1 + ox, 8 + oy, 4 + ox, 8 + oy, COLOR.blanco)
+    p.box(59 + ox, 8 + oy, 62 + ox, 8 + oy, COLOR.blanco)
+  },
   boina(p, ox, oy) {
     p.sprite(BERET, 2 + ox, 0 + oy)
   },
@@ -262,6 +295,13 @@ const HOLD = {
     // Manchitas de pintura
     const k = Math.floor(t / 1500)
     for (let i = 0; i < 3; i++) p.put(2 + ((k * 5 + i * 9) % 18) + ox, 29 + (i % 2) * 2 + oy, tips[(k + i) % tips.length])
+  },
+  descanso(p, ox, oy, t) {
+    p.sprite(MATE, 54 + ox, 22 + oy)
+    // El vapor que sube del mate
+    const u = (t % 1800) / 1800
+    const y = Math.round(20 - 8 * u)
+    if (u < 0.85) p.put(61 + ox + (Math.floor(t / 300) % 2), y + oy, COLOR.blanco)
   },
   musica(p, ox, oy, t) {
     const u = (t % 1600) / 1600

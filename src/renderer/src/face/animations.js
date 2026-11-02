@@ -147,7 +147,8 @@ export const IDLE_BY_SCENE = {
   programando: [[0.08, 'nod'], [0.13, 'proud'], [0.16, 'dizzy']],
   leyendo: [[0.08, 'peek']],
   chateando: [[0.12, 'giggle']],
-  artista: [[0.1, 'proud']]
+  artista: [[0.1, 'proud']],
+  descanso: [[0.14, 'stretch'], [0.24, 'happy'], [0.3, 'dance']]
 }
 
 // Cómo se mueve con cada disfraz (mientras está tranquilo)
@@ -170,7 +171,13 @@ export const SCENE_MOTION = {
   jugando: (t) => ({ lookX: beat(t, 650) % 2 ? 0.35 : -0.35, lookY: 0.2, brow: 'angry', mouth: 'flat' }),
   reunion: () => ({ mouth: 'small' }),
   chateando: () => ({ dx: -2, lookX: 0.9, lookY: 0.5, mouth: 'small' }),
-  artista: () => ({ dx: -1, lookX: 0.6, lookY: 0.4, mouth: 'smile' })
+  artista: () => ({ dx: -1, lookX: 0.6, lookY: 0.4, mouth: 'smile' }),
+  // Relajada, se hamaca despacito y de vez en cuando toma un mate
+  descanso: (t) => {
+    const c = t % 5000
+    const sip = c >= 3800 && c < 4600
+    return { dy: beat(t, 900) % 2 ? -1 : 0, mouth: sip ? 'small' : 'smile', ...(sip ? { lookX: 0.6, lookY: 0.5 } : {}) }
+  }
 }
 
 // Boca que se mueve mientras Pixie "habla".

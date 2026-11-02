@@ -61,9 +61,16 @@ test('avisa si pasás mucho tiempo en videos, y enseguida si hay un Pomodoro', (
   assert.deepEqual(ini.tick(at(15, 40), yt, mem).notices.map((n) => n.text), ['Llevás 40 minutos en YouTube. ¿Volvemos a lo tuyo?'])
   assert.deepEqual(kinds(ini.tick(at(15, 45), yt, mem)), []) // no insiste
 
+  // En un bloque de Pomodoro avisa enseguida (también con juegos), y no insiste antes de 5 minutos
   const ini2 = createInitiative()
   const r = ini2.tick(at(16), { ...yt, pomodoro: true }, mem)
-  assert.equal(r.notices[0].text, '¡Ey! Estamos en pleno Pomodoro y te veo en YouTube.')
+  assert.equal(r.notices[0].text, 'Estás en el bloque de estudio y te veo en YouTube. Lo mejor es priorizar lo tuyo: ya vas a tener tiempo para eso en el descanso.')
+  assert.deepEqual(kinds(ini2.tick(at(16, 2), { ...yt, pomodoro: true }, mem)), [])
+  assert.deepEqual(kinds(ini2.tick(at(16, 6), { ...yt, pomodoro: true }, mem)), ['distraccion'])
+  const game = { ...base, pomodoro: true, actividad: { categoria: 'juego', app: 'Roblox' } }
+  assert.match(createInitiative().tick(at(16), game, mem).notices[0].text, /te veo en Roblox/)
+  // Si en Ajustes → Pomodoro apagaste los avisos de distracciones, no avisa
+  assert.deepEqual(kinds(createInitiative().tick(at(16), { ...game, pomodoroAvisos: false }, mem)), [])
 })
 
 test('no molesta en pantalla completa ni en modo no molestar', () => {

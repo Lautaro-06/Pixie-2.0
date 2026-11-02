@@ -160,11 +160,19 @@ export function createInitiative(times = TIMES, rng = Math.random) {
 
       // Distracciones
       const act = snap.actividad
+      // En un bloque de Pomodoro también cuentan los juegos; avisa al entrar (y de nuevo cada 5 minutos)
+      if (act && snap.pomodoro && snap.pomodoroAvisos !== false && (DISTRACTIONS.has(act.categoria) || act.categoria === 'juego') && t - (s.pomodoroAvisado || 0) > 5 * MIN) {
+        s.pomodoroAvisado = t
+        notices.push({
+          kind: 'distraccion',
+          text: `Estás en el bloque de estudio y te veo en ${act.app}. Lo mejor es priorizar lo tuyo: ya vas a tener tiempo para eso en el descanso.`,
+          face: 'surprised'
+        })
+      }
       if (act && DISTRACTIONS.has(act.categoria)) {
         if (s.racha.categoria !== act.categoria) s.racha = { categoria: act.categoria, desde: t, avisada: false }
-        if (snap.pomodoro && !s.pomodoroAvisado) {
-          s.pomodoroAvisado = true
-          say({ kind: 'distraccion', text: `¡Ey! Estamos en pleno Pomodoro y te veo en ${act.app}.`, face: 'angry' })
+        if (snap.pomodoro) {
+          // ya avisó arriba
         } else if (!s.racha.avisada && t - s.racha.desde >= times.distraccion * factor(memory, 'distraccion')) {
           s.racha.avisada = true
           say({
@@ -177,7 +185,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
       } else if (act) {
         s.racha = { categoria: null, desde: 0, avisada: false }
       }
-      if (!snap.pomodoro) s.pomodoroAvisado = false
+      if (!snap.pomodoro || !act || !(DISTRACTIONS.has(act.categoria) || act.categoria === 'juego')) s.pomodoroAvisado = 0
 
       // A la noche jugando o con videos, y mañana entregás algo: te lo recuerda una vez
       const h = now.getHours() + now.getMinutes() / 60

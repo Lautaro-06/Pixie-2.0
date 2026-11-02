@@ -1,13 +1,17 @@
 // Dentro de la app de escritorio, window.pixie lo pone el preload.
 // Si abrís la interfaz en el navegador (para diseñar), se usa esta versión de prueba.
 
+import { pomodoroView, blockTips, buildPlan } from '../../main/study.js'
+
 // Ajustes de prueba: se guardan solo mientras está abierta la página
+let fakePomodoro = { minutos: 120, metodo: 'clasico', materia: '', ofrecer: true, distracciones: true }
 let fakeSettings = {
   version: 'navegador',
   bienvenidaHecha: false,
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
   apariencia: { pantallaReposo: 'cara' },
   mapas: { casa: '', transporteId: '', transporteSecreto: '', transporte: false },
+  pomodoro: pomodoroView(fakePomodoro),
   apps: {
     actualizado: Date.now(),
     buscando: false,
@@ -41,9 +45,13 @@ const previewSettings = {
     let apps = fakeSettings.apps
     if (patch.appPermiso) apps = { ...apps, lista: apps.lista.map((x) => (x.id === patch.appPermiso.id ? { ...x, ...patch.appPermiso } : x)) }
     if (typeof patch.appsTodas === 'boolean') apps = { ...apps, lista: apps.lista.map((x) => ({ ...x, abrir: patch.appsTodas, usar: patch.appsTodas })) }
+    // Pomodoro: lo elegido y el plan que sale
+    const pomo = { pomodoroMinutos: 'minutos', pomodoroMetodo: 'metodo', pomodoroMateria: 'materia', pomodoroOfrecer: 'ofrecer', pomodoroDistracciones: 'distracciones' }
+    for (const [k, v] of Object.entries(pomo)) if (k in patch) fakePomodoro = { ...fakePomodoro, [v]: patch[k] }
     fakeSettings = {
       ...fakeSettings,
       apps,
+      pomodoro: pomodoroView(fakePomodoro),
       general: g,
       apariencia: patch.pantallaReposo ? { pantallaReposo: patch.pantallaReposo } : fakeSettings.apariencia,
       voz: {
@@ -103,6 +111,11 @@ const previewSettings = {
     return { ...fakeSettings, mensaje: 'Leí tus Pendientes: tenés 3 tareas.' }
   },
   openTransitSignup: async () => window.open('https://api-transporte.buenosaires.gob.ar/registro', '_blank'),
+  pomodoro: async (accion) => ({ ...fakeSettings, mensaje: `En la app de escritorio haría «${accion}».` }),
+  pomodoroAdvice: async () => {
+    await wait(700)
+    return { ia: false, consejos: blockTips(buildPlan({ minutos: fakePomodoro.minutos, metodo: fakePomodoro.metodo, materia: fakePomodoro.materia || null })) }
+  },
   searchApps: async () => {
     await wait(600)
     return { ...fakeSettings, mensaje: `Encontré ${fakeSettings.apps.lista.length} apps en tu compu.` }
@@ -152,6 +165,7 @@ const preview = {
   wakeLog: () => {},
   wakeLearn: () => {},
   gameResult: () => {},
+  timerToggle: async () => null,
   reportError: (info) => console.error(info),
   onEvent: () => () => {},
   settings: previewSettings

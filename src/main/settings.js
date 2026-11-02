@@ -6,12 +6,14 @@ import { entriesBetween } from './changelog.js'
 import { maskSecret } from './secrets.js'
 import { parseShortcut, shortcutText } from './shortcut.js'
 import { findCalendarUrl } from './calendars.js'
+import { buildPlan, blockTips, advicePrompt, pomodoroView, clampMinutes, METHODS } from './study.js'
 
 export const STANDBY_MODES = ['cara', 'reloj', 'resumen']
 export const NEWS_SOURCES = ['infobae', 'tn']
 export const NEWS_ALERTS = ['nunca', 'aveces', 'seguido']
 export const GOOGLE_CALENDAR_SETTINGS_URL = 'https://calendar.google.com/calendar/r/settings'
 export const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey'
+export const POMODORO_ACTIONS = ['empezar', 'pausar', 'seguir', 'saltar', 'terminar']
 const NAMES = { gemini: 'Gemini', groq: 'Groq', claude: 'Claude', ollama: 'Ollama' }
 const KEY = /(AIza[\w-]{30,}|AQ\.[\w.-]{20,}|gsk_[A-Za-z0-9]{20,}|sk-ant-[\w-]{20,})/
 
@@ -51,12 +53,23 @@ export function createSettings({
   classroom = null,
   mail = null,
   apps = null,
+  pomodoro = null, // la sesión (pomodoro.js)
+  runPomodoro = null, // async (accion) → lo que dice Pixie (arrancar, pausar, seguir, saltar, terminar)
   extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
 }) {
   let candidate = null // la clave que se encontró copiada, sin mostrarla
   let calendarCandidate = null // la dirección de un calendario que se encontró copiada
   let calendarTried = null // la última que se probó (para no probarla de nuevo a cada rato)
+
+  // Ajustes → Pomodoro: lo elegido, el plan que sale con eso y cómo va la sesión
+  function pomodoroSnapshot() {
+    const cfg = getConfig()
+    return pomodoroView(
+      { minutos: cfg.pomodoroMinutos, metodo: cfg.pomodoroMetodo, materia: cfg.pomodoroMateria, ofrecer: cfg.pomodoroOfrecer, distracciones: cfg.pomodoroDistracciones },
+      pomodoro?.status()
+    )
+  }
 
   function snapshot() {
     const cfg = getConfig()
@@ -92,6 +105,7 @@ export function createSettings({
         mails: mail ? { ...mail.status(), extension: extension() } : null
       },
       apps: apps ? { lista: apps.list(), actualizado: apps.updated(), buscando: apps.searching() } : null,
+      pomodoro: pomodoroSnapshot(),
       mapas: {
         casa: cfg.direccionCasa ?? '',
         transporteId: cfg.transporte?.id ?? '',
@@ -149,6 +163,12 @@ export function createSettings({
       saveConfig({ transporte: next })
       if (next.id && next.secreto) mensajes.push('Listo: ya puedo decirte dónde vienen los colectivos. Probá «¿dónde viene el 60?».')
     }
+    // Ajustes → Pomodoro
+    if ('pomodoroMinutos' in patch) saveConfig({ pomodoroMinutos: clampMinutes(patch.pomodoroMinutos) })
+    if (typeof patch.pomodoroMetodo === 'string' && METHODS[patch.pomodoroMetodo]) saveConfig({ pomodoroMetodo: patch.pomodoroMetodo })
+    if (typeof patch.pomodoroMateria === 'string') saveConfig({ pomodoroMateria: patch.pomodoroMateria.trim().slice(0, 40) || undefined })
+    if ('pomodoroOfrecer' in patch) saveConfig({ pomodoroOfrecer: Boolean(patch.pomodoroOfrecer) })
+    if ('pomodoroDistracciones' in patch) saveConfig({ pomodoroDistracciones: Boolean(patch.pomodoroDistracciones) })
     // Ajustes → Apps: qué apps puede abrir y usar
     if (patch.appPermiso && typeof patch.appPermiso.id === 'string') apps?.set(patch.appPermiso.id, patch.appPermiso)
     if (typeof patch.appsTodas === 'boolean') apps?.setAll(patch.appsTodas)
@@ -282,6 +302,28 @@ export function createSettings({
     return { ...snapshot(), mensaje }
   }
 
+  // Los botones del Pomodoro (arrancar, pausar, seguir, saltar, terminar): lo hace y lo dice Pixie
+  async function pomodoroControl(accion) {
+    if (!POMODORO_ACTIONS.includes(accion) || !runPomodoro) return { ...snapshot(), mensaje: null }
+    const mensaje = await runPomodoro(accion)
+    return { ...snapshot(), mensaje }
+  }
+
+  // Consejos para cada bloque: con IA, a medida; sin IA (o si falla), los de siempre
+  async function pomodoroAdvice() {
+    const p = pomodoroSnapshot()
+    const plan = buildPlan({ minutos: p.minutos, metodo: p.metodo, materia: p.materia || null })
+    if (ai?.enabled?.() && ai.advise) {
+      try {
+        const text = await ai.advise(advicePrompt(plan))
+        if (text) return { ia: true, consejos: text.split(/\n+/).map((l) => l.trim()).filter(Boolean).slice(0, 10) }
+      } catch {
+        // sin internet o sin cupo: los de siempre
+      }
+    }
+    return { ia: false, consejos: blockTips(plan) }
+  }
+
   // Los últimos titulares, para ver cómo quedan
   async function previewNews() {
     try {
@@ -309,6 +351,8 @@ export function createSettings({
     removeCalendar,
     calendarAlerts,
     previewNews,
-    readClassroom
+    readClassroom,
+    pomodoroControl,
+    pomodoroAdvice
   }
 }

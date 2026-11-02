@@ -16,6 +16,8 @@ import { combineScene } from './scenes.js'
 
 // Avisos que se dicen menos si no les das bola
 const LEARNS = new Set(['charla', 'agua', 'pausa', 'noticias', 'distraccion'])
+// En un bloque de Pomodoro solo se dicen estos; el resto se guarda para el descanso
+const DURING_FOCUS = new Set(['pomodoro', 'distraccion'])
 const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¡!¿?.,]/g, ' ').trim()
 
 const TICK_MS = 5000
@@ -40,6 +42,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
   let lastFeeling = null
   let question = null // la última pregunta que hizo por su cuenta, esperando respuesta
   const timers = []
+  let held = [] // avisos guardados durante un bloque de Pomodoro
+  let missed = [] // los que se guardó en el último bloque (para «¿qué me perdí?»)
   // El disfraz de Pixie según lo que hacés, y la música que suena (se mira cada 10 segundos)
   let scene = { escena: null, auris: false }
   let media = null
@@ -74,6 +78,11 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
   }
 
   async function deliver(notice) {
+    // Estudiando no molesta: lo guarda para el descanso (los recordatorios de la agenda y la batería, igual)
+    if (ctx.pomodoro?.enFoco() && !notice.urgent && !DURING_FOCUS.has(notice.kind)) {
+      held.push(notice)
+      return
+    }
     let n = notice
     if (n.kind === 'resumen') n = { ...(await runAction('buen_dia', {}, ctx)), kind: 'resumen' }
     if (n.kind === 'noticias') {
@@ -105,6 +114,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
         ...snap,
         silencioHasta: quietUntil,
         pomodoro: isPomodoroRunning(),
+        pomodoroAvisos: ctx.getConfig().pomodoroDistracciones !== false,
         salud: ctx.getConfig().recordatoriosSalud !== false,
         noticias: ctx.getConfig().noticiasAvisos ?? 'aveces',
         // Cuántos mails llegaron desde un momento (si pediste los avisos de mails)
@@ -156,6 +166,31 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     },
     feeling: () => feeling(memory.getMood(), new Date()),
     scene: () => scene,
+    // En el descanso: lo que no te dijo mientras estudiabas, en una frase
+    releaseHeld() {
+      const list = held
+      held = []
+      if (!list.length) return ''
+      missed = list
+      const mails = list.filter((n) => n.kind === 'mail').length
+      const others = list.length - mails
+      const parts = []
+      if (mails) parts.push(mails === 1 ? 'te llegó un mail' : `te llegaron ${mails} mails`)
+      if (others) parts.push(others === 1 ? 'tengo un aviso para vos' : `tengo ${others} avisos para vos`)
+      return `Mientras estudiabas ${parts.join(' y ')}: preguntame «¿qué me perdí?».`
+    },
+    // «¿Qué me perdí?»: lo que se guardó (en el último bloque y en este, si seguís estudiando)
+    missedNotices() {
+      const all = [...missed, ...held]
+      missed = []
+      return all.map((n) => {
+        if (n.text) return n.text
+        if (n.kind === 'noticias') return 'Hay noticias nuevas: preguntame «¿qué noticias hay?».'
+        if (n.kind === 'resumen') return 'Tenía tu resumen del día: decime «buen día» y te lo cuento.'
+        return null
+      }).filter(Boolean)
+    },
+    heldNotices: () => [...held],
     howAreYou: () => howAreYou(memory.getMood(), new Date()),
     // Lo que la IA necesita saber en cada mensaje
     contextText() {
