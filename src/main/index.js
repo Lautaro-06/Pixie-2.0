@@ -8,7 +8,7 @@ import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } 
 import { createPixieWindow, getWindow, setMode, showAndFocus, sendEvent } from './window.js'
 import { createMenus } from './tray.js'
 import { createMind } from './mind.js'
-import { createAI, aiErrorText, describeAI } from './ai.js'
+import { createAI, aiErrorText, voiceErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
 import { createPhone } from './phone.js'
@@ -422,7 +422,7 @@ if (!app.requestSingleInstanceLock()) {
       } catch (err) {
         logAction(`voz: ${err.status ? `${err.status} ` : ''}${err.message}`)
         diagnostics.record('micrófono', err)
-        return { error: aiErrorText(err) ?? 'No me pude conectar para entenderte. ¿Hay internet?' }
+        return { error: voiceErrorText(err) }
       }
     })
     // Voz natural: el audio va llegando en pedacitos a la interfaz
@@ -489,7 +489,7 @@ if (!app.requestSingleInstanceLock()) {
         setTimeout(() => classroom?.refresh(), 5000)
       }
     })
-    ai = createAI({ getConfig, ctx })
+    ai = createAI({ getConfig, ctx, log: logAction })
     phone = createPhone({ getConfig, log: logAction })
     tts = createVoices({
       getConfig,

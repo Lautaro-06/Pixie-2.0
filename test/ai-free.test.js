@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createAI, pickProvider, aiErrorText, describeAI } from '../src/main/ai.js'
+import { createAI, pickProvider, aiErrorText, voiceErrorText, describeAI } from '../src/main/ai.js'
 import { COMPATIBLE_TOOLS, cleanText, AIHttpError, AIConnectionError } from '../src/main/ai-compatible.js'
 import { createMemory } from '../src/main/memory.js'
 
@@ -145,4 +145,48 @@ test('explica por qué no hay IA', () => {
   assert.match(describeAI({ claveIA: 'AQ.x', ia: false }, {}).text, /apagada/)
   assert.match(describeAI({ proveedorIA: 'gemini' }, {}).text, /falta la clave/)
   assert.equal(describeAI({ claveIA: 'AQ.x' }, {}).text, 'Estoy usando la IA de Gemini (gemini-flash-lite-latest).')
+})
+
+test('la voz: si el modelo de voz falla o tarda, la pasa a texto con el de siempre', async () => {
+  const config = { claveIA: 'AIzaSyPrueba' }
+  const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+  const logs = []
+  let t = 0
+  const f = fakeFetch([
+    reply('Pixie, poné música'), // anda el de voz
+    timeout, // el de voz tarda...
+    reply('abrí WhatsApp'), // ...y contesta el de siempre
+    new TypeError('fetch failed'), // falla otra vez: un rato usa directo el de siempre
+    reply('qué hora es'),
+    reply('[nada]')
+  ])
+  const memory = createMemory(join(mkdtempSync(join(tmpdir(), 'pixie-voz-ia-')), 'memoria.json'))
+  const ai = createAI({ getConfig: () => config, ctx: { memory }, clientFactory: () => assert.fail('no debería usar Claude'), fetchImpl: f.fn, log: (l) => logs.push(l), now: () => t })
+  const wav = new Uint8Array([1, 2, 3])
+  assert.equal(await ai.transcribe(wav), 'Pixie, poné música')
+  assert.equal(f.calls[0].body.model, 'gemini-flash-latest')
+  assert.equal(f.calls[0].body.reasoning_effort, 'low', 'para copiar lo que dijiste no piensa de más')
+  assert.equal(f.calls[0].body.messages[0].content[1].type, 'input_audio')
+  assert.equal(await ai.transcribe(wav), 'abrí WhatsApp')
+  assert.equal(f.calls[2].body.model, 'gemini-flash-lite-latest')
+  assert.ok(!('reasoning_effort' in f.calls[2].body))
+  assert.match(logs[0], /modelo de voz falló.*timeout.*el de siempre/)
+  assert.equal(await ai.transcribe(wav), 'qué hora es')
+  assert.equal(f.calls.length, 5)
+  // Falló dos veces seguidas: el rato que sigue va directo al de siempre
+  t += 60 * 1000
+  assert.equal(await ai.transcribe(wav), '')
+  assert.equal(f.calls.length, 6)
+  assert.equal(f.calls[5].body.model, 'gemini-flash-lite-latest')
+})
+
+test('la voz: con la clave mal no prueba otro modelo, y los avisos no culpan a internet de más', async () => {
+  const config = { claveIA: 'AIzaSyPrueba' }
+  const { ai, calls } = setup([{ status: 401, body: { error: { message: 'API key not valid' } } }], config)
+  await assert.rejects(ai.transcribe(new Uint8Array([1])), (err) => err instanceof AIHttpError && err.status === 401)
+  assert.equal(calls.length, 1)
+  assert.match(voiceErrorText(new AIHttpError(401, 'API key not valid')), /clave/)
+  assert.match(voiceErrorText(new AIConnectionError('x', { timeout: true })), /tardó demasiado/)
+  assert.match(voiceErrorText(new AIConnectionError('fetch failed')), /internet/)
+  assert.match(voiceErrorText(new TypeError('algo raro')), /trabó/)
 })

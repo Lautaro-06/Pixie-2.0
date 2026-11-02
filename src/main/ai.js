@@ -14,6 +14,8 @@ const DEFAULT_MODEL = 'claude-opus-5-5'
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'])
 const MAX_STEPS = 10 // vueltas de herramientas por mensaje (usar una app puede llevar varios pasos)
 const VOICE_MODEL = 'gemini-flash-latest'
+const VOICE_TIMEOUT_MS = 20000 // pasar unas palabras a texto tarda segundos: si tarda más, va al modelo de siempre
+const VOICE_PAUSE_MS = 15 * 60 * 1000 // si el modelo de voz falla seguido, un rato usa directo el de siempre
 
 // Lo que se le pide al modelo para pasar tu voz a texto
 export function transcriptionPrompt(hints = '') {
@@ -134,7 +136,9 @@ export function createAI({
   getConfig,
   ctx,
   clientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 1, timeout: 45000 }),
-  fetchImpl = (...args) => fetch(...args)
+  fetchImpl = (...args) => fetch(...args),
+  log = () => {},
+  now = () => Date.now()
 }) {
   let client = null
   let clientKey = null
@@ -142,6 +146,8 @@ export function createAI({
   let messagesFor = null // de qué IA es la charla guardada (cada una tiene su formato)
   let lastAt = 0
   let notes = [] // cosas que pasaron fuera de la charla (avisos, confirmaciones)
+  let voiceFailures = 0 // veces seguidas que falló el modelo de voz
+  let voicePausedUntil = 0
 
   const provider = () => pickProvider(getConfig())
   const enabled = () => provider() !== null
@@ -274,22 +280,33 @@ export function createAI({
       { type: 'text', text: transcriptionPrompt(hints) },
       { type: 'input_audio', input_audio: { data: Buffer.from(wav).toString('base64'), format: 'wav' } }
     ]
-    // El modelo Flash entiende mejor el audio que el Lite; si se agota lo gratis, vuelve al Lite
-    const voiceDriver = createCompatibleDriver({
-      preset: { ...p.preset, fallback: p.model },
-      apiKey: p.apiKey,
-      model: getConfig().modeloVoz || VOICE_MODEL,
-      system: SYSTEM,
-      fetchImpl
-    })
-    let r
-    try {
-      r = await voiceDriver.step([{ role: 'user', content }], { tools: false, persona: false })
-    } catch (err) {
-      // Si ese modelo no existe para esta clave, sigue con el de siempre
-      if (!(err instanceof AIHttpError && err.status === 404)) throw err
-      r = await driverFor(p).step([{ role: 'user', content }], { tools: false, persona: false })
+    const ask = (driver, extra) => driver.step([{ role: 'user', content }], { tools: false, persona: false, extra })
+    // El modelo Flash entiende mejor el audio que el Lite. Pero si tarda, falla o se agota lo gratis,
+    // se usa el de siempre (el que andaba antes): nunca te quedás sin poder hablarle.
+    let r = null
+    if (now() >= voicePausedUntil) {
+      const custom = getConfig().modeloVoz
+      const voiceDriver = createCompatibleDriver({
+        preset: { ...p.preset, fallback: null, timeout: VOICE_TIMEOUT_MS },
+        apiKey: p.apiKey,
+        model: custom || VOICE_MODEL,
+        system: SYSTEM,
+        fetchImpl
+      })
+      try {
+        // Para copiar lo que dijiste no hace falta pensar mucho: así contesta más rápido
+        r = await ask(voiceDriver, custom ? {} : { reasoning_effort: 'low' })
+        voiceFailures = 0
+      } catch (err) {
+        // Con la clave mal, el otro modelo tampoco va a andar
+        if (err instanceof AIHttpError && (err.status === 401 || err.status === 403)) throw err
+        voiceFailures++
+        const broken = err instanceof AIHttpError && (err.status === 400 || err.status === 404)
+        if (broken || voiceFailures >= 2) voicePausedUntil = now() + VOICE_PAUSE_MS
+        log(`voz: el modelo de voz falló (${err.status ? `${err.status} ` : ''}${err.message}); pruebo con el de siempre`)
+      }
     }
+    if (!r) r = await ask(driverFor(p))
     const text = r.text.replace(/^["«]|["»]$/g, '').trim()
     return /^\[?nada\]?\.?$/i.test(text) ? '' : text
   }
@@ -355,6 +372,15 @@ export function parseLocation(text) {
 }
 
 // Mensaje claro según el error de la IA. null = seguir con las reglas sin decir nada.
+// Qué decir cuando no pudo pasar tu voz a texto (sin culpar a internet si no fue eso)
+export function voiceErrorText(err) {
+  const friendly = aiErrorText(err)
+  if (friendly) return friendly
+  if (err instanceof AIConnectionError && err.timeout) return 'La IA tardó demasiado en entenderte. ¿Me lo repetís?'
+  if (err instanceof AIConnectionError) return 'No me pude conectar para entenderte. ¿Hay internet?'
+  return 'Se me trabó algo al entenderte. ¿Me lo repetís?'
+}
+
 export function aiErrorText(err) {
   if (err instanceof FriendlyError) return err.message
   if (err instanceof AIConnectionError) return null

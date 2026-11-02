@@ -19,7 +19,13 @@ export class AIHttpError extends Error {
   }
 }
 
-export class AIConnectionError extends Error {}
+// timeout: la IA no contestó a tiempo (hay internet, pero tardó demasiado)
+export class AIConnectionError extends Error {
+  constructor(message, { timeout = false } = {}) {
+    super(message)
+    this.timeout = timeout
+  }
+}
 
 // Groq transcribe audio con Whisper (gratis): otro endpoint, mismo formato de errores
 export async function whisperTranscribe({ apiKey, wav, fetchImpl = fetch }) {
@@ -93,7 +99,8 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
       res = await fetchImpl(preset.url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(preset.timeout) })
     } catch (err) {
       const where = preset.local ? ' (¿está abierto Ollama?)' : ''
-      throw new AIConnectionError(`No me pude conectar con la IA${where}: ${err.message}`)
+      const timeout = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+      throw new AIConnectionError(`No me pude conectar con la IA${where} (${body.model}): ${err.message}`, { timeout })
     }
     if (!res.ok) {
       let msg = ''
@@ -110,8 +117,9 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
   return {
     user: (text) => ({ role: 'user', content: text }),
 
-    async step(history, { tools = true, persona = true } = {}) {
-      const body = { model, messages: persona ? [{ role: 'system', content: system }, ...history] : history }
+    // extra: campos de más para este pedido (por ejemplo, cuánto piensa el modelo)
+    async step(history, { tools = true, persona = true, extra = {} } = {}) {
+      const body = { ...extra, model, messages: persona ? [{ role: 'system', content: system }, ...history] : history }
       if (tools) body.tools = COMPATIBLE_TOOLS
       const res = await post(body)
       const choice = res.choices?.[0] ?? {}
