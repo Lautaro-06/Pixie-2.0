@@ -12,8 +12,10 @@ export interface Release {
   sizeMb: number | null;
 }
 
+declare const __FALLBACK_RELEASE__: Release | null;
+
 export function useLatestRelease() {
-  const [release, setRelease] = useState<Release | null>(null);
+  const [release, setRelease] = useState<Release | null>(__FALLBACK_RELEASE__);
   useEffect(() => {
     fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
       .then(r => (r.ok ? r.json() : Promise.reject()))
@@ -25,7 +27,7 @@ export function useLatestRelease() {
           sizeMb: exe ? Math.round(exe.size / 1_048_576) : null,
         });
       })
-      .catch(() => setRelease(null));
+      .catch(() => {});
   }, []);
   return release;
 }
@@ -33,6 +35,11 @@ export function useLatestRelease() {
 function isWindows() {
   const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
   return /win/i.test(uaData?.platform || navigator.platform || navigator.userAgent);
+}
+
+function isPhone() {
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  return uaData?.mobile ?? /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 export function DownloadButton({ release, compact = false }: { release: Release | null; compact?: boolean }) {
@@ -49,11 +56,15 @@ export function DownloadButton({ release, compact = false }: { release: Release 
     return (
       <div className="cta">
         <button type="button" className="cta-button" onClick={copy}>
-          {copied === 'si' ? <Check aria-hidden size={20} /> : <Copy aria-hidden size={20} />}
+          {copied === 'si' ? <Check aria-hidden size={20} className="shrink-0" /> : <Copy aria-hidden size={20} className="shrink-0" />}
           {copied === 'si' ? 'Link copiado' : 'Copiar link para la compu'}
         </button>
         <p className="cta-note" aria-live="polite">
-          {copied === 'error' ? `Abrí ${link} en tu compu.` : 'Pixie es para Windows 10 y 11. Abrí este link en tu compu para bajarla.'}
+          {copied === 'error'
+            ? `Abrí ${link} en una compu con Windows.`
+            : isPhone()
+              ? 'Pixie es para Windows 10 y 11. Abrí este link en tu compu para bajarla.'
+              : 'Por ahora Pixie es solo para Windows 10 y 11. Abrí este link en una compu con Windows.'}
         </p>
       </div>
     );
