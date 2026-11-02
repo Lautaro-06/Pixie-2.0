@@ -83,6 +83,7 @@ function Pinned() {
       });
       // Se achica hasta su esquina, y el día avanza a su alrededor.
       tl.fromTo('.desk-pixie', { scale: 3, x: '-24vw', y: '-22vh' }, { scale: 1, x: 0, y: 0, duration: 1 })
+        .fromTo('.desk-bubble', { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0.8)
         .fromTo('.day-text-0', { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0.7)
         .fromTo('.desk-tarde', { opacity: 0 }, { opacity: 1, duration: 0.5 }, 1.7)
         .to('.day-text-0', { opacity: 0, duration: 0.25 }, 1.7)
@@ -112,7 +113,7 @@ function Pinned() {
       </div>
       <Desktop moment={moment}>
         <div className="desk-pixie">
-          <p className="reply" key={moment}>{MOMENTS[moment].bubble}</p>
+          <p className="reply desk-bubble">{MOMENTS[moment].bubble}</p>
           <div className="bezel is-small">
             <PixieScreen
               mood={(asleep ? 'sleeping' : 'idle') as Mood}
