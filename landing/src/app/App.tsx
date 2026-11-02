@@ -46,8 +46,10 @@ function Closing({ release }: { release: Release | null }) {
 
   return (
     <section ref={ref} className="closing">
-      <div className="bezel">
-        <PixieScreen reaction={reaction} />
+      <div>
+        <div className="bezel">
+          <PixieScreen reaction={reaction} />
+        </div>
       </div>
       <div>
         <h2>Acá estoy.</h2>
