@@ -4,7 +4,7 @@ name: Página de descarga
 on:
   push:
     branches: [landing-page, main]
-    paths: ['landing/**', '.github/workflows/landing.yml']
+    paths: ['landing/**', 'src/renderer/src/face/**', '.github/workflows/landing.yml']
   workflow_dispatch:
 
 permissions:
