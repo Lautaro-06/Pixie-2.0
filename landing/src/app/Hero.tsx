@@ -44,7 +44,9 @@ export default function Hero({ release }: { release: Release | null }) {
     if (reduce || touched) return;
     const id = setInterval(() => {
       if (document.hidden || window.scrollY > 300) return;
-      play((shown.current + 1) % DEMOS.length);
+      // Una sola vuelta: después queda quieta hasta que alguien toque un pedido.
+      if (shown.current === DEMOS.length - 1) return clearInterval(id);
+      play(shown.current + 1);
     }, 5200);
     return () => clearInterval(id);
   }, [reduce, touched]);
@@ -64,7 +66,7 @@ export default function Hero({ release }: { release: Release | null }) {
         <div className="bezel">
           <PixieScreen mood={mood} reaction={reaction} speech={speech} label="Cara de Pixie, que te mira y reacciona" />
         </div>
-        <div className="hero-reply" aria-live="polite">
+        <div className="hero-reply" aria-live={touched ? 'polite' : undefined}>
           <AnimatePresence mode="wait">
             {answered && active >= 0 && (
               <motion.p
