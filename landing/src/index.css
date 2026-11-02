@@ -208,9 +208,9 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
 
 .desk-window {
   position: absolute;
-  right: 28rem;
+  right: 21rem;
   bottom: 6rem;
-  width: 22rem;
+  width: 20rem;
   padding: 0 1rem 1rem;
   border-radius: 10px;
   background: #f7f9fc;
@@ -235,6 +235,10 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
   font-size: 0.875rem;
 }
 .desk-bar time { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1279px) {
+  .is-pinned .desk-window { display: none; }
+}
 
 .day-panel { padding: 3.5rem var(--gutter) 0; }
 .day-panel h2 { font-size: clamp(2rem, 8vw, 3rem); margin-bottom: 0.75rem; }
