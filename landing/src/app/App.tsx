@@ -26,7 +26,7 @@ const FAQ = [
   { q: '¿Es seguro? ¿Por qué Windows me avisa?', a: 'El aviso aparece porque el instalador todavía no tiene firma digital, un certificado pago. El código es abierto y lo podés revisar en GitHub.' },
   { q: '¿Funciona sin internet?', a: 'En parte. Sin IA entiende las órdenes que conoce, como «abrí Spotify» o «subí el volumen», sin internet. Para conversar de todo necesita una IA: en línea, o Ollama en tu compu.' },
   { q: '¿Me escucha todo el tiempo?', a: 'Solo si activás «Pixie, ¿estás?». Compara lo que oye con tu voz en la compu y no manda audio a ningún lado hasta que la llamás. Mientras está prendido, Windows muestra el ícono del micrófono.' },
-  { q: '¿Tengo que actualizarla a mano?', a: 'No. Busca versiones nuevas al arrancar y cada 6 horas, y te pregunta antes de instalarlas.' },
+  { q: '¿Tengo que actualizarla a mano?', a: 'No. Busca versiones nuevas al arrancar y cada 6 horas, y te pregunta si te actualizás ahora. Si decís que no, se instala sola la próxima vez que se cierre.' },
   { q: '¿Qué necesito para usarla?', a: 'Windows 10 u 11. Para la IA en línea, también internet.' },
 ];
 
@@ -101,10 +101,10 @@ export default function App() {
 
         <section id="privacidad" className="band">
           <div className="wrap privacy">
-            <h2>Lo que sabe de vos se queda en tu compu.</h2>
+            <h2>Tu memoria vive en tu compu. Vos elegís qué sale.</h2>
             <div>
-              <p>Tu memoria y tu agenda se guardan en tu PC. Del uso de la compu solo anota el tipo de actividad, nunca lo que escribís. La clave de la IA queda cifrada con tu cuenta de Windows.</p>
-              <p>Lo que le preguntás a una IA en línea sí viaja a ese servicio, y en el plan gratis de Gemini, Google puede usarlo para mejorar sus productos. Con Ollama, nada sale de la compu.</p>
+              <p>Tu memoria y tu agenda se guardan en tu PC, con una copia de respaldo en tu OneDrive. Del uso de la compu solo anota el tipo de actividad, nunca lo que escribís. La clave de la IA queda cifrada con tu cuenta de Windows.</p>
+              <p>Con una IA en línea, cada mensaje viaja a ese servicio junto con lo que necesita para responderte: tu nombre, lo que le contaste, tus pendientes, tu agenda y la app que estás usando. En el plan gratis de Gemini, Google puede usarlo para mejorar sus productos. Con Ollama, la IA corre en tu compu.</p>
               <p>Tiene un filtro de contenido siempre activo, y las acciones riesgosas, como apagar la compu, piden confirmación.</p>
             </div>
           </div>
