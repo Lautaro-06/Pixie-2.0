@@ -304,3 +304,7 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
   .privacy, .install, .faq, .closing { grid-template-columns: minmax(0, 1fr); }
   .providers > div { grid-template-columns: minmax(0, 1fr); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-button:active { transform: none; }
+}
