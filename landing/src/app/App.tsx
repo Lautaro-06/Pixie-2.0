@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { LazyMotion, domAnimation } from 'motion/react';
-import { ExternalLink } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
 import logo from '../images/PIXIE-LogoEyes.png';
 import Hero from './Hero';
 import PixieScreen from './PixieScreen';
@@ -150,7 +150,10 @@ export default function App() {
             <div>
               {FAQ.map(f => (
                 <details key={f.q}>
-                  <summary>{f.q}</summary>
+                  <summary>
+                    {f.q}
+                    <ChevronDown aria-hidden size={20} />
+                  </summary>
                   <p>{f.a}</p>
                 </details>
               ))}

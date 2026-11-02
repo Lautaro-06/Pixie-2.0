@@ -25,7 +25,7 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 4.5rem;
+  scroll-padding-top: 3.75rem;
   -webkit-text-size-adjust: 100%;
   background: var(--screen);
 }
@@ -40,7 +40,7 @@ body {
   overflow-x: clip;
 }
 
-h1, h2, h3 { font-family: var(--font-pixel); font-weight: 600; line-height: 1.05; text-wrap: balance; }
+h1, h2, h3 { font-family: var(--font-pixel); font-weight: 600; line-height: 1.05; text-wrap: balance; font-variant-ligatures: none; }
 h2 { font-size: clamp(2.25rem, 5vw, 4rem); }
 a { text-underline-offset: 3px; }
 kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px solid var(--ice-line); border-radius: 6px; white-space: nowrap; }
@@ -84,6 +84,7 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
 .cta { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
 
 .cta-button {
+  font-variant-ligatures: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -181,7 +182,7 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
   .hero-copy { grid-column: 1; grid-row: 2; gap: 1rem; }
   .hero-try { grid-row: 3; margin-top: 1rem; }
   .hero h1 { font-size: clamp(2.75rem, 13vw, 4.5rem); margin-bottom: 0.5rem; }
-  .cta-button:not(.is-compact) { width: 100%; }
+  .cta-button:not(.is-compact) { width: 100%; padding: 0 1rem; font-size: 1.25rem; }
   .cta { align-items: stretch; }
 }
 @media (max-width: 899px) and (max-height: 700px) {
@@ -277,7 +278,10 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
 
 .faq { display: grid; grid-template-columns: 1fr 1.4fr; gap: 2rem clamp(2rem, 6vw, 6rem); }
 .faq details { border-top: 1px solid var(--ice-line); }
-.faq summary { padding: 1rem 0; font-size: 1.1875rem; font-weight: 600; cursor: pointer; }
+.faq summary { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 2.75rem; padding: 0.75rem 0; font-size: 1.1875rem; font-weight: 600; cursor: pointer; list-style: none; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary svg { flex-shrink: 0; color: var(--ice); transition: transform 200ms var(--ease-out); }
+.faq details[open] summary svg { transform: rotate(180deg); }
 .faq details p { padding-bottom: 1.25rem; color: var(--muted); max-width: 40rem; }
 
 .closing {
@@ -289,6 +293,7 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
   background: var(--ice);
   color: var(--ice-ink);
 }
+.closing :focus-visible { outline-color: var(--ice-ink); }
 .closing h2 { font-size: clamp(3rem, 8vw, 6rem); }
 .closing p { margin: 0.5rem 0 1.5rem; font-size: 1.1875rem; }
 .closing .cta-button { background: var(--ice-ink); color: var(--ice); }
@@ -305,8 +310,11 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
 @media (max-width: 899px) {
   .privacy, .install, .faq, .closing { grid-template-columns: minmax(0, 1fr); }
   .providers > div { grid-template-columns: minmax(0, 1fr); }
+  .closing .bezel { margin-inline: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   .cta-button:active { transform: none; }
+  .faq summary svg { transition: none; }
 }
