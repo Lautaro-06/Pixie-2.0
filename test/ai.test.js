@@ -85,24 +85,27 @@ test('usa las herramientas y sigue la charla con el resultado', async () => {
 })
 
 test('lo riesgoso no se hace: pide confirmación', async () => {
-  const { ai, pending, calls } = setup([toolUse('t1', 'bloquear_pc', {}), text('[normal] ¿Seguro? Tocá Sí para bloquearla.')])
+  const { ai, pending, calls } = setup([toolUse('t1', 'bloquear_pc', {}), text('[feliz] Dale.')])
   const r = await ai.chat('bloqueá la compu que me voy', 'ctx')
   assert.equal(r.confirm, true)
+  assert.match(r.text, /bloque/i, 'pregunta enseguida, sin otra vuelta de la IA')
+  assert.equal(calls.length, 1)
   assert.deepEqual(pending, [{ action: 'bloquear_pc', params: {} }])
+  await ai.chat('gracias', 'ctx')
   assert.match(calls[1].messages[2].content[0].content, /Todavía no se hizo/)
+  assert.equal(calls[1].messages[3].role, 'assistant', 'la charla sigue en orden')
 })
 
 test('puede empezar el Pong y leer el mail', async () => {
   const { ai, calls } = setup([
     toolUse('t1', 'jugar', {}),
-    text('[feliz] ¡A jugar!'),
     toolUse('t2', 'leer_pagina', { que: 'mail' }),
     text('[normal] Dice que mañana no hay clases.')
   ])
   assert.equal((await ai.chat('juguemos a algo', 'ctx')).game, 'pong')
   const r = await ai.chat('¿qué dice el mail?', 'ctx')
   assert.equal(r.text, 'Dice que mañana no hay clases.')
-  const toolResult = calls[3].messages.at(-1).content[0]
+  const toolResult = calls[2].messages.at(-1).content[0]
   assert.equal(toolResult.tool_use_id, 't2')
 })
 

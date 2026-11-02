@@ -61,6 +61,10 @@ export function createVoices({ getConfig, saveConfig = () => {}, dataDir, log = 
       piper.stop(id)
       gemini.stop(id)
     },
+    // Va cargando la voz natural porque enseguida va a hablar (te está entendiendo)
+    prepare() {
+      return engine() === 'piper' ? piper.prepare() : false
+    },
     install,
     status,
     use(mode) {

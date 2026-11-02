@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AI_TOOLS } from './ai-tools.js'
 import { actions, runAction, needsConfirm } from './actions/index.js'
 import { pageForAI } from './actions/browser.js'
-import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver, whisperTranscribe } from './ai-compatible.js'
+import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver, whisperTranscribe, thinkingFor } from './ai-compatible.js'
 import { FriendlyError } from './windows.js'
 
 const DEFAULT_MODEL = 'claude-opus-5-5'
@@ -14,8 +14,25 @@ const DEFAULT_MODEL = 'claude-opus-5-5'
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'])
 const MAX_STEPS = 10 // vueltas de herramientas por mensaje (usar una app puede llevar varios pasos)
 const VOICE_MODEL = 'gemini-flash-latest'
-const VOICE_TIMEOUT_MS = 20000 // pasar unas palabras a texto tarda segundos: si tarda más, va al modelo de siempre
-const VOICE_PAUSE_MS = 15 * 60 * 1000 // si el modelo de voz falla seguido, un rato usa directo el de siempre
+const VOICE_TIMEOUT_MS = 15000 // pasar unas palabras a texto tarda segundos
+const VOICE_HEDGE_MS = 3000 // si el modelo de voz no contestó en 3 s, le pregunta también al de siempre (gana el primero)
+const VOICE_PAUSE_MS = 15 * 60 * 1000 // si el modelo de voz falla o tarda seguido, un rato usa directo el de siempre
+const SLOW_MS = 3000 // más que esto queda anotado en el historial, para saber dónde se va el tiempo
+
+// Herramientas que hacen algo y cuya respuesta ya es la respuesta final ("Pongo música", "Abrí Spotify").
+// Si el pedido es de un solo paso, no hace falta otra vuelta de la IA para contestar: es más rápido.
+const FINAL_TOOLS = new Set([
+  'abrir', 'cerrar_app', 'buscar', 'volumen', 'musica', 'crear_timer', 'cancelar_timers', 'agendar', 'agregar_pendiente',
+  'completar_pendiente', 'captura', 'bloquear_pc', 'apagar_pc', 'no_molestar', 'jugar',
+  'reproducir', 'youtube', 'registrar_agua', 'registrar_pausa', 'respaldar', 'brillo', 'bluetooth', 'whatsapp', 'voz',
+  'abrir_noticia', 'escribir', 'teclas', 'atajo', 'desplazar', 'ventana', 'cambiar_atajo', 'actualizar'
+])
+// "abrí Word y escribí…", "después", "también": puede necesitar más pasos, así que la IA sigue
+export function singleStep(text) {
+  const plain = String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return !/\b(y|e|despues|luego|entonces|tambien|ademas|primero|antes|mientras)\b/.test(plain)
+}
+const seconds = (ms) => `${(ms / 1000).toFixed(1).replace('.', ',')} s`
 
 // Lo que se le pide al modelo para pasar tu voz a texto
 export function transcriptionPrompt(hints = '') {
@@ -52,6 +69,11 @@ Qué hacés:
 const FACES = {
   feliz: 'happy', amor: 'love', guino: 'wink', guiño: 'wink', sorpresa: 'surprised', triste: 'sad',
   confundido: 'confused', enojado: 'angry', risa: 'laugh', musica: 'music', música: 'music', normal: 'idle'
+}
+
+// La etiqueta que va en la charla para una cara ("happy" → "feliz")
+export function tagFor(face) {
+  return Object.keys(FACES).find((k) => FACES[k] === face) ?? 'feliz'
 }
 
 export function parseEmotion(text) {
@@ -138,7 +160,8 @@ export function createAI({
   clientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 1, timeout: 45000 }),
   fetchImpl = (...args) => fetch(...args),
   log = () => {},
-  now = () => Date.now()
+  now = () => Date.now(),
+  voiceHedgeMs = VOICE_HEDGE_MS
 }) {
   let client = null
   let clientKey = null
@@ -146,7 +169,8 @@ export function createAI({
   let messagesFor = null // de qué IA es la charla guardada (cada una tiene su formato)
   let lastAt = 0
   let notes = [] // cosas que pasaron fuera de la charla (avisos, confirmaciones)
-  let voiceFailures = 0 // veces seguidas que falló el modelo de voz
+  let voiceFailures = 0 // veces seguidas que el modelo de voz falló o tardó
+  let background = null // la IA siguiendo un pedido después de contestar rápido
   let voicePausedUntil = 0
 
   const provider = () => pickProvider(getConfig())
@@ -162,7 +186,8 @@ export function createAI({
 
   function driverFor(p) {
     if (p.name === 'claude') return createClaudeDriver({ getClient: () => getClient(p.apiKey), model: p.model, effort: getConfig().esfuerzoIA || 'low' })
-    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl })
+    const thinking = p.name === 'gemini' ? thinkingFor(p.model) : null
+    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl, thinking })
   }
 
   // Ejecuta una herramienta pedida por la IA. Devuelve { content, game?, confirm?, isError? }
@@ -180,22 +205,64 @@ export function createAI({
     if (!action) return { content: `No existe la herramienta ${name}.`, isError: true }
     if (needsConfirm(action, params, ctx)) {
       ctx.setPending({ action: name, params })
-      return { content: `Pixie le mostró al usuario botones Sí/No: «${action.confirmText(params, ctx)}». Todavía no se hizo.`, confirm: true }
+      const question = action.confirmText(params, ctx)
+      return { content: `Pixie le mostró al usuario botones Sí/No: «${question}». Todavía no se hizo.`, confirm: true, reply: { text: question, face: 'idle' } }
     }
     const result = await runAction(name, params, ctx)
-    return { content: String(result.text ?? 'Listo.'), game: result.game }
+    return { content: String(result.text ?? 'Listo.'), game: result.game, reply: { text: result.text, face: result.face } }
+  }
+
+  // Después de contestar rápido, la IA sigue la charla: si era un solo paso solo lo anota; si faltaban
+  // pasos (abrió el Bloc de notas y faltaba escribir), los hace y te cuenta cómo salió.
+  async function keepGoing(d, quick) {
+    let did = false
+    try {
+      for (let step = 1; step < MAX_STEPS; step++) {
+        const r = await d.step(messages)
+        messages.push(...r.assistant)
+        if (r.stop === 'pause') continue
+        if (r.stop === 'tool') {
+          let asked = false
+          const results = []
+          for (const call of r.toolCalls) {
+            const res = await runTool(call)
+            if (res.confirm) asked = true
+            results.push({ id: call.id, content: res.content, isError: res.isError })
+          }
+          messages.push(...d.results(results))
+          did = true
+          if (asked) {
+            const ask = await d.step(messages)
+            messages.push(...ask.assistant)
+            const { face, text } = parseEmotion(ask.text)
+            if (text) ctx.emit?.({ type: 'notice', text, face: face ?? 'idle', suggestions: ['Sí', 'No'] })
+            return
+          }
+          continue
+        }
+        if (r.toolCalls.length) messages = []
+        const { face, text } = parseEmotion(r.text)
+        if (did && text) ctx.emit?.({ type: 'notice', text, face: face ?? 'happy' })
+        return
+      }
+    } catch (err) {
+      log(`IA (siguiendo en segundo plano): ${err.status ? `${err.status} ` : ''}${err.message}`)
+      if (!did) messages.push({ role: 'assistant', content: `[${tagFor(quick.face)}] ${quick.text}` })
+      else messages = []
+    }
   }
 
   // Un mensaje del usuario → respuesta de Pixie { text, face, confirm?, game? }
   async function chat(text, contextText) {
+    if (background) await background // si la IA seguía con el pedido anterior, primero termina
     const p = provider()
     if (!p) throw new Error('No hay IA configurada')
     const d = driverFor(p)
-    const now = Date.now()
+    const at = Date.now()
     const key = `${p.name}:${p.model}`
-    if (key !== messagesFor || now - lastAt > NEW_CONVERSATION_AFTER_MS || messages.length > MAX_MESSAGES) messages = []
+    if (key !== messagesFor || at - lastAt > NEW_CONVERSATION_AFTER_MS || messages.length > MAX_MESSAGES) messages = []
     messagesFor = key
-    lastAt = now
+    lastAt = at
     const extra = notes.length ? `\nPasó hace un rato: ${notes.join(' ')}` : ''
     notes = []
     const before = messages.length
@@ -203,6 +270,9 @@ export function createAI({
 
     let confirm = false
     let game
+    const started = now()
+    const slow = (steps) => now() - started > SLOW_MS && log(`lento: la IA tardó ${seconds(now() - started)} en responder (${steps} ${steps === 1 ? 'vuelta' : 'vueltas'})`)
+    const oneStep = singleStep(text)
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
         const r = await d.step(messages)
@@ -213,19 +283,32 @@ export function createAI({
 
         if (r.stop === 'tool') {
           const results = []
+          const done = []
           for (const call of r.toolCalls) {
             const res = await runTool(call)
             if (res.confirm) confirm = true
             if (res.game) game = res.game
             results.push({ id: call.id, content: res.content, isError: res.isError })
+            done.push({ name: call.name, res })
           }
           messages.push(...d.results(results))
+          // Pedido de un solo paso ("poné música tranqui"): lo que contestó la acción ya es la respuesta, así que
+          // contesta enseguida. Por las dudas la IA sigue en segundo plano: si faltaba algo, lo hace y te avisa.
+          const replies = done.map(({ res }) => res.reply).filter((x) => x?.text)
+          if (step === 0 && oneStep && replies.length && done.every(({ name, res }) => FINAL_TOOLS.has(name) && !res.isError)) {
+            const quick = { text: replies.map((x) => x.text).join(' '), face: replies.find((x) => x.face)?.face ?? 'happy' }
+            if (confirm || game) messages.push({ role: 'assistant', content: `[${tagFor(quick.face)}] ${quick.text}` })
+            else background = keepGoing(d, quick).finally(() => (background = null))
+            slow(1)
+            return { ...quick, confirm, game }
+          }
           continue
         }
 
         // Si cortó a mitad de pedir una herramienta, la charla queda incompleta: se empieza otra
         if (r.toolCalls.length) messages = []
         const { face, text: clean } = parseEmotion(r.text)
+        slow(step + 1)
         return { text: clean || 'Listo.', face: face ?? 'happy', confirm, game }
       }
     } catch (err) {
@@ -280,33 +363,55 @@ export function createAI({
       { type: 'text', text: transcriptionPrompt(hints) },
       { type: 'input_audio', input_audio: { data: Buffer.from(wav).toString('base64'), format: 'wav' } }
     ]
-    const ask = (driver, extra) => driver.step([{ role: 'user', content }], { tools: false, persona: false, extra })
-    // El modelo Flash entiende mejor el audio que el Lite. Pero si tarda, falla o se agota lo gratis,
-    // se usa el de siempre (el que andaba antes): nunca te quedás sin poder hablarle.
+    const ask = (driver) => driver.step([{ role: 'user', content }], { tools: false, persona: false })
+    const usual = () => ask(driverFor(p))
+    const started = now()
+    // El modelo Flash entiende mejor el audio que el Lite. Pero si tarda más de 3 s, se le pregunta también
+    // al de siempre y gana el primero que contesta. Si falla o tarda seguido, un rato se usa directo el de siempre.
     let r = null
     if (now() >= voicePausedUntil) {
-      const custom = getConfig().modeloVoz
+      const model = getConfig().modeloVoz || VOICE_MODEL
       const voiceDriver = createCompatibleDriver({
         preset: { ...p.preset, fallback: null, timeout: VOICE_TIMEOUT_MS },
         apiKey: p.apiKey,
-        model: custom || VOICE_MODEL,
+        model,
         system: SYSTEM,
-        fetchImpl
+        fetchImpl,
+        thinking: thinkingFor(model)
       })
-      try {
-        // Para copiar lo que dijiste no hace falta pensar mucho: así contesta más rápido
-        r = await ask(voiceDriver, custom ? {} : { reasoning_effort: 'low' })
+      const fast = ask(voiceDriver)
+      let timer
+      const outcome = await Promise.race([
+        fast.then((res) => ({ res }), (err) => ({ err })),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve({ slow: true }), voiceHedgeMs)
+        })
+      ])
+      clearTimeout(timer)
+      if (outcome.res) {
         voiceFailures = 0
-      } catch (err) {
+        r = outcome.res
+      } else {
+        const { err } = outcome
         // Con la clave mal, el otro modelo tampoco va a andar
         if (err instanceof AIHttpError && (err.status === 401 || err.status === 403)) throw err
         voiceFailures++
         const broken = err instanceof AIHttpError && (err.status === 400 || err.status === 404)
         if (broken || voiceFailures >= 2) voicePausedUntil = now() + VOICE_PAUSE_MS
-        log(`voz: el modelo de voz falló (${err.status ? `${err.status} ` : ''}${err.message}); pruebo con el de siempre`)
+        const why = err ? `falló (${err.status ? `${err.status} ` : ''}${err.message})` : `tardó más de ${seconds(voiceHedgeMs)}`
+        log(`voz: el modelo de voz ${why}; pruebo con el de siempre`)
+        if (outcome.slow) {
+          // Los dos a la vez: gana el primero que entiende
+          try {
+            r = await Promise.any([fast, usual()])
+          } catch (all) {
+            throw all.errors?.[1] ?? all.errors?.[0] ?? all
+          }
+        }
       }
     }
-    if (!r) r = await ask(driverFor(p))
+    if (!r) r = await usual()
+    if (now() - started > SLOW_MS) log(`lento: entender tu voz tardó ${seconds(now() - started)}`)
     const text = r.text.replace(/^["«]|["»]$/g, '').trim()
     return /^\[?nada\]?\.?$/i.test(text) ? '' : text
   }
@@ -352,6 +457,7 @@ export function createAI({
     transcribe,
     locate,
     note: (text) => notes.push(text),
+    idle: () => background ?? Promise.resolve(), // cuando termina lo que seguía en segundo plano
     reset: () => {
       messages = []
     }

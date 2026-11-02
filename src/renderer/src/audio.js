@@ -128,7 +128,7 @@ export async function openMicrophone() {
 // tap: si Pixie ya está escuchando el micrófono (esperando «Pixie, ¿estás?»), se cuelga de ese mismo
 // audio: no hay que esperar a que se abra otro micrófono ni a que se acomode el volumen, y no se
 // pierden las primeras palabras.
-export async function listen({ onLevel = () => {}, silenceMs = 1700, maxMs = 30000, waitMs = 7000, tap = null } = {}) {
+export async function listen({ onLevel = () => {}, silenceMs = 1500, maxMs = 30000, waitMs = 7000, tap = null } = {}) {
   const chunks = []
   const started = performance.now()
   let heard = false

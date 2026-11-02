@@ -394,6 +394,11 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
+Lo nuevo de la versión 0.10.2 (más rápida al hablarle; acá se probó con respuestas de mentira de Gemini, falta con la de verdad):
+
+- **Tiempo de respuesta:** llamarla y pedirle cosas cortas («poneme música tranqui», «subí el volumen», «anotame estudiar química») y cosas de charla. Tiene que contestar bastante antes que en la 0.10.1. Si algo tarda más de 3 segundos queda anotado en `historial.txt` como «lento: …» (dice si fue entender tu voz o pensar la respuesta): pasanos esas líneas.
+- **Pedidos de varios pasos:** «escribí hola en el Bloc de notas» tiene que abrirlo **y** escribir (Pixie contesta enseguida y, si faltaba algo, lo hace y te avisa).
+
 Lo nuevo de la versión 0.10 (las «manos» no se pueden probar fuera de Windows: acá se compiló el código y se probó todo lo demás):
 
 - **Usar apps:** en el Bloc de notas o Word, «escribí: Hola, ¿cómo andás?»; «guardá»; «poné en negrita». En Chrome: «nueva pestaña», «bajá la página», «tocá el botón …». Probalo hablándole y también escribiéndole en su ventanita (tiene que volver a la app de antes).

@@ -74,20 +74,50 @@ export function cleanText(text) {
     .trim()
 }
 
+// Cuánto piensa Gemini antes de contestar. Para abrir una app o pasar tu voz a texto no hace falta
+// pensar: los modelos 2.5 pueden no pensar nada y los 3 en adelante, lo mínimo. Contestan mucho más rápido.
+export function thinkingFor(model) {
+  const m = String(model ?? '').toLowerCase()
+  if (!m.includes('gemini') || /gemini-(1|2\.0)/.test(m)) return null
+  if (m.includes('2.5-pro')) return 'low'
+  if (m.includes('2.5')) return 'none'
+  return 'minimal'
+}
+const NO_THINKING_SETTING = new Set() // modelos que no aceptaron reasoning_effort
+const withoutThinking = ({ reasoning_effort: _ignored, ...rest }) => rest
+
 function errorMessage(body) {
   const e = Array.isArray(body) ? body[0]?.error : body?.error
   return typeof e === 'string' ? e : e?.message ?? ''
 }
 
-export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch }) {
+// thinking: cuánto piensa el modelo (ver thinkingFor); null = lo que traiga el modelo
+export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch, thinking = null }) {
   async function post(body) {
     try {
-      return await send(body)
+      return await sendTuned(body)
     } catch (err) {
       // Límite gratis agotado (429) o servicio saturado (503): cada modelo tiene su propio límite
       const busy = err instanceof AIHttpError && (err.status === 429 || err.status === 503)
-      if (busy && preset.fallback && body.model !== preset.fallback) return send({ ...body, model: preset.fallback })
+      if (busy && preset.fallback && body.model !== preset.fallback) {
+        const next = withoutThinking({ ...body, model: preset.fallback })
+        const effort = body.reasoning_effort && thinkingFor(preset.fallback)
+        return sendTuned(effort ? { ...next, reasoning_effort: effort } : next)
+      }
       throw err
+    }
+  }
+
+  // Si el modelo no acepta que le digan cuánto pensar, se manda sin eso (y no se le vuelve a decir)
+  async function sendTuned(body) {
+    if (body.reasoning_effort && NO_THINKING_SETTING.has(body.model)) body = withoutThinking(body)
+    try {
+      return await send(body)
+    } catch (err) {
+      if (!(body.reasoning_effort && err instanceof AIHttpError && err.status === 400)) throw err
+      const res = await send(withoutThinking(body))
+      NO_THINKING_SETTING.add(body.model) // sin eso anduvo: era eso
+      return res
     }
   }
 
@@ -120,6 +150,7 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
     // extra: campos de más para este pedido (por ejemplo, cuánto piensa el modelo)
     async step(history, { tools = true, persona = true, extra = {} } = {}) {
       const body = { ...extra, model, messages: persona ? [{ role: 'system', content: system }, ...history] : history }
+      if (thinking && !('reasoning_effort' in body)) body.reasoning_effort = thinking
       if (tools) body.tools = COMPATIBLE_TOOLS
       const res = await post(body)
       const choice = res.choices?.[0] ?? {}

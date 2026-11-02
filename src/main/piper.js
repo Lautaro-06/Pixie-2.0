@@ -13,6 +13,8 @@ export const VOICE_NAME = 'es_AR-daniela-high'
 export const VOICE_URL = 'https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_AR/daniela/high/es_AR-daniela-high.onnx'
 const SIZES = { zip: 22e6, model: 114.2e6 } // para calcular el porcentaje
 
+const WARM_MS = 45000 // cuánto espera un Piper ya cargado a que llegue el texto
+
 // Más rápido o más lento según la emoción (sin tocar el tono, que distorsiona)
 const SPEED = { happy: 0.95, laugh: 0.92, surprised: 0.95, alarm: 0.9, sad: 1.08, love: 1.02 }
 
@@ -37,6 +39,7 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
   const model = join(dir, `${VOICE_NAME}.onnx`)
   const modelConfig = `${model}.json`
   const running = new Map()
+  let warm = null // un Piper que ya cargó la voz y espera el texto (cargarla tarda: así habla enseguida)
   let installing = null
   let progress = 0
 
@@ -94,19 +97,53 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
     return installing
   }
 
+  function start(speed) {
+    const exe = findExe()
+    return spawnImpl(exe, ['--model', model, '--output-raw', '--length_scale', String(speed), '--sentence_silence', '0.15'], {
+      windowsHide: true,
+      cwd: dirname(exe)
+    })
+  }
+
+  // Mientras la IA piensa la respuesta, Piper ya va cargando la voz. Si no se usa en un rato, se cierra.
+  function prepare() {
+    if (warm || !installed()) return false
+    const child = start(1)
+    const forget = () => {
+      if (warm?.child !== child) return
+      clearTimeout(warm.timer)
+      warm = null
+    }
+    child.stderr?.on('data', () => {})
+    child.stdin?.on('error', () => {})
+    child.on('error', forget)
+    child.on('close', forget)
+    const timer = setTimeout(() => {
+      forget()
+      child.kill()
+    }, WARM_MS)
+    timer.unref?.()
+    warm = { child, timer }
+    return true
+  }
+
+  function takeWarm() {
+    if (!warm) return null
+    const { child, timer } = warm
+    clearTimeout(timer)
+    warm = null
+    return child.exitCode == null && !child.killed ? child : null
+  }
+
   // Habla: el audio (PCM de 16 bits, mono) llega en pedacitos a onChunk(chunk, rate)
   function speak(id, text, face, onChunk) {
     const line = piperLine(text)
     if (!installed() || !line) return Promise.resolve({ ok: false })
     const rate = sampleRate()
-    const exe = findExe()
     return new Promise((resolve) => {
       let received = 0
       let finished = false
-      const child = spawnImpl(exe, ['--model', model, '--output-raw', '--length_scale', String(SPEED[face] ?? 1), '--sentence_silence', '0.15'], {
-        windowsHide: true,
-        cwd: dirname(exe)
-      })
+      const child = takeWarm() ?? start(SPEED[face] ?? 1)
       const done = () => {
         if (finished) return
         finished = true
@@ -137,6 +174,7 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
     progress: () => progress,
     install,
     speak,
+    prepare,
     stop: (id) => running.get(id)?.kill()
   }
 }

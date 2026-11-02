@@ -138,3 +138,26 @@ test('entiende los pedidos sobre su voz', () => {
   assert.deepEqual(act('tu voz suena rara'), [['voz', 'estado']])
   assert.equal(piperLine('«Hola»\n**vos**'), 'Hola vos')
 })
+
+test('la voz natural se va cargando mientras te entiende: después habla enseguida', async () => {
+  const dir = tmp()
+  const s = fakeSpawn()
+  let spawned = 0
+  const spawnImpl = (...a) => {
+    spawned++
+    return s.fn(...a)
+  }
+  const piper = createPiper({ dir, fetchImpl: fakeFetch().fn, extract: fakeExtract, spawnImpl })
+  assert.equal(piper.prepare(), false, 'sin instalar no hay nada que cargar')
+  await piper.install()
+  assert.equal(piper.prepare(), true)
+  assert.equal(piper.prepare(), false, 'ya hay una esperando')
+  assert.equal(spawned, 1)
+  const r = await piper.speak(1, 'Hola', 'happy', () => {})
+  assert.deepEqual(r, { ok: true })
+  assert.equal(spawned, 1, 'usó la que ya estaba cargada')
+  assert.equal(s.calls[0].input, 'Hola\n')
+  await piper.speak(2, 'Chau', 'sad', () => {})
+  assert.equal(spawned, 2, 'sin cargar antes, arranca otra como siempre')
+  assert.equal(s.calls[1].args[s.calls[1].args.indexOf('--length_scale') + 1], '1.08')
+})

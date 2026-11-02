@@ -417,6 +417,7 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('pixie:transcribe', async (_e, audio) => {
       const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio ?? [])
       if (!bytes.length || bytes.length > MAX_AUDIO_BYTES) return { error: 'El audio quedó vacío o muy largo.' }
+      tts?.prepare?.() // mientras te entiende, la voz ya se va cargando para contestarte
       try {
         return { text: await ai.transcribe(bytes, voiceHints()) }
       } catch (err) {
