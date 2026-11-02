@@ -3,6 +3,7 @@
 // de apps y varios pedidos juntos ("abrí YouTube y subí el volumen").
 // Más adelante se puede sumar una IA que elija entre las mismas acciones.
 import { APPS, SITES, FOLDERS } from './catalog.js'
+import { parseCombo } from './control.js'
 import { toExpression } from './calc.js'
 import { parseWhen, withoutSpans } from './dates.js'
 
@@ -240,6 +241,87 @@ const RULES = [
     /^(tengo|me llegaron) (mensajes|whatsapps?)( nuevos)?( en whatsapp)?$/.test(t)
       ? intent('chats_privados')
       : null,
+  // ── Usar las apps ──
+  // "escribí hola, ¿cómo estás?" (el texto exacto, con tildes y signos, lo recupera index.js del original)
+  (t) => {
+    const m = /^(?:escribi|escribe|escribir|escribime|tipea|tipear|tipeame|pone que diga|escribi que dice)\s+(?:esto\s+|lo siguiente\s+|que diga\s+|aca\s+)?(.+)$/.exec(t)
+    // "escribí un mail a la profe" no es escribir eso tal cual: lo resuelve la IA (abrir el mail, redactarlo)
+    if (!m || /\bwhatsapp\b/.test(t) || /^(un|una|el|la) (mail|correo|mensaje|carta|nota|email)\b/.test(m[1])) return null
+    return intent('escribir', { texto: m[1] })
+  },
+  // Lo de todos los días: "guardá", "copiá", "nueva pestaña", "recargá la página", "poné en negrita"
+  (t) => {
+    const SHORTCUTS = [
+      [/^(guarda|guardalo|guardala|guardame|guardar|guarda el archivo|guarda los cambios|guarda esto)$/, 'guardar'],
+      [/^(copia|copialo|copiala|copiar|copia esto)$/, 'copiar'],
+      [/^(pega|pegalo|pegala|pegar|pega aca|pega esto)$/, 'pegar'],
+      [/^(corta|cortalo|cortala|cortar)$/, 'cortar'],
+      [/^(deshace|deshacelo|deshacer|volve atras lo que hice|deshace lo ultimo|control z)$/, 'deshacer'],
+      [/^(rehace|rehacelo|rehacer)$/, 'rehacer'],
+      [/^(selecciona|seleccionar|marca) todo$/, 'seleccionar todo'],
+      [/^(imprimi|imprimilo|imprimila|imprimir)( esto| el archivo| la pagina)?$/, 'imprimir'],
+      [/^(busca|buscar) en (la|esta) pagina$/, 'buscar en la pagina'],
+      [/^((abri|abrime|abrir) (una )?(nueva )?pestana( nueva)?|nueva pestana|pestana nueva)$/, 'nueva pestaña'],
+      [/^(cerra|cerrar|cerrame) (la |esta )?pestana$/, 'cerrar pestaña'],
+      [/^(volve a abrir|reabri|recupera) (la )?pestana( que cerre)?$/, 'reabrir pestaña'],
+      [/^(siguiente pestana|pasa a la (otra|siguiente) pestana|la otra pestana)$/, 'siguiente pestaña'],
+      [/^(pestana anterior|volve a la pestana anterior)$/, 'pestaña anterior'],
+      [/^((recarga|recargar|actualiza|actualizar|refresca|refrescar) (la |esta )?pagina|recargala|f5)$/, 'recargar'],
+      [/^((volve|anda|ir) (para |pa )?atras|pagina anterior)$/, 'atras'],
+      [/^((anda|ir) (para |pa )?adelante|pagina siguiente)$/, 'adelante'],
+      [/^((pone(lo|la)?|ponelo|ponela|pasalo|pasala|hacelo|hacela) en negrita|negrita)$/, 'negrita'],
+      [/^((pone(lo|la)?|ponelo|ponela|pasalo|pasala|hacelo|hacela) en cursiva|cursiva)$/, 'cursiva'],
+      [/^(subraya|subrayalo|subrayala|subrayar|subrayado)$/, 'subrayado'],
+      [/^((agranda|acerca|aumenta) (la letra|el zoom)|acerca(r)?|zoom)$/, 'acercar'],
+      [/^((achica|aleja|disminui) (la letra|el zoom)|aleja(r)?)$/, 'alejar'],
+      [/^(mostra(me)? el escritorio|anda al escritorio|escritorio)$/, 'mostrar escritorio'],
+      [/^(recorta(r)? (la )?pantalla|captura de pantalla|saca(me)? una captura)$/, 'recortar pantalla'],
+      [/^(mandalo|mandala|envialo|enviala|dale enter|dale a enter|apreta enter|enter)$/, 'enter']
+    ]
+    for (const [re, accion] of SHORTCUTS) if (re.test(t)) return intent('atajo', { accion })
+    return null
+  },
+  // "tocá el botón Enviar", "hacé clic en Archivo", "clic en Nuevo documento"
+  (t) => {
+    const m =
+      /^(?:toca|toque|apreta|presiona|pulsa|cliquea|clickea|selecciona)\s+(?:en\s+|sobre\s+)?(?:el |la )?(?:boton|botoncito|opcion|pestana|link|enlace|menu|icono)\s+(.+)$/.exec(t) ||
+      /^(?:hace|dale|da|haceme)\s+(?:un\s+)?(?:clic|click|doble clic)\s+(?:en|sobre|a)\s+(?:el |la )?(.+)$/.exec(t) ||
+      /^(?:clic|click|cliquea|clickea|toca)\s+(?:en|sobre)\s+(?:el |la )?(.+)$/.exec(t)
+    return m ? intent('clic', { objetivo: m[1] }) : null
+  },
+  // "apretá control S", "apretá enter", "presioná alt tab dos veces"
+  (t) => {
+    const m = /^(?:apreta|aprieta|presiona|pulsa|toca|dale a)\s+(?:la tecla |las teclas |el atajo )?(.+?)(?:\s+(dos|tres|cuatro|cinco|\d+) veces)?$/.exec(t)
+    if (!m || !parseCombo(m[1])) return null
+    const veces = { dos: 2, tres: 3, cuatro: 4, cinco: 5 }[m[2]] ?? (m[2] ? Number(m[2]) : undefined)
+    return intent('teclas', { teclas: m[1], ...(veces ? { veces } : {}) })
+  },
+  // "bajá la página", "seguí bajando", "subí un poco"
+  (t) => {
+    if (/^(baja|bajame|anda para abajo|scrollea|scroll|scrollea para abajo|segui bajando|mas abajo|baja un poco|baja mas)( la pagina| un poco| mucho| todo)?$/.test(t) && !/^baja$/.test(t)) {
+      return intent('desplazar', { direccion: 'abajo', ...(/mucho|todo/.test(t) ? { cantidad: 15 } : {}) })
+    }
+    if (/^(subi|subime|anda para arriba|scrollea para arriba|mas arriba|subi un poco|volve arriba)( la pagina| un poco| mucho| todo)?$/.test(t) && !/^subi$/.test(t)) {
+      return intent('desplazar', { direccion: 'arriba', ...(/mucho|todo/.test(t) ? { cantidad: 15 } : {}) })
+    }
+    return null
+  },
+  // Ventanas: "maximizá", "minimizá esta ventana", "poné la ventana a la izquierda"
+  (t) => {
+    if (/^(maximiza|maximizala|maximizar|agranda la ventana|ventana grande)( la ventana| esta ventana)?$/.test(t)) return intent('ventana', { accion: 'maximizar' })
+    if (/^(minimiza|minimizala|minimizar|achica la ventana|esconde la ventana)( la ventana| esta ventana)?$/.test(t)) return intent('ventana', { accion: 'minimizar' })
+    const side = /^(?:pone|pone(?:la|lo)|move|mova|manda(?:la)?)\s+(?:la ventana |esta ventana |esto )?a la (izquierda|derecha)$/.exec(t)
+    if (side) return intent('ventana', { accion: side[1] })
+    if (/^(cerra|cerrar) (la |esta )?ventana$/.test(t)) return intent('ventana', { accion: 'cerrar' })
+    return null
+  },
+  // "cambiá a Word", "pasá a Chrome", "traeme WhatsApp"
+  (t) => {
+    const m = /^(?:cambia a|cambiate a|pasa a|pasate a|volve a|traeme|trae)\s+(?:el |la )?(.+)$/.exec(t)
+    return m && !/^(abrir|la pestana|atras)/.test(m[1]) ? intent('ir_a', { app: m[1] }) : null
+  },
+  (t) => (/\b(que (botones|opciones) (hay|tiene|ves)|que puedo tocar|que se puede tocar|que hay para tocar)\b/.test(t) ? intent('ver_elementos') : null),
+
   // Noticias: "abrí la segunda", "más noticias", "¿qué noticias hay?", "noticias de TN", "noticias de deportes"
   (t) => {
     const m =
@@ -682,10 +764,21 @@ export function interpret(text, options) {
 const SOCIAL = new Set(['saludo', 'gracias', 'charla'])
 const SPLIT = /\s*(?:,|\by despues\b|\by luego\b|\by tambien\b|\bdespues\b|\bluego\b|\by\b)\s*/
 
+// "escribí hola, ¿cómo estás?" no se corta en la coma: todo es el texto. Solo se separa si al final
+// pediste otra cosa ("escribí hola y mandalo").
+const WRITE_START = /^(?:escribi|escribe|escribir|escribime|tipea|tipear|tipeame|pone que diga|escribi que dice)\s/
+const AFTER_WRITE = /^(.*?)\s*(?:,\s*)?(?:\by\s+)?(?:despues\s+|luego\s+)?\b((?:apreta|presiona|pulsa|dale a enter|dale enter|guardalo|guarda|mandalo|mandala|envialo|enviala|enter)\b.*)$/
+
 // Uno o varios pedidos: "abrí YouTube y subí el volumen" → 2 acciones.
 export function interpretAll(text, options) {
   const t = normalize(text)
   const ctx = context(options)
+  if (WRITE_START.test(t)) {
+    const m = AFTER_WRITE.exec(t)
+    const then = m && WRITE_START.test(`${m[1]} `) ? interpretSegment(m[2], ctx) : null
+    const write = interpretSegment(then ? m[1] : t, ctx)
+    if (write?.action === 'escribir') return then ? [write, then] : [write]
+  }
   const parts = t.split(SPLIT).filter(Boolean)
   if (parts.length > 1 && parts.length <= 5) {
     const intents = []

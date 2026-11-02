@@ -1,5 +1,6 @@
 // Las acciones de Pixie que la IA puede usar, con la forma de sus datos.
 // El orden es fijo para que el pedido sea siempre igual (y se aproveche el caché).
+import { SHORTCUT_NAMES } from './control.js'
 
 const obj = (properties = {}, required = []) => ({ type: 'object', properties, required, additionalProperties: false })
 const str = (description) => ({ type: 'string', description })
@@ -160,6 +161,46 @@ export const AI_TOOLS = [
     name: 'abrir_noticia',
     description: 'Abre en el navegador una de las noticias que se acaban de leer (n = 1 es la primera)',
     input_schema: obj({ n: int('Cuál de las noticias leídas', 1, 3) }, ['n'])
+  },
+  {
+    name: 'escribir',
+    description: 'Escribe un texto donde está el cursor, en la app que el usuario tiene adelante (un documento, un chat, un buscador). Los saltos de línea se escriben como Enter.',
+    input_schema: obj({ texto: str('El texto exacto a escribir') }, ['texto'])
+  },
+  {
+    name: 'teclas',
+    description: 'Aprieta una tecla o un atajo en la app de adelante, por ejemplo "enter", "ctrl+s", "alt+tab", "flecha abajo", "f5".',
+    input_schema: obj({ teclas: str('La tecla o el atajo'), veces: int('Cuántas veces (1 si no se dice)', 1, 20) }, ['teclas'])
+  },
+  {
+    name: 'atajo',
+    description: 'Hace algo común en la app de adelante sin saber el atajo (en Word en castellano los atajos cambian: esto lo resuelve).',
+    input_schema: obj({ accion: oneOf(SHORTCUT_NAMES) }, ['accion'])
+  },
+  {
+    name: 'clic',
+    description: 'Toca un botón, menú, pestaña, link, opción o campo de la app de adelante por su nombre (lo que dice). Si no sabés cómo se llama, usá ver_elementos primero.',
+    input_schema: obj({ objetivo: str('Lo que dice el botón o el elemento, por ejemplo "Enviar" o "Nuevo documento"') }, ['objetivo'])
+  },
+  {
+    name: 'desplazar',
+    description: 'Mueve la página o la lista de la app de adelante para arriba o para abajo.',
+    input_schema: obj({ direccion: oneOf(['arriba', 'abajo']), cantidad: int('Cuánto (1 a 30, 5 si no se dice)', 1, 30) }, ['direccion'])
+  },
+  {
+    name: 'ventana',
+    description: 'Maximiza, minimiza o restaura la ventana de adelante, la pone a un costado, o la cierra (pide confirmación).',
+    input_schema: obj({ accion: oneOf(['maximizar', 'minimizar', 'restaurar', 'izquierda', 'derecha', 'cerrar']) }, ['accion'])
+  },
+  {
+    name: 'ir_a',
+    description: 'Trae al frente una app que ya está abierta (si no está abierta, la abre). Usala antes de escribir o tocar algo en otra app.',
+    input_schema: obj({ app: str('El nombre de la app, por ejemplo "Word" o "WhatsApp"') }, ['app'])
+  },
+  {
+    name: 'ver_elementos',
+    description: 'Lista los botones, menús y opciones con nombre que se pueden tocar en la ventana de adelante.',
+    input_schema: obj()
   },
   {
     name: 'classroom',

@@ -26,6 +26,8 @@ import { createCalendars } from './calendars.js'
 import { createNews } from './news.js'
 import { createClassroom } from './classroom.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
+import { createHands } from './hands.js'
+import { textToWrite } from './control.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
 const VOICE_SHORTCUTS = ['Control+Alt+Space', 'Alt+Shift+H']
@@ -50,6 +52,9 @@ let calendars = null // Google Calendar, Classroom
 let news = null
 let classroom = null // las tareas de Classroom, con la extensión de Chrome
 let extensionFiles = null // dónde quedó la extensión para instalarla en Chrome
+let hands = null // escribir, apretar teclas y tocar botones en tus apps
+const OWN_APP = /^(pixie|electron)$/i
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const BACKUP_EVERY_MS = 6 * 60 * 60 * 1000
 
 // Errores anotados para el informe de diagnóstico (errores.log en la carpeta de Pixie)
@@ -65,6 +70,9 @@ process.on('unhandledRejection', (err) => {
 
 // Lo que conviene mandarle a la IA aunque las reglas lo entiendan: charla y preguntas
 const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar_memoria'])
+// Usar las apps: si las reglas lo entendieron, se hace tal cual (el texto a escribir no pasa por la IA)
+const DIRECT = new Set(['escribir', 'teclas', 'atajo', 'clic', 'desplazar', 'ventana', 'ir_a', 'ver_elementos'])
+
 
 function shortcutLabel() {
   if (!activeShortcut) return 'el ícono de la barra de tareas'
@@ -112,11 +120,70 @@ const ctx = {
   }
 }
 
+// ───────────── Usar tus apps ─────────────
+
+// La app donde hacer lo que pediste: la que tenés adelante, o si adelante está Pixie (le escribiste),
+// la que estabas usando antes, que vuelve al frente.
+async function targetWindow() {
+  const fg = await hands.request('ventana')
+  if (fg?.proceso && !OWN_APP.test(fg.proceso)) return fg
+  const last = mind?.lastWindow()
+  if (!last?.hwnd) throw new FriendlyError('No sé en qué app hacerlo. Tocá la app que querés y pedímelo de nuevo.')
+  hidePixieFocus()
+  const r = await hands.request('enfocar', { hwnd: last.hwnd })
+  if (!r?.ok) throw new FriendlyError(`No pude volver a ${last.proceso}. Tocala vos y pedímelo de nuevo.`)
+  return { ...last, ...(await hands.request('ventana')) }
+}
+
+// Pixie suelta el teclado (si lo tenía) para que vuelva a la app de abajo
+function hidePixieFocus() {
+  const win = getWindow()
+  if (win && !win.isDestroyed() && win.isFocused()) win.blur()
+}
+
+// Si el clic cae arriba de la carita de Pixie, la esconde un momento
+async function withPixieHidden(point, fn) {
+  const win = getWindow()
+  let hid = false
+  if (win && !win.isDestroyed() && win.isVisible() && point) {
+    const b = isWindows ? screen.dipToScreenRect(win, win.getBounds()) : win.getBounds()
+    if (point.x >= b.x && point.x <= b.x + b.width && point.y >= b.y && point.y <= b.y + b.height) {
+      win.hide()
+      hid = true
+      await sleep(150)
+    }
+  }
+  try {
+    return await fn()
+  } finally {
+    if (hid) setTimeout(() => !win.isDestroyed() && win.showInactive(), 300)
+  }
+}
+
+// Busca algo en la pantalla con la IA (un botón sin nombre): el punto en píxeles reales, o null
+async function locateOnScreen(what) {
+  if (!ai?.enabled()) return null
+  const shot = await captureScreen({ withDisplay: true })
+  const p = await ai.locate(shot.image, what)
+  if (!p) return null
+  const d = shot.display.bounds
+  const dip = { x: Math.round(d.x + (p.x / 1000) * d.width), y: Math.round(d.y + (p.y / 1000) * d.height) }
+  return isWindows ? screen.dipToScreenPoint(dip) : dip
+}
+
 // Cerrar del todo (no solo esconderla). Avisa cómo volver a abrirla.
 function quitPixie() {
   ctx.notify('Pixie', 'Me cierro. Para volver a abrirme, buscá «Pixie» en el menú Inicio.')
   logAction('cerrar: me cerraste')
   setTimeout(() => app.quit(), 400)
+}
+
+// Palabras que ayudan a entenderte por voz: tu nombre y tus apps
+function voiceHints() {
+  const name = mind?.memory.getName()
+  const apps = ['WhatsApp', 'YouTube', 'Spotify', 'Chrome', 'Classroom', 'Discord', 'Instagram', 'TikTok', 'Word', 'Excel', 'Netflix', 'Gmail']
+  const extra = (getConfig().apps ?? []).map((a) => a?.nombre).filter(Boolean)
+  return [name, ...apps, ...extra].filter(Boolean).slice(0, 30).join(', ')
 }
 
 function openHistory() {
@@ -193,14 +260,15 @@ function registerVoiceShortcut() {
 }
 
 // Captura de la pantalla donde está el mouse (como mucho 1600 px de ancho, en JPG)
-async function captureScreen() {
+async function captureScreen({ withDisplay = false } = {}) {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
   const width = Math.min(1600, Math.round(display.size.width * display.scaleFactor))
   const height = Math.round((width * display.size.height) / display.size.width)
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } })
   const source = sources.find((s) => s.display_id === String(display.id)) ?? sources[0]
   if (!source || source.thumbnail.isEmpty()) throw new FriendlyError('No pude sacarle una foto a la pantalla.')
-  return source.thumbnail.toJPEG(75).toString('base64')
+  const image = source.thumbnail.toJPEG(75).toString('base64')
+  return withDisplay ? { image, display } : image
 }
 
 function registerShortcut() {
@@ -234,7 +302,8 @@ async function ask(text) {
   // Las órdenes cortas siguen por las reglas, que son instantáneas y gratis.
   const words = input.trim().split(/\s+/).length
   const social = intents?.every((i) => AI_PREFERRED.has(i.action) || i.knowledge)
-  if (ai?.enabled() && (!intents || social || words > 10)) {
+  const direct = intents?.some((i) => DIRECT.has(i.action))
+  if (ai?.enabled() && !direct && (!intents || social || words > 10)) {
     try {
       return await ai.chat(input, mind.contextText())
     } catch (err) {
@@ -264,6 +333,7 @@ async function ask(text) {
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
     for (const key of ['texto', 'nombre', 'pregunta', 'tema']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
       pending = it
@@ -348,7 +418,7 @@ if (!app.requestSingleInstanceLock()) {
       const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio ?? [])
       if (!bytes.length || bytes.length > MAX_AUDIO_BYTES) return { error: 'El audio quedó vacío o muy largo.' }
       try {
-        return { text: await ai.transcribe(bytes) }
+        return { text: await ai.transcribe(bytes, voiceHints()) }
       } catch (err) {
         logAction(`voz: ${err.status ? `${err.status} ` : ''}${err.message}`)
         diagnostics.record('micrófono', err)
@@ -392,6 +462,9 @@ if (!app.requestSingleInstanceLock()) {
       if (fromPixie(e) && win && !win.isVisible()) win.showInactive()
     })
     ipcMain.on('pixie:wake-log', (e, line) => fromPixie(e) && logAction(`palabra mágica: ${String(line).slice(0, 200)}`))
+    ipcMain.on('pixie:wake-learn', (e, frames) => {
+      if (fromPixie(e) && wake?.learn(frames)) logAction(`palabra mágica: aprendí cómo me llamaste (van ${wake.learnedCount()})`)
+    })
     ipcMain.on('pixie:game-result', (_e, result) => {
       const ganador = result?.ganador === 'user' ? 'vos' : 'Pixie'
       logAction(`partido de pong: ganó ${ganador}`)
@@ -459,7 +532,13 @@ if (!app.requestSingleInstanceLock()) {
     } catch (err) {
       logAction(`extensión de Chrome: no la pude copiar (${err.message})`)
     }
+    hands = createHands({ log: logAction })
     Object.assign(ctx, {
+      hands,
+      targetWindow,
+      withPixieHidden,
+      hidePixieFocus,
+      locateOnScreen,
       news,
       calendars,
       classroom,
@@ -735,6 +814,7 @@ if (!app.requestSingleInstanceLock()) {
     media?.stop()
     calendars?.stop()
     classroom?.stop()
+    hands?.stop()
     backup?.backup()
     browser?.close()
   })

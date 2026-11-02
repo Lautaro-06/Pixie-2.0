@@ -486,7 +486,7 @@ function Updates({ s, setS, say }) {
   )
 }
 
-const EXAMPLES = ['«Poné música para estudiar»', '«Recordame la prueba del jueves»', '«¿Qué tengo que entregar?»', '«¿Qué noticias hay?»', '«¿Qué ves en mi pantalla?»', '«Cambiá el atajo a Ctrl+Alt+P»', '«Juguemos»']
+const EXAMPLES = ['«Escribí: hola, ¿cómo andás?» y «mandalo»', '«Tocá el botón Enviar»', '«Guardá» · «Nueva pestaña» · «Bajá la página»', '«Poné música para estudiar»', '«Recordame la prueba del jueves»', '«¿Qué tengo que entregar?»', '«¿Qué noticias hay?»', '«¿Qué ves en mi pantalla?»', '«Cambiá el atajo a Ctrl+Alt+P»', '«Juguemos»']
 
 function Help({ s, say }) {
   return (

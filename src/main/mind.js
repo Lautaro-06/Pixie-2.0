@@ -99,6 +99,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     },
     // Lo que Pixie ve ahora (solo en Windows)
     snapshot: () => (isWindows ? awareness.snapshot() : null),
+    lastWindow: () => (isWindows ? awareness.lastWindow() : null),
     setQuiet(minutes) {
       quietUntil = minutes > 0 ? Date.now() + minutes * 60000 : 0
     },

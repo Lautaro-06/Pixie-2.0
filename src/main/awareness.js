@@ -6,7 +6,8 @@ import { powerMonitor, net } from 'electron'
 import { isWindows } from './windows.js'
 import { categorize } from './usage.js'
 
-// Corre de fondo y cada 5 segundos escribe una línea JSON con la ventana activa.
+// Corre de fondo y cada segundo escribe una línea JSON con la ventana activa (la batería se mira cada
+// minuto y el micrófono cada 5 segundos). Así, si le escribís a Pixie, sabe en qué app estabas.
 const WINDOW_SCRIPT = `
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
@@ -36,6 +37,7 @@ function Get-MicInUse {
   return $false
 }
 $i = 0
+$mic = $false
 while ($true) {
   try {
     $h = [PixieWin]::GetForegroundWindow()
@@ -50,20 +52,19 @@ while ($true) {
     $s = [System.Windows.Forms.Screen]::FromHandle($h).Bounds
     $full = ($r.Left -le $s.Left) -and ($r.Top -le $s.Top) -and ($r.Right -ge $s.Right) -and ($r.Bottom -ge $s.Bottom)
     $bat = $null
-    if ($i % 12 -eq 0) {
+    if ($i % 60 -eq 0) {
       try {
         $b = Get-CimInstance -ClassName Win32_Battery -ErrorAction Stop | Select-Object -First 1
         if ($b) { $bat = @{ nivel = [int]$b.EstimatedChargeRemaining; cargando = ($b.BatteryStatus -eq 2) } }
       } catch {}
     }
-    $mic = $false
-    try { $mic = Get-MicInUse } catch {}
-    $o = @{ titulo = $sb.ToString(); proceso = $name; pantallaCompleta = $full; bateria = $bat; microfono = $mic }
+    if ($i % 5 -eq 0) { try { $mic = Get-MicInUse } catch {} }
+    $o = @{ hwnd = $h.ToInt64(); titulo = $sb.ToString(); proceso = $name; pantallaCompleta = $full; bateria = $bat; microfono = $mic }
     [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress))
     [Console]::Out.Flush()
   } catch {}
   $i++
-  Start-Sleep -Seconds 5
+  Start-Sleep -Seconds 1
 }
 `
 
@@ -80,6 +81,7 @@ export function createAwareness() {
     bateria: null, // { nivel, cargando }
     microfono: false // otra app está usando el micrófono (una llamada)
   }
+  let lastWindow = null // la última ventana que no es Pixie: { hwnd, proceso, titulo } (solo en memoria)
   let watcher = null
   let restarts = 0
   let buffer = ''
@@ -94,6 +96,8 @@ export function createAwareness() {
     if (o.bateria) state.bateria = { nivel: o.bateria.nivel, cargando: Boolean(o.bateria.cargando) }
     state.microfono = Boolean(o.microfono)
     if (OWN_PROCESS.test(o.proceso ?? '')) return // hablarle a Pixie no cambia lo que estabas haciendo
+    if (o.hwnd && o.proceso && !/^(explorer|searchhost|shellexperiencehost|lockapp)$/i.test(o.proceso)) lastWindow = { hwnd: o.hwnd, proceso: o.proceso, titulo: o.titulo ?? '' }
+    else if (o.hwnd && /^explorer$/i.test(o.proceso ?? '') && o.titulo) lastWindow = { hwnd: o.hwnd, proceso: o.proceso, titulo: o.titulo }
     const act = categorize({ titulo: o.titulo, proceso: o.proceso, pantallaCompleta: o.pantallaCompleta })
     state.pantallaCompleta = Boolean(act) && Boolean(o.pantallaCompleta)
     const before = state.actividad ? `${state.actividad.categoria}|${state.actividad.app}` : ''
@@ -146,6 +150,7 @@ export function createAwareness() {
       restarts = 99
       watcher?.kill()
     },
+    lastWindow: () => lastWindow,
     snapshot: () => ({
       ...state,
       enActividadSeg: Math.round((Date.now() - state.desde) / 1000),

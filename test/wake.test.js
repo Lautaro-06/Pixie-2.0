@@ -110,3 +110,23 @@ test('guarda solo la huella de la voz, en esta compu', () => {
   assert.equal(existsSync(file), false)
   assert.ok(changes >= 4)
 })
+
+test('aprende de las veces que la llamaste de verdad (las últimas 6)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pixie-voz2-'))
+  const file = join(dir, 'palabra-magica.json')
+  let cfg = {}
+  const store = createWakeStore({ file, getConfig: () => cfg, saveConfig: (p) => (cfg = { ...cfg, ...p }) })
+  const plain = templates.map((t) => t.map((f) => Array.from(f)))
+  assert.equal(store.learn(plain[0]), false, 'sin grabar tu voz no aprende')
+  store.save(plain)
+  const before = store.forWindow().huella
+  for (let i = 0; i < 8; i++) assert.equal(store.learn(plain[i % 3]), true)
+  assert.equal(store.learnedCount(), 6)
+  assert.equal(store.forWindow().aprendidas.length, 6)
+  assert.notEqual(store.forWindow().huella, before, 'la ventanita se entera de que aprendió')
+  assert.equal(store.learn([[1, 2, 3]]), false, 'una huella rota no se guarda')
+  const again = createWakeStore({ file, getConfig: () => cfg, saveConfig: () => {} })
+  assert.equal(again.learnedCount(), 6)
+  store.save(plain)
+  assert.equal(store.learnedCount(), 0, 'si grabás tu voz de nuevo, empieza de cero')
+})

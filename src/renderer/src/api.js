@@ -123,6 +123,7 @@ const preview = {
   show: () => {},
   menu: () => console.log('Acá aparece el menú de Pixie (en la app de escritorio).'),
   wakeLog: () => {},
+  wakeLearn: () => {},
   gameResult: () => {},
   reportError: (info) => console.error(info),
   onEvent: () => () => {},

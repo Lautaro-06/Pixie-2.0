@@ -141,7 +141,7 @@ test('explica los errores de las IA gratis', () => {
 })
 
 test('explica por qué no hay IA', () => {
-  assert.match(describeAI({}, {}).text, /No encuentro la clave de IA en config.json/)
+  assert.match(describeAI({}, {}).text, /Todavía no tengo la clave de IA.*paso a paso/)
   assert.match(describeAI({ claveIA: 'AQ.x', ia: false }, {}).text, /apagada/)
   assert.match(describeAI({ proveedorIA: 'gemini' }, {}).text, /falta la clave/)
   assert.equal(describeAI({ claveIA: 'AQ.x' }, {}).text, 'Estoy usando la IA de Gemini (gemini-flash-lite-latest).')

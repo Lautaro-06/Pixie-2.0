@@ -12,7 +12,19 @@ import { FriendlyError } from './windows.js'
 const DEFAULT_MODEL = 'claude-opus-5-5'
 // Modelos que aceptan el reintento automático en otro modelo si se niegan a responder
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'])
-const MAX_STEPS = 6 // vueltas de herramientas por mensaje
+const MAX_STEPS = 10 // vueltas de herramientas por mensaje (usar una app puede llevar varios pasos)
+const VOICE_MODEL = 'gemini-flash-latest'
+
+// Lo que se le pide al modelo para pasar tu voz a texto
+export function transcriptionPrompt(hints = '') {
+  return (
+    'Este audio es una persona hablándole a Pixie, su asistente de la compu, en español rioplatense (Argentina, con voseo). ' +
+    'Transcribí exactamente lo que dice, con las palabras de la persona: no lo resumas, no lo corrijas ni le agregues nada. ' +
+    'Pueden aparecer nombres de apps, páginas, canciones, artistas y materias de la escuela' +
+    (hints ? ` (por ejemplo: ${hints})` : '') +
+    '. Respondé solo con la transcripción, sin comillas. Si no hay voz o no se entiende nada, respondé [nada].'
+  )
+}
 const NEW_CONVERSATION_AFTER_MS = 30 * 60 * 1000
 const MAX_MESSAGES = 40
 
@@ -30,6 +42,7 @@ Qué hacés:
 - Si te cuentan algo personal que valga la pena recordar (gustos, familia, planes, cómo les fue), guardalo con recordar_dato sin preguntar. Si mencionan algo con fecha, agendalo.
 - Si te preguntan algo de conocimiento general, respondé vos mismo, corto y claro.
 - Para resumir un mail o una página, usá leer_pagina.
+- Podés usar las apps de la persona, no solo abrirlas: escribir, teclas, atajo (guardar, copiar, nueva pestaña…), clic (un botón, menú, pestaña o link por lo que dice), desplazar, ventana e ir_a (traer una app abierta al frente). Todo pasa en la app que tiene adelante. Para algo de varios pasos, hacelos de a uno: si no sabés qué hay en la ventana, mirá con ver_elementos (o ver_pantalla) y recién después tocá. No escribas contraseñas ni datos de tarjetas, y no mandes mensajes o mails a nadie sin que la persona te haya dicho qué mandar y a quién. Al final contá en una oración qué hiciste.
 - No podés entrar a WhatsApp, a los mails ni a ninguna cuenta: no tenés acceso. Si te piden «revisá mi WhatsApp», decí que no podés leer sus chats. Solo ves la pantalla si usás ver_pantalla, y eso es una foto de lo que está a la vista: contalo así («en tu pantalla veo…»).
 - A Pixie la usan chicos y público en general (por ejemplo en una feria). Nunca muestres, describas, abras ni busques contenido sexual, violencia explícita o gore, ni cómo conseguir cosas ilegales (drogas, armas, contrabando, documentos falsos). Si te lo piden, decí que no con buena onda y ofrecé otra cosa, sin sugerir dónde encontrarlo. Si una herramienta contesta que algo está bloqueado, no intentes otra forma de abrirlo.
 - Cada mensaje trae un bloque <contexto> con la fecha, lo que el usuario está haciendo y lo que sabés de él. Usalo con naturalidad, sin recitarlo.`
@@ -109,12 +122,12 @@ function createClaudeDriver({ getClient, model, effort }) {
 
 // Cómo está la IA, en palabras: para la terminal y para «estado de la IA»
 export function describeAI(cfg, env = process.env) {
-  if (cfg.ia === false) return { on: false, text: 'La IA está apagada en config.json ("ia": false).' }
+  if (cfg.ia === false) return { on: false, text: 'La IA está apagada. Se prende en mis Ajustes → Inteligencia artificial.' }
   const p = pickProvider(cfg, env)
   const names = { gemini: 'Gemini', groq: 'Groq', claude: 'Claude', ollama: 'Ollama' }
   if (p) return { on: true, text: `Estoy usando la IA de ${names[p.name] ?? p.name} (${p.model}).` }
   if (cfg.proveedorIA) return { on: false, text: `En config.json dice "proveedorIA": "${cfg.proveedorIA}", pero falta la clave ("claveIA").` }
-  return { on: false, text: 'No encuentro la clave de IA en config.json ("claveIA"). Abrilo desde mi ícono → Abrir config.json.' }
+  return { on: false, text: 'Todavía no tengo la clave de IA. Es gratis: decime «ayudame con la clave» y te explico paso a paso.' }
 }
 
 export function createAI({
@@ -251,18 +264,55 @@ export function createAI({
   }
 
   // Pasa a texto lo que dijiste por el micrófono (un WAV). Devuelve '' si no se escuchó nada.
-  async function transcribe(wav) {
+  // hints: palabras que conviene reconocer (tu nombre, tus apps, tus materias)
+  async function transcribe(wav, hints = '') {
     const p = provider()
     if (!p) throw new FriendlyError(`Para entenderte por voz necesito la IA. ${describeAI(getConfig()).text}`)
     if (p.name === 'groq') return whisperTranscribe({ apiKey: p.apiKey, wav, fetchImpl })
     if (p.name !== 'gemini') throw new FriendlyError('Para hablarme por voz necesito la IA de Gemini o de Groq.')
     const content = [
-      { type: 'text', text: 'Transcribí exactamente lo que dice este audio, en español. Respondé solo con la transcripción, sin comillas ni nada más. Si no hay voz o no se entiende, respondé [nada].' },
+      { type: 'text', text: transcriptionPrompt(hints) },
       { type: 'input_audio', input_audio: { data: Buffer.from(wav).toString('base64'), format: 'wav' } }
     ]
-    const r = await driverFor(p).step([{ role: 'user', content }], { tools: false, persona: false })
+    // El modelo Flash entiende mejor el audio que el Lite; si se agota lo gratis, vuelve al Lite
+    const voiceDriver = createCompatibleDriver({
+      preset: { ...p.preset, fallback: p.model },
+      apiKey: p.apiKey,
+      model: getConfig().modeloVoz || VOICE_MODEL,
+      system: SYSTEM,
+      fetchImpl
+    })
+    let r
+    try {
+      r = await voiceDriver.step([{ role: 'user', content }], { tools: false, persona: false })
+    } catch (err) {
+      // Si ese modelo no existe para esta clave, sigue con el de siempre
+      if (!(err instanceof AIHttpError && err.status === 404)) throw err
+      r = await driverFor(p).step([{ role: 'user', content }], { tools: false, persona: false })
+    }
     const text = r.text.replace(/^["«]|["»]$/g, '').trim()
     return /^\[?nada\]?\.?$/i.test(text) ? '' : text
+  }
+
+  // Busca algo en una captura de pantalla (un botón sin nombre, un ícono). Devuelve { x, y } de 0 a 1000 o null
+  async function locate(imageBase64, what) {
+    const p = provider()
+    if (!p || p.name !== 'gemini') return null
+    const prompt =
+      `En esta captura de pantalla, ¿dónde está «${String(what).slice(0, 120)}»? (puede ser un botón, un link, un campo, una pestaña o un ícono). ` +
+      'Ignorá la carita de píxeles de la esquina. Respondé solo con JSON: {"x": número, "y": número} con el centro, en una escala de 0 a 1000 ' +
+      '(x de izquierda a derecha, y de arriba a abajo). Si no está, respondé {"x": null}.'
+    const content = [
+      { type: 'text', text: prompt },
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+    ]
+    const d = createCompatibleDriver({ preset: { ...p.preset, fallback: p.model }, apiKey: p.apiKey, model: getConfig().modeloVoz || VOICE_MODEL, system: SYSTEM, fetchImpl })
+    try {
+      const r = await d.step([{ role: 'user', content }], { tools: false, persona: false })
+      return parseLocation(r.text)
+    } catch {
+      return null
+    }
   }
 
   // Prueba una clave (o la guardada) con un pedido cortito. Devuelve { provider, model, reply } o tira el error.
@@ -283,10 +333,24 @@ export function createAI({
     summarize,
     look,
     transcribe,
+    locate,
     note: (text) => notes.push(text),
     reset: () => {
       messages = []
     }
+  }
+}
+
+// {"x": 512, "y": 300} (dentro de lo que contestó la IA) → { x, y } o null
+export function parseLocation(text) {
+  const m = /\{[^{}]*\}/.exec(String(text ?? ''))
+  if (!m) return null
+  try {
+    const o = JSON.parse(m[0])
+    const ok = (v) => Number.isFinite(v) && v >= 0 && v <= 1000
+    return ok(o.x) && ok(o.y) ? { x: o.x, y: o.y } : null
+  } catch {
+    return null
   }
 }
 

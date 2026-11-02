@@ -189,7 +189,7 @@ export function learnSample(samples) {
   const voice = trimSilence(samples)
   const seconds = voice.length / RATE
   if (seconds < 0.3) return { ok: false, problema: 'No te escuché. Acercate al micrófono y decilo un poco más fuerte.' }
-  if (seconds > 2.6) return { ok: false, problema: 'Fue muy largo. Decí solo «Pixie, ¿estás?» y quedate callado después.' }
+  if (seconds > 3.2) return { ok: false, problema: 'Fue muy largo. Decí solo «Pixie, ¿estás?» y quedate callado después.' }
   return { ok: true, frames: features(voice), seconds }
 }
 
@@ -227,7 +227,8 @@ export function matches(distance, limit) {
 
 // Corta el audio en frases cortas rodeadas de silencio. El nivel de ruido de la habitación se va
 // ajustando solo, así con un ventilador o música bajita no cree que todo es voz.
-export function createSegmenter({ onSegment, minMs = 300, maxMs = 2600, silenceMs = 350, preMs = 200 }) {
+// silenceMs: una pausa corta («Pixie… ¿estás?») no corta la frase en dos.
+export function createSegmenter({ onSegment, minMs = 300, maxMs = 3200, silenceMs = 600, preMs = 200 }) {
   const win = 320 // 20 ms
   let noise = 0.005
   let pending = new Float32Array(0)
@@ -241,7 +242,8 @@ export function createSegmenter({ onSegment, minMs = 300, maxMs = 2600, silenceM
     let sum = 0
     for (const s of block) sum += s * s
     const rms = Math.sqrt(sum / block.length)
-    const speech = rms > Math.max(0.012, noise * 3)
+    // Para empezar hace falta sobresalir bien del ruido; ya hablando, alcanza con menos (sílabas suaves)
+    const speech = current ? rms > Math.max(0.004, noise * 1.8) : rms > Math.max(0.006, noise * 3)
     // El ruido de fondo se mide solo cuando no hay voz
     if (!speech) noise = noise * 0.995 + rms * 0.005
     if (!current) {
@@ -307,16 +309,33 @@ export function createSegmenter({ onSegment, minMs = 300, maxMs = 2600, silenceM
 }
 
 // Junta todo: le pasás el audio y avisa cuando escucha la frase. templates: las huellas de tus grabaciones.
-export function createWakeDetector({ templates, sensibilidad = 'normal', onWake, onCandidate = () => {} }) {
+// Si te escucha «casi» (un poco más lejos que el límite) y lo repetís enseguida, se despierta igual:
+// cuando no te contesta, lo natural es volver a llamarla.
+const NEAR = 1.4
+const REPEAT_MS = 8000
+
+// learned: grabaciones que aprendió de las veces que la llamaste de verdad (se comparan, pero no
+// cambian el límite, que sale solo de las tres que grabaste en Ajustes).
+export function createWakeDetector({ templates, learned = [], sensibilidad = 'normal', onWake, onCandidate = () => {}, now = () => Date.now() }) {
   const limit = limitFor(templates, sensibilidad)
+  const near = { total: limit.total * NEAR, nombre: limit.nombre * NEAR }
+  const all = [...templates, ...learned]
+  let lastNear = 0
   const segmenter = createSegmenter({
     onSegment: (samples) => {
       const voice = trimSilence(samples)
       if (voice.length < 0.3 * RATE) return
-      const distance = distanceTo(templates, features(voice))
+      const frames = features(voice)
+      const distance = distanceTo(all, frames)
       const match = matches(distance, limit)
-      onCandidate({ distance, limit, match })
-      if (match) onWake({ distance, limit })
+      const almost = !match && matches(distance, near)
+      const t = now()
+      const repeated = almost && t - lastNear < REPEAT_MS
+      onCandidate({ distance, limit, match, almost, repeated })
+      if (match || repeated) {
+        lastNear = 0
+        onWake({ distance, limit, frames, repeated })
+      } else if (almost) lastNear = t
     }
   })
   return { push: segmenter.push, reset: segmenter.reset, limit }

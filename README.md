@@ -17,6 +17,8 @@ Todo se hace desde la ventanita: **clic derecho en la cara** (o el botón **⋯*
 
 En **Ajustes → Voz** (o en la bienvenida) decís tres veces «Pixie, ¿estás?» y aprende tu voz. Desde ahí la llamás así, sin tocar nada: hace un sonidito, te escucha y, cuando dejás de hablar, hace lo que le pediste. Si le seguís hablando, te sigue escuchando; cuando te quedás callado, vuelve a esperar la frase.
 
+- **Aprende con el uso:** cada vez que la llamás y entiende tu pedido, guarda esa forma de decirlo (las últimas 6) y te reconoce mejor. Si te escucha «casi» y lo repetís enseguida, se despierta igual.
+- **No te corta:** escucha según el ruido de tu habitación (anda con micrófonos bajitos y con ruido de fondo) y espera casi 2 segundos de silencio antes de terminar. Para entenderte usa el modelo de Gemini que mejor entiende el audio, sabiendo que le hablás en castellano rioplatense y con los nombres de tus apps.
 - **Funciona en la compu:** compara lo que oye con tus grabaciones (sin internet). No manda audio a ningún lado hasta que la llamás. De tu voz guarda solo una huella (números) en `palabra-magica.json`, que no va al respaldo.
 - Mientras está prendido, Windows muestra el ícono del micrófono en la barra de tareas.
 - Si se despierta sola, elegí **Menos** en «Qué tan fácil me despierto»; si no te escucha, **Más**, o grabá tu voz de nuevo en el lugar donde la vas a usar. **Probar ahora** te muestra si te reconoce.
@@ -28,6 +30,20 @@ En **Ajustes → Voz** (o en la bienvenida) decís tres veces «Pixie, ¿estás?
 Pixie se fija sola si hay una versión nueva al arrancar y cada 6 horas. La baja en segundo plano y, cuando está lista, avisa: «¡Hay una versión nueva de Pixie! ¿Me actualizo ahora?». Tocás **actualizar** y en unos segundos vuelve con la versión nueva. Si no, se instala sola la próxima vez que se cierre.
 
 También se puede pedir: «actualizate», «¿hay una versión nueva?», «¿qué versión tenés?», o desde el ícono → **Buscar actualizaciones**.
+
+### Usar tus apps (no solo abrirlas)
+
+Pixie hace cosas **adentro** de la app que tenés adelante (si le escribiste en su ventanita, en la que estabas usando antes):
+
+- **Escribir:** «escribí: Hola, ¿cómo andás?» escribe eso tal cual, con tildes y signos, donde está el cursor. «escribí hola y mandalo» escribe y aprieta Enter.
+- **Atajos con palabras:** «guardá», «copiá», «pegá», «deshacé», «seleccioná todo», «imprimí», «nueva pestaña», «cerrá la pestaña», «recargá la página», «volvé atrás», «poné en negrita»… En Word, Excel y PowerPoint en castellano (que usan otros atajos) toca el botón por su nombre.
+- **Teclas:** «apretá control S», «apretá enter», «presioná alt tab dos veces».
+- **Tocar botones por lo que dicen:** «tocá el botón Enviar», «hacé clic en Archivo», «clic en Nuevo documento». Los encuentra con la accesibilidad de Windows; si un botón no tiene nombre, con la IA lo busca en una foto de la pantalla.
+- **Moverse:** «bajá la página», «subí un poco», «maximizá», «minimizá», «poné la ventana a la izquierda», «cambiá a Word» (si ya está abierta, la trae al frente; «abrí Word» también).
+- **«¿Qué botones hay?»** dice qué se puede tocar.
+- **Con IA**, pedidos de varios pasos: «en Word escribí un título que diga Informe y ponelo en negrita».
+
+Por seguridad: **no escribe en campos de contraseña**, no escribe lo que bloquea el filtro de contenido y **pregunta antes** de lo que puede hacer perder algo (cerrar la ventana, Alt+F4, borrar sin papelera). Solo funciona en Windows.
 
 ### Agenda: Google Calendar y Classroom
 
@@ -62,7 +78,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.9)
+## Qué hace (versión 0.10)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -333,6 +349,8 @@ src/
     news.js        ← los titulares de Infobae y TN (RSS)
     classroom.js   ← las tareas de Classroom que lee la extensión (y sus fechas de entrega)
     extension-files.js ← copia la extensión de Chrome a la carpeta de datos de Pixie
+    hands.js       ← las «manos» en Windows: escribir, teclas, clics y botones (UI Automation)
+    control.js     ← entiende atajos dichos con palabras y elige el botón que nombraste
     updates.js     ← las actualizaciones automáticas desde las Releases de GitHub
     diagnostics.js ← anota los errores y arma el informe (sin claves)
     secrets.js     ← cifra las claves de config.json con la cuenta de Windows
@@ -375,6 +393,11 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.10 (las «manos» no se pueden probar fuera de Windows: acá se compiló el código y se probó todo lo demás):
+
+- **Usar apps:** en el Bloc de notas o Word, «escribí: Hola, ¿cómo andás?»; «guardá»; «poné en negrita». En Chrome: «nueva pestaña», «bajá la página», «tocá el botón …». Probalo hablándole y también escribiéndole en su ventanita (tiene que volver a la app de antes).
+- **«Pixie, ¿estás?»:** que te reconozca más veces, que no corte mientras hablás bajito o con pausas, y que entienda mejor las palabras. En `historial.txt` quedan las veces que te escuchó «casi» (con la distancia), útil para ajustar.
 
 Lo nuevo de la versión 0.9 (acá se probó con un calendario de ejemplo; a Google, Infobae y TN no se pudo llegar desde el entorno de prueba):
 

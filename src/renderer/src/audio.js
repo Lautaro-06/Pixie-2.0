@@ -2,7 +2,34 @@
 // para que la IA lo transcriba. Nada se graba si no tocás el micrófono.
 
 const TARGET_RATE = 16000
-const SPEECH_LEVEL = 0.02 // volumen a partir del cual cuenta como voz
+// Cuánto tiene que sobresalir la voz del ruido de la habitación. No es un volumen fijo: con un
+// micrófono bajito (o lejos) también te escucha, y mientras hablás alcanza con menos (las pausas
+// entre palabras y las sílabas suaves no cortan la grabación).
+const START_OVER_NOISE = 3
+const KEEP_OVER_NOISE = 1.8
+const MIN_START_LEVEL = 0.007
+const MIN_KEEP_LEVEL = 0.004
+const NOISE_WINDOW_MS = 1500
+
+// Decide, pedacito a pedacito, si estás hablando. El ruido de la habitación es lo más bajo del
+// último segundo y medio (entre palabra y palabra siempre hay un silencio): así sirve igual si
+// empezaste a hablar enseguida, si el micrófono está bajito o si hay un ventilador.
+export function createVoiceGate() {
+  const recent = [] // [momento, volumen]
+  let heard = false
+  return {
+    push(l, now) {
+      recent.push([now, l])
+      while (recent.length > 1 && now - recent[0][0] > NOISE_WINDOW_MS) recent.shift()
+      const floor = Math.min(...recent.map(([, v]) => v))
+      const start = Math.max(MIN_START_LEVEL, floor * START_OVER_NOISE)
+      const keep = Math.max(MIN_KEEP_LEVEL, floor * KEEP_OVER_NOISE)
+      const speaking = heard ? l > keep : l > start
+      if (speaking) heard = true
+      return { heard, speaking }
+    }
+  }
+}
 
 // Promedia muestras para bajar la frecuencia (por ejemplo de 48 kHz a 16 kHz)
 export function downsample(samples, fromRate, toRate = TARGET_RATE) {
@@ -98,17 +125,22 @@ export async function openMicrophone() {
   })
 }
 
-export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 15000, waitMs = 6000 } = {}) {
-  const stream = await openMicrophone()
-  const ctx = new AudioContext()
-  const source = ctx.createMediaStreamSource(stream)
-  const proc = ctx.createScriptProcessor(4096, 1, 1)
+// tap: si Pixie ya está escuchando el micrófono (esperando «Pixie, ¿estás?»), se cuelga de ese mismo
+// audio: no hay que esperar a que se abra otro micrófono ni a que se acomode el volumen, y no se
+// pierden las primeras palabras.
+export async function listen({ onLevel = () => {}, silenceMs = 1700, maxMs = 30000, waitMs = 7000, tap = null } = {}) {
   const chunks = []
   const started = performance.now()
   let heard = false
   let lastVoice = started
   let finished = false
+  let rate = 48000
+  const gate = createVoiceGate()
   let resolveDone
+  let close = () => {}
+  let lastChunk = performance.now()
+  // Si el audio deja de llegar (se desenchufó el micrófono), no se queda escuchando para siempre
+  const watchdog = setInterval(() => performance.now() - lastChunk > 3000 && finish(), 1000)
 
   const done = new Promise((resolve) => {
     resolveDone = resolve
@@ -117,11 +149,8 @@ export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 150
   function finish(keep = true) {
     if (finished) return
     finished = true
-    proc.disconnect()
-    source.disconnect()
-    stream.getTracks().forEach((t) => t.stop())
-    const rate = ctx.sampleRate
-    ctx.close()
+    clearInterval(watchdog)
+    close()
     if (!keep || !heard) return resolveDone({ wav: null, samples: null, heard })
     const all = new Float32Array(chunks.reduce((n, c) => n + c.length, 0))
     let offset = 0
@@ -133,21 +162,38 @@ export async function listen({ onLevel = () => {}, silenceMs = 1300, maxMs = 150
     resolveDone({ wav: encodeWav(samples), samples, heard })
   }
 
-  proc.onaudioprocess = (e) => {
+  function onChunk(data, sampleRate) {
     if (finished) return
-    const data = new Float32Array(e.inputBuffer.getChannelData(0))
+    lastChunk = performance.now()
+    rate = sampleRate
     chunks.push(data)
     const now = performance.now()
     const l = level(data)
     onLevel(l)
-    if (l > SPEECH_LEVEL) {
-      heard = true
-      lastVoice = now
-    }
+    const g = gate.push(l, now)
+    if (g.speaking) lastVoice = now
+    heard = g.heard
     if ((heard && now - lastVoice > silenceMs) || now - started > maxMs || (!heard && now - started > waitMs)) finish()
   }
-  source.connect(proc)
-  proc.connect(ctx.destination) // la salida queda en silencio: solo hace falta para que procese
+
+  if (tap?.live()) {
+    tap.setTap(onChunk)
+    close = () => tap.setTap(null)
+  } else {
+    const stream = await openMicrophone()
+    const ctx = new AudioContext()
+    const source = ctx.createMediaStreamSource(stream)
+    const proc = ctx.createScriptProcessor(4096, 1, 1)
+    proc.onaudioprocess = (e) => onChunk(new Float32Array(e.inputBuffer.getChannelData(0)), ctx.sampleRate)
+    source.connect(proc)
+    proc.connect(ctx.destination) // la salida queda en silencio: solo hace falta para que procese
+    close = () => {
+      proc.disconnect()
+      source.disconnect()
+      stream.getTracks().forEach((t) => t.stop())
+      ctx.close()
+    }
+  }
 
   return { done, stop: () => finish(true), cancel: () => finish(false) }
 }

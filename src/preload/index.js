@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('pixie', {
   show: () => ipcRenderer.send('pixie:show'),
   menu: () => ipcRenderer.send('pixie:menu'),
   wakeLog: (line) => ipcRenderer.send('pixie:wake-log', String(line).slice(0, 200)),
+  wakeLearn: (frames) => ipcRenderer.send('pixie:wake-learn', frames),
   gameResult: (result) => ipcRenderer.send('pixie:game-result', result),
   voice: (request) => ipcRenderer.invoke('pixie:voice', request),
   voiceStop: (id) => ipcRenderer.send('pixie:voice-stop', id),

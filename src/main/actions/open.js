@@ -1,9 +1,10 @@
 import { app } from 'electron'
+import { findWindow } from '../control.js'
 import { resolveTarget } from '../catalog.js'
 import { launch, closeProcess, BlockedError } from '../windows.js'
 import { checkUrl, checkQuery } from '../safety.js'
 
-function findTarget(objetivo, ctx) {
+export function findTarget(objetivo, ctx) {
   return resolveTarget(objetivo ?? '', ctx.getConfig().apps ?? [])
 }
 
@@ -25,6 +26,20 @@ export const openActions = [
       if (tipo === 'sitio') {
         const blocked = checkUrl(item.url, ctx.getConfig().sitiosBloqueados)
         if (blocked) throw new BlockedError(blocked)
+      }
+      // Si la app ya está abierta, la trae al frente en vez de abrir otra
+      if (tipo === 'app' && item.proceso && ctx.hands?.available()) {
+        try {
+          const windows = await ctx.hands.request('ventanas')
+          const win = findWindow(Array.isArray(windows) ? windows : [], item.nombre, item.proceso)
+          if (win) {
+            ctx.hidePixieFocus?.()
+            const r = await ctx.hands.request('enfocar', { hwnd: win.hwnd })
+            if (r.ok) return { text: `Te traje ${item.nombre}.`, face: 'happy' }
+          }
+        } catch {
+          // si no se puede, la abre como siempre
+        }
       }
       if (tipo === 'carpeta') await launch({ tipo: 'ruta', valor: app.getPath(item.clave) })
       else if (tipo === 'sitio') await launch({ tipo: 'uri', valor: item.url })

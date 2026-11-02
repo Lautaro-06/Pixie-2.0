@@ -295,6 +295,7 @@ export default function App() {
 
   // «Pixie, ¿estás?»: escucha todo el tiempo (en la compu) mientras esté prendido
   const wakeTemplates = wakeCfg?.activa ? wakeCfg.plantillas : null
+  const wakeLearned = wakeCfg?.aprendidas
   const wakeSensitivity = wakeCfg?.sensibilidad ?? 'normal'
   useEffect(() => {
     if (isPreview || !wakeTemplates) return
@@ -302,7 +303,11 @@ export default function App() {
     let listener = null
     startWakeListener({
       templates: wakeTemplates,
+      learned: wakeLearned ?? [],
       sensibilidad: wakeSensitivity,
+      onCandidate: ({ distance, limit, almost }) => {
+        if (almost) api.wakeLog?.(`casi te escuché (distancia ${distance.total.toFixed(3)} de ${limit.total.toFixed(3)}); si lo repetís, me despierto`)
+      },
       onWake: (info) => onWakeRef.current(info),
       onLost: () => !stopped && setTimeout(() => setWakeRestart((n) => n + 1), 3000)
     })
@@ -333,7 +338,7 @@ export default function App() {
       listener?.stop()
       wakeRef.current = null
     }
-  }, [wakeTemplates, wakeSensitivity, wakeRestart])
+  }, [wakeTemplates, wakeLearned, wakeSensitivity, wakeRestart])
 
   // No busca la frase mientras habla (para no escucharse a sí misma), te escucha, piensa o jugás
   useEffect(() => {
@@ -359,9 +364,9 @@ export default function App() {
 
   onWakeRef.current = (info) => {
     if (listeningRef.current || busyRef.current || gameRef.current) return
-    api.wakeLog?.(`me llamaste (distancia ${info.distance.total.toFixed(3)} de ${info.limit.total.toFixed(3)})`)
+    api.wakeLog?.(`me llamaste (distancia ${info.distance.total.toFixed(3)} de ${info.limit.total.toFixed(3)}${info.repeated ? ', a la segunda' : ''})`)
     api.show?.()
-    voiceSession.current = { turns: 0 }
+    voiceSession.current = { turns: 0, frames: info.frames }
     startListeningRef.current({ byVoice: true })
   }
 
@@ -449,8 +454,16 @@ export default function App() {
       return
     }
     let rec
+    let loudest = 0 // para el historial: si no te escuchó, cuánto volumen llegó
     try {
-      rec = await listen({ onLevel: setMicLevel, waitMs: followUp ? 5000 : 6000 })
+      rec = await listen({
+        onLevel: (l) => {
+          loudest = Math.max(loudest, l)
+          setMicLevel(l)
+        },
+        waitMs: followUp ? 5000 : 6000,
+        tap: wakeRef.current
+      })
     } catch {
       voiceSession.current = null
       show({ text: 'No pude usar el micrófono. Fijate en Configuración de Windows → Privacidad → Micrófono que las apps de escritorio tengan permiso.', face: 'confused' })
@@ -464,6 +477,7 @@ export default function App() {
     setListening(false)
     setMicLevel(0)
     if (!wav) {
+      if (byVoice && !heard) api.wakeLog?.(`me llamaste pero después no te escuché (volumen máximo ${loudest.toFixed(3)})`)
       if (quietly) endVoiceSession(followUp)
       else if (!heard) show({ text: 'No te escuché. Tocá el micrófono y hablame.', face: 'confused' })
       return
@@ -485,6 +499,12 @@ export default function App() {
       return show({ text: 'No te entendí bien. ¿Me lo repetís?', face: 'confused' })
     }
     setYouSaid(result.text)
+    // Te despertó y entendió el pedido: era tu voz llamándola. Aprende esa forma de decirlo.
+    const session = voiceSession.current
+    if (session?.frames && session.turns === 0) {
+      api.wakeLearn?.(session.frames.map((f) => Array.from(f)))
+      session.frames = null
+    }
     send(result.text, { spoken: true })
   }
   startListeningRef.current = startListening
