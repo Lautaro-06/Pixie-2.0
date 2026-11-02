@@ -5,11 +5,15 @@ import react from '@vitejs/plugin-react'
 // Si el navegador no llega a la API de GitHub, el botón baja igual este instalador.
 async function latestInstaller() {
   try {
-    const res = await fetch('https://api.github.com/repos/Lautaro-06/Pixie-2.0/releases/latest')
+    const token = process.env.GITHUB_TOKEN
+    const res = await fetch('https://api.github.com/repos/Lautaro-06/Pixie-2.0/releases/latest', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     const data = await res.json()
     const exe = data.assets.find(a => a.name.endsWith('.exe'))
     return { version: data.tag_name, url: exe.browser_download_url, sizeMb: Math.round(exe.size / 1_048_576) }
-  } catch {
+  } catch (err) {
+    console.warn('No se pudo leer la última Release para el respaldo de descarga:', err.message)
     return null
   }
 }

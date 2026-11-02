@@ -39,7 +39,7 @@ function isWindows() {
 
 function isPhone() {
   const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
-  return uaData?.mobile ?? /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  return uaData?.mobile || /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 export function DownloadButton({ release, compact = false }: { release: Release | null; compact?: boolean }) {

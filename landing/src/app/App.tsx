@@ -101,10 +101,10 @@ export default function App() {
 
         <section id="privacidad" className="band">
           <div className="wrap privacy">
-            <h2>Tu memoria vive en tu compu. Vos elegís qué sale.</h2>
+            <h2>Tu memoria vive en tu compu. Lo que mandás a una IA en línea, no.</h2>
             <div>
               <p>Tu memoria y tu agenda se guardan en tu PC, con una copia de respaldo en tu OneDrive. Del uso de la compu solo anota el tipo de actividad, nunca lo que escribís. La clave de la IA queda cifrada con tu cuenta de Windows.</p>
-              <p>Con una IA en línea, cada mensaje viaja a ese servicio junto con lo que necesita para responderte: tu nombre, lo que le contaste, tus pendientes, tu agenda y la app que estás usando. En el plan gratis de Gemini, Google puede usarlo para mejorar sus productos. Con Ollama, la IA corre en tu compu.</p>
+              <p>Con una IA en línea, cada mensaje viaja a ese servicio junto con lo que necesita para responderte: tu nombre, lo que le contaste, tus pendientes, tu agenda, la app que estás usando y el texto del mail o la página que le pidas resumir. En el plan gratis de Gemini, Google puede usarlo para mejorar sus productos. Con Ollama, la IA corre en tu compu.</p>
               <p>Tiene un filtro de contenido siempre activo, y las acciones riesgosas, como apagar la compu, piden confirmación.</p>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function App() {
                 <p className="smartscreen-step">Después</p>
                 <div className="smartscreen-window">
                   <p className="smartscreen-title">Windows protegió su PC</p>
-                  <p>Aplicación: Pixie-instalador.exe<br />Editor: Editor desconocido</p>
+                  <p>Aplicación: Pixie-…-instalador.exe<br />Editor: Editor desconocido</p>
                   <p className="smartscreen-actions"><span className="is-next">Ejecutar de todas formas</span><span>No ejecutar</span></p>
                 </div>
               </div>
