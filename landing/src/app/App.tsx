@@ -125,12 +125,21 @@ export default function App() {
             </div>
             <figure className="smartscreen">
               <div aria-hidden>
-                <p className="smartscreen-title">Windows protegió su PC</p>
-                <p>SmartScreen de Microsoft Defender impidió el inicio de una aplicación no reconocida.</p>
-                <p className="smartscreen-link">Más información</p>
-                <p className="smartscreen-actions"><span>Ejecutar de todas formas</span><span>No ejecutar</span></p>
+                <p className="smartscreen-step">Primero</p>
+                <div className="smartscreen-window">
+                  <p className="smartscreen-title">Windows protegió su PC</p>
+                  <p>SmartScreen de Microsoft Defender impidió el inicio de una aplicación no reconocida. Si ejecuta esta aplicación, podría poner su PC en riesgo.</p>
+                  <p className="smartscreen-link">Más información</p>
+                  <p className="smartscreen-actions"><span>No ejecutar</span></p>
+                </div>
+                <p className="smartscreen-step">Después</p>
+                <div className="smartscreen-window">
+                  <p className="smartscreen-title">Windows protegió su PC</p>
+                  <p>Aplicación: Pixie-instalador.exe<br />Editor: Editor desconocido</p>
+                  <p className="smartscreen-actions"><span className="is-next">Ejecutar de todas formas</span><span>No ejecutar</span></p>
+                </div>
               </div>
-              <figcaption>Así se ve el aviso, recreado para esta página. Primero tocá «Más información» y aparece «Ejecutar de todas formas».</figcaption>
+              <figcaption>Recreación del aviso de Windows. Primero tocá «Más información»; ahí aparece «Ejecutar de todas formas».</figcaption>
             </figure>
           </div>
         </section>
