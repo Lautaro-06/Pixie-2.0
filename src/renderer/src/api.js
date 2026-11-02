@@ -9,7 +9,8 @@ let fakeSettings = {
   apariencia: { pantallaReposo: 'cara' },
   agenda: {
     calendarios: [],
-    classroom: { estado: 'sin-leer', conectada: false, tareas: 0, conFecha: 0, leido: null, error: null, avisos: true, extension: { carpeta: null, version: '0.9.1', conectada: false, vieja: false } }
+    classroom: { estado: 'sin-leer', conectada: false, tareas: 0, conFecha: 0, leido: null, error: null, avisos: true, extension: { carpeta: null, version: '0.11.0', conectada: false, vieja: false } },
+    mails: { estado: 'sin-leer', conectada: false, avisos: false, leido: null, sinLeer: 0, cuentas: [], error: null, silenciados: ['Netflix'], extension: { carpeta: null, version: '0.11.0', conectada: false, vieja: false } }
   },
   noticias: { fuentes: ['infobae', 'tn'], avisos: 'aveces' },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
@@ -73,7 +74,7 @@ const previewSettings = {
     await wait(700)
     if (!url) return { ok: false, mensaje: 'Copiá o pegá la dirección primero.', ...fakeSettings }
     const cal = { id: `cal${Date.now()}`, nombre: 'Matemática 5°B', avisos: true, proximos: 3, actualizado: Date.now(), error: null }
-    fakeSettings = { ...fakeSettings, agenda: { calendarios: [...fakeSettings.agenda.calendarios, cal] } }
+    fakeSettings = { ...fakeSettings, agenda: { ...fakeSettings.agenda, calendarios: [...fakeSettings.agenda.calendarios, cal] } }
     return { ok: true, mensaje: '¡Listo! Sumé «Matemática 5°B»: tiene 3 cosas en los próximos 7 días.', ...fakeSettings }
   },
   clipboardCalendar: async () => ({ encontrada: false }),
@@ -85,11 +86,16 @@ const previewSettings = {
     }
     return { ...fakeSettings, mensaje: 'Leí tus Pendientes: tenés 3 tareas.' }
   },
+  readMails: async () => {
+    await wait(700)
+    fakeSettings = { ...fakeSettings, agenda: { ...fakeSettings.agenda, mails: { ...fakeSettings.agenda.mails, estado: 'ok', sinLeer: 4, cuentas: ['lauti@gmail.com'], leido: Date.now() } } }
+    return { ...fakeSettings, mensaje: 'Miré tu Gmail: tenés 4 mails sin leer.' }
+  },
   openExtensionFolder: async () => {},
   copyExtensionsAddress: async () => {},
-  removeCalendar: async (id) => (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.filter((c) => c.id !== id) } }),
+  removeCalendar: async (id) => (fakeSettings = { ...fakeSettings, agenda: { ...fakeSettings.agenda, calendarios: fakeSettings.agenda.calendarios.filter((c) => c.id !== id) } }),
   calendarAlerts: async (id, on) =>
-    (fakeSettings = { ...fakeSettings, agenda: { calendarios: fakeSettings.agenda.calendarios.map((c) => (c.id === id ? { ...c, avisos: on } : c)) } }),
+    (fakeSettings = { ...fakeSettings, agenda: { ...fakeSettings.agenda, calendarios: fakeSettings.agenda.calendarios.map((c) => (c.id === id ? { ...c, avisos: on } : c)) } }),
   openGoogleCalendar: async () => window.open('https://calendar.google.com/calendar/r/settings', '_blank'),
   previewNews: async () => (
     await wait(600),

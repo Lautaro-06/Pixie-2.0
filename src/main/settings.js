@@ -48,6 +48,7 @@ export function createSettings({
   calendars = null,
   news = null,
   classroom = null,
+  mail = null,
   extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
 }) {
@@ -85,7 +86,8 @@ export function createSettings({
       },
       agenda: {
         calendarios: calendars?.status() ?? [],
-        classroom: classroom ? { ...classroom.status(), extension: extension() } : null
+        classroom: classroom ? { ...classroom.status(), extension: extension() } : null,
+        mails: mail ? { ...mail.status(), extension: extension() } : null
       },
       noticias: {
         fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
@@ -119,6 +121,11 @@ export function createSettings({
     if (Array.isArray(patch.noticiasFuentes)) saveConfig({ noticiasFuentes: patch.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) })
     if (NEWS_ALERTS.includes(patch.noticiasAvisos)) saveConfig({ noticiasAvisos: patch.noticiasAvisos })
     if ('classroomAvisos' in patch) saveConfig({ classroomAvisos: Boolean(patch.classroomAvisos) })
+    if ('mailAvisos' in patch) {
+      mail?.setAlerts(Boolean(patch.mailAvisos))
+      if (patch.mailAvisos) mail?.refresh({ force: true, silent: true }).catch(() => {})
+    }
+    if (typeof patch.mailsDesilenciar === 'string') mail?.unmute(patch.mailsDesilenciar)
     if ('palabraMagica' in patch) wake?.setActive(Boolean(patch.palabraMagica))
     if (typeof patch.sensibilidadPalabra === 'string') wake?.setSensitivity(patch.sensibilidadPalabra)
     if (typeof patch.atajo === 'string') {
@@ -225,6 +232,23 @@ export function createSettings({
     return { ...snapshot(), mensaje }
   }
 
+  // Mails: mira ahora cuántos hay sin leer (con la extensión de Chrome)
+  async function readMails() {
+    const st = await mail.refresh({ force: true, silent: true })
+    const n = st.sinLeer
+    const mensaje =
+      st.estado === 'ok'
+        ? n === 0
+          ? 'Miré tu Gmail: no tenés mails sin leer.'
+          : `Miré tu Gmail: tenés ${n === 1 ? '1 mail sin leer' : `${n} mails sin leer`}.`
+        : st.estado === 'sin-extension'
+          ? 'Primero instalá la extensión de Chrome (los pasos están en Classroom, acá arriba) y dejá Chrome abierto.'
+          : st.estado === 'extension-vieja'
+            ? 'La extensión está desactualizada: en chrome://extensions tocá recargar en «Pixie para Chrome».'
+            : `No pude mirar tus mails: ${st.error ?? 'probá de nuevo en un rato'}`
+    return { ...snapshot(), mensaje }
+  }
+
   // Los últimos titulares, para ver cómo quedan
   async function previewNews() {
     try {
@@ -238,6 +262,7 @@ export function createSettings({
   return {
     snapshot,
     apply,
+    readMails,
     testKey,
     saveKey,
     forgetKey,

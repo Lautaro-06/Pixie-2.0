@@ -45,13 +45,15 @@ Pixie hace cosas **adentro** de la app que tenés adelante (si le escribiste en 
 
 Por seguridad: **no escribe en campos de contraseña**, no escribe lo que bloquea el filtro de contenido y **pregunta antes** de lo que puede hacer perder algo (cerrar la ventana, Alt+F4, borrar sin papelera). Solo funciona en Windows.
 
-### Agenda: Google Calendar y Classroom
+### Agenda: Google Calendar, Classroom y mails
 
 Pixie suma tu calendario y tus tareas de Classroom a su agenda: «¿qué tengo hoy?», «¿qué tengo esta semana?», «¿qué tengo que entregar?» y el resumen del día los incluyen, y te avisa **15 minutos antes** de cada clase o evento y **la noche anterior y a la mañana** de cada entrega.
 
 **Google Calendar.** En **Ajustes → Agenda** (o pedile «conectá mi Google Calendar») copiás la **dirección secreta en formato iCal** de tu calendario y Pixie la encuentra sola. Si no sabés dónde está, **«No sé dónde está»** te guía paso a paso (y te lo lee en voz alta). Es gratis y no pide iniciar sesión. La dirección secreta deja ver tu calendario a quien la tenga: Pixie la guarda **cifrada solo en esta compu** (`calendarios.json`, no va al respaldo) y se fija si hay cambios cada 15 minutos. Google solo la da para los calendarios que son tuyos, y algunos colegios la desactivan.
 
 **Classroom.** Las materias de Classroom son calendarios del profe y Google no da su dirección secreta. Por eso Pixie las lee con su **extensión de Chrome** (ver [Pixie para Chrome](#pixie-para-chrome-youtube-gmail-y-classroom)): cada 2 horas, si Chrome está abierto, abre tus **Pendientes** en una pestaña de fondo, los lee y la cierra. Usa la sesión que ya tenés en Chrome, así que anda también con cuentas del colegio. Las tareas con fecha van a la agenda como entregas, con sus avisos. Pedile «¿qué tengo en Classroom?» o tocá **Leer ahora** en Ajustes → Agenda. Lo último que leyó queda en `classroom.json`.
+
+**Mails de Gmail.** Con la misma extensión, Pixie mira el **aviso de mails sin leer de Gmail** (el que usan los avisadores de mails): quién lo manda, el asunto y las primeras palabras. Usa la sesión que ya tenés en Chrome (hasta 3 cuentas), no abre tus mails ni los marca como leídos. Preguntale «¿tengo mails nuevos?» o «¿me llegó algún mail?». **Solo te avisa si se lo pedís**: «avisame de los mails» (cuando conectás la extensión te lo pregunta una vez). Con los avisos prendidos mira cada 3 minutos si Chrome está abierto y te dice «Te llegó un mail de la profe de Química: «TP 3»». «Leémelo» o «leeme el mail de la profe» lo abre en Chrome y te lo resume. «No me avises más de los mails de Netflix» lo silencia. Si llega un mail de Classroom con una tarea nueva, vuelve a leer tus Pendientes. Todo esto también está en **Ajustes → Agenda → Mails de Gmail**. En `mails.json` guarda solo cuáles ya te contó (no de quién ni qué dicen).
 
 ### Noticias
 
@@ -78,7 +80,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.10)
+## Qué hace (versión 0.11)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -110,6 +112,7 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «juguemos», «jugamos al pong», «revancha» | Pong contra Pixie: su cara se vuelve el juego |
 | «dale like», «suscribime», «saltá el anuncio», «poné subtítulos», «adelantá 30 segundos», «velocidad 1,5», «siguiente video», «¿qué estoy viendo?» | YouTube en Chrome (con la extensión) |
 | «resumime este mail», «¿de qué trata esta página?» | Resume el mail abierto en Gmail o la página que estás viendo (con la extensión) |
+| «¿tengo mails nuevos?», «leeme el mail de la profe», «avisame de los mails» | Cuenta tus mails sin leer de Gmail, te lee uno y, si se lo pedís, te avisa cuando llega uno (con la extensión) |
 | El micrófono de la barra o **Ctrl+Alt+Espacio** | Le hablás por voz (con IA de Gemini o Groq) |
 | «¿qué ves en mi pantalla?», «ayudame con esto», «explicame este error» | Mira tu pantalla y te ayuda (con IA de Gemini o Claude) |
 | «mandame por WhatsApp que compre pan», «mandame mis pendientes por WhatsApp» | Te escribe al celular (ver [WhatsApp](#whatsapp-al-celular)) |
@@ -147,7 +150,7 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu.
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 
@@ -257,7 +260,7 @@ Las acciones riesgosas (apagar, bloquear, cerrar apps) siempre te piden confirma
 
 ## Pixie para Chrome (YouTube, Gmail y Classroom)
 
-Para que Pixie pueda darle like a un video, resumir un mail o leer tus Pendientes de Classroom, instalá su extensión. Viene adentro de Pixie: al arrancar, la copia a la carpeta `extension-chrome` de su carpeta de datos.
+Para que Pixie pueda darle like a un video, contarte tus mails nuevos, resumir un mail o leer tus Pendientes de Classroom, instalá su extensión. Viene adentro de Pixie: al arrancar, la copia a la carpeta `extension-chrome` de su carpeta de datos.
 
 1. En Pixie: **Ajustes → Agenda → Classroom → Cómo instalar la extensión → Abrir la carpeta** (es `%APPDATA%\Pixie\extension-chrome`).
 2. En Chrome, abrí `chrome://extensions` (en Edge, `edge://extensions`).
@@ -393,6 +396,13 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.11 (acá se probó con un Chrome de verdad y un Gmail de ejemplo; falta con tu Gmail):
+
+- **Recargar la extensión:** en `chrome://extensions`, tocá recargar en «Pixie para Chrome» (pasa a la versión 0.11.0). Unos segundos después Pixie te pregunta si querés que te avise de los mails.
+- **Mails:** «¿tengo mails nuevos?» tiene que decir cuántos tenés sin leer y de quién son los últimos (compará con Gmail). Con «avisame de los mails», mandate un mail desde otra cuenta y fijate que en menos de 3 minutos te diga «Te llegó un mail de…». Después «leémelo».
+- **Varias cuentas:** si tenés la del colegio y la tuya abiertas en Chrome, que cuente las dos (en Ajustes → Agenda → Mails de Gmail aparecen las cuentas que miró).
+- Si no anda, pasanos el informe de diagnóstico y las líneas `mails:` de `historial.txt`.
 
 Lo nuevo de la versión 0.10.2 (más rápida al hablarle; acá se probó con respuestas de mentira de Gemini, falta con la de verdad):
 

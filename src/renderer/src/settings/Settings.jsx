@@ -237,6 +237,58 @@ function ClassroomCard({ c, setS, change, say }) {
   )
 }
 
+function MailCard({ m, setS, change, say }) {
+  const ext = m.extension
+  const [reading, setReading] = useState(false)
+  let state
+  if (ext.vieja) state = 'La extensión está desactualizada: en chrome://extensions tocá el botón de recargar de «Pixie para Chrome».'
+  else if (m.estado === 'leyendo' || reading) state = 'Mirando tu Gmail…'
+  else if (m.leido) {
+    const n = m.sinLeer === 0 ? 'no tenías mails sin leer' : m.sinLeer === 1 ? 'tenías 1 mail sin leer' : `tenías ${m.sinLeer} mails sin leer`
+    const where = m.cuentas.length ? ` (${m.cuentas.join(', ')})` : ''
+    state = `Miré tu Gmail${where} ${ago(m.leido)}: ${n}.${m.error ? ` La última vez no pude: ${m.error}` : ''}`
+  } else if (!ext.conectada) state = 'Todavía no está conectada la extensión de Chrome (o Chrome está cerrado). Los pasos para instalarla están en Classroom, acá arriba.'
+  else state = m.error ? `No pude mirar tus mails: ${m.error}` : 'La extensión está conectada. Tocá «Mirar ahora».'
+  return (
+    <Card
+      title="Mails de Gmail"
+      note="Con la misma extensión de Chrome miro el aviso de mails sin leer de Gmail: quién lo manda, el asunto y las primeras palabras. No abro tus mails ni los marco como leídos, y lo que veo queda en tu compu. Solo si me pedís «leeme el mail de…» lo abro en Chrome (y, si tenés la IA, se lo paso para resumirlo)."
+    >
+      <p className="big-status">{state}</p>
+      <Row label="Avisarme cuando llega un mail" hint="Miro cada 3 minutos, si Chrome está abierto. También podés decirme «avisame de los mails».">
+        <Toggle label="Avisarme cuando llega un mail" on={m.avisos} onChange={(v) => change({ mailAvisos: v })} />
+      </Row>
+      {m.silenciados.length > 0 && (
+        <Row label="No te aviso de" hint="Para sumar a alguien, decime «no me avises de los mails de…».">
+          <div className="buttons">
+            {m.silenciados.map((who) => (
+              <button key={who} type="button" className="button secondary" title={`Volver a avisarte de ${who}`} onClick={() => change({ mailsDesilenciar: who })}>
+                {who} ✕
+              </button>
+            ))}
+          </div>
+        </Row>
+      )}
+      <div className="buttons">
+        <button
+          type="button"
+          className="button"
+          disabled={reading}
+          onClick={async () => {
+            setReading(true)
+            const r = await api.settings.readMails()
+            setReading(false)
+            setS(r)
+            say(r.mensaje)
+          }}
+        >
+          {reading ? 'Mirando…' : 'Mirar ahora'}
+        </button>
+      </div>
+    </Card>
+  )
+}
+
 function AgendaSection({ s, setS, change, say }) {
   const list = s.agenda.calendarios
   const hint = (c) => {
@@ -246,7 +298,7 @@ function AgendaSection({ s, setS, change, say }) {
   }
   return (
     <>
-      <Header title="Agenda" text="Sumá tu Google Calendar y tus tareas de Classroom: te aviso antes de cada cosa y te las cuento cuando me preguntás «¿qué tengo hoy?» o «¿qué tengo que entregar?»." />
+      <Header title="Agenda" text="Sumá tu Google Calendar, tus tareas de Classroom y tus mails de Gmail: te aviso antes de cada cosa y te las cuento cuando me preguntás «¿qué tengo hoy?», «¿qué tengo que entregar?» o «¿tengo mails?»." />
       {list.length > 0 && (
         <Card title="Tus calendarios" note="El interruptor es para los avisos: 15 minutos antes de cada clase o evento, y la noche anterior y a la mañana de cada entrega.">
           {list.map((c) => (
@@ -269,6 +321,7 @@ function AgendaSection({ s, setS, change, say }) {
         </Card>
       )}
       {s.agenda.classroom && <ClassroomCard c={s.agenda.classroom} setS={setS} change={change} say={say} />}
+      {s.agenda.mails && <MailCard m={s.agenda.mails} setS={setS} change={change} say={say} />}
       <Card title={list.length ? 'Sumar otro calendario de Google' : 'Sumar tu Google Calendar'}>
         <CalendarWizard
           onAdded={(r) => {

@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('pixie', {
     openGoogleCalendar: () => ipcRenderer.invoke('ajustes:abrir-google-calendar'),
     previewNews: () => ipcRenderer.invoke('ajustes:noticias-probar'),
     readClassroom: () => ipcRenderer.invoke('ajustes:classroom-leer'),
+    readMails: () => ipcRenderer.invoke('ajustes:mails-leer'),
     openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
     copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),
     onView: (callback) => {

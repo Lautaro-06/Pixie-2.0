@@ -1,6 +1,6 @@
 // Pixie para Chrome: se conecta con la app de Pixie (en la misma compu) y hace
-// lo que Pixie le pide en YouTube, Gmail o la página abierta. Solo actúa cuando
-// Pixie se lo pide; no manda nada a internet.
+// lo que Pixie le pide en YouTube, Gmail, Classroom o la página abierta. Solo actúa
+// cuando Pixie se lo pide; lo que lee va solo a Pixie, en tu compu.
 
 const PIXIE_URL = 'ws://127.0.0.1:47631'
 let ws = null
@@ -82,11 +82,11 @@ function loaded(tabId, timeout = 15000) {
 }
 
 // Repite una función en la página hasta que devuelva algo (YouTube carga de a poco)
-async function poll(tabId, func, args = [], tries = 25, every = 400) {
+async function poll(tabId, func, args = [], tries = 25, every = 400, accept = (r) => r) {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await run(tabId, func, args)
-      if (r) return r
+      if (accept(r)) return r
     } catch {
       // la página todavía está cambiando
     }
@@ -140,6 +140,10 @@ async function handle(cmd, args) {
   }
   // Tus Pendientes de Classroom (para la agenda de Pixie)
   if (cmd === 'classroom') return readClassroom()
+  // Tus mails sin leer (quién y el asunto), para avisarte cuando llega uno
+  if (cmd === 'mails') return readMails()
+  // «Leeme el mail de la profe»: lo abre en Chrome y lo lee entero
+  if (cmd === 'abrir_mail') return openMail(String(args.link ?? ''))
   if (cmd === 'leer') {
     if (args.que === 'mail') {
       const tab = await findTab((url) => url.startsWith('https://mail.google.com/'))
@@ -180,6 +184,51 @@ async function readClassroom() {
   } finally {
     chrome.tabs.remove(tab.id).catch(() => {})
   }
+}
+
+// Los mails sin leer de Gmail: el aviso de Gmail (el que usan los avisadores de mails) con la sesión
+// que ya tenés en Chrome. No abre los mails ni los marca como leídos. Mira hasta 3 cuentas.
+async function readMails() {
+  const cuentas = []
+  const seen = new Set()
+  let problem = null
+  for (let u = 0; u < 3; u++) {
+    let res
+    try {
+      res = await fetch(`https://mail.google.com/mail/u/${u}/feed/atom`, { credentials: 'include', cache: 'no-store' })
+    } catch {
+      if (u === 0) problem = 'No pude conectarme con Gmail. ¿Hay internet?'
+      break
+    }
+    const xml = res.ok ? (await res.text()).slice(0, 300000) : ''
+    if (!/<feed[\s>]/i.test(xml)) {
+      // Sin sesión, Gmail contesta 401 o manda a la página para entrar
+      if (u === 0) problem = res.status === 401 || res.status === 403 || /accounts\.google\.com/.test(res.url) || /<html/i.test(xml) ? 'login' : `Gmail no respondió (${res.status}).`
+      break
+    }
+    const title = /<title>([^<]*)<\/title>/i.exec(xml)?.[1] ?? ''
+    const email = /[\w.+-]+@[\w-]+(\.[\w-]+)+/.exec(title)?.[0] ?? `cuenta ${u}`
+    if (seen.has(email)) break // esa cuenta no existe: Gmail mostró otra vez la primera
+    seen.add(email)
+    cuentas.push({ cuenta: u, xml })
+  }
+  if (cuentas.length) return { cuentas }
+  // Si el aviso no anduvo, lee la bandeja de entrada si la tenés abierta
+  const tab = await findTab((url) => url.startsWith('https://mail.google.com/mail/'))
+  if (tab) {
+    const r = await poll(tab.id, readGmailInbox, [], 10, 500)
+    if (r) return { cuentas: [{ cuenta: r.cuenta, filas: r.filas, total: r.filas.length }] }
+  }
+  throw new Error(problem === 'login' || !problem ? 'Entrá a Gmail en Chrome con tu cuenta y probá de nuevo.' : problem)
+}
+
+async function openMail(link) {
+  if (!/^https:\/\/mail\.google\.com\//.test(link)) throw new Error('Ese mail no es de Gmail.')
+  const tab = await chrome.tabs.create({ url: link, active: true })
+  await loaded(tab.id, 20000)
+  const r = await poll(tab.id, readGmail, [], 40, 500, (x) => x?.ok)
+  if (!r) throw new Error('Abrí el mail, pero no lo pude leer.')
+  return r
 }
 
 // ───────────── Funciones que corren dentro de la página ─────────────
@@ -323,6 +372,31 @@ function readGmail() {
   const truncated = text.length > MAX
   if (truncated) text = text.slice(0, MAX)
   return { ok: true, kind: 'mail', subject, sender: senders[senders.length - 1] || '', text, truncated }
+}
+
+// La bandeja de entrada abierta: los mails sin leer que se ven (si el aviso de Gmail no anduvo)
+function readGmailInbox() {
+  const rows = [...document.querySelectorAll('tr.zA')].filter((r) => r.offsetParent !== null)
+  if (!rows.length) return null
+  const filas = []
+  for (const row of rows) {
+    if (!row.classList.contains('zE')) continue // solo los que no leíste
+    const who = row.querySelector('.yX [email], .yW [email], [email]')
+    const asunto = (row.querySelector('.bog')?.innerText || '').trim()
+    const resumen = (row.querySelector('.y2')?.innerText || '').trim()
+    const thread = row.querySelector('[data-legacy-thread-id]')?.getAttribute('data-legacy-thread-id') || ''
+    filas.push({
+      id: thread || `${who?.getAttribute('email') || ''}|${asunto}`,
+      de: who?.getAttribute('name') || (who?.innerText || '').trim(),
+      email: who?.getAttribute('email') || '',
+      asunto,
+      resumen,
+      link: thread ? `${location.origin}${location.pathname}#inbox/${thread}` : ''
+    })
+    if (filas.length >= 30) break
+  }
+  const cuenta = (document.title.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/) || [])[0] || null
+  return { filas, cuenta }
 }
 
 function readPage() {

@@ -25,6 +25,7 @@ import { createWakeStore } from './wake-store.js'
 import { createCalendars } from './calendars.js'
 import { createNews } from './news.js'
 import { createClassroom } from './classroom.js'
+import { createMail, announceText } from './mail.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
 import { textToWrite } from './control.js'
@@ -51,6 +52,7 @@ let wake = null // «Pixie, ¿estás?»
 let calendars = null // Google Calendar, Classroom
 let news = null
 let classroom = null // las tareas de Classroom, con la extensión de Chrome
+let mail = null // los mails nuevos de Gmail, con la extensión de Chrome
 let extensionFiles = null // dónde quedó la extensión para instalarla en Chrome
 let hands = null // escribir, apretar teclas y tocar botones en tus apps
 const OWN_APP = /^(pixie|electron)$/i
@@ -209,6 +211,7 @@ function diagnosticsReport() {
     `Atajo: ${shortcutLabel()}${getConfig().atajo && getConfig().atajo !== activeShortcut ? ` (pidió ${shortcutText(getConfig().atajo)}, ocupado)` : ''}`,
     `WhatsApp: ${phone?.configured() ? 'configurado' : 'sin configurar'}`,
     `Classroom: ${classroom ? `${classroom.status().estado}, ${classroom.status().tareas} tareas` : 'sin arrancar'}`,
+    `Mails: ${mail ? `${mail.status().estado}, avisos ${mail.status().avisos ? 'sí' : 'no'}` : 'sin arrancar'}`,
     `Calendarios: ${calendars?.status().map((c) => `${c.nombre}${c.error ? ' (no anda)' : ''}`).join(', ') || 'ninguno'}`,
     `Noticias por su cuenta: ${getConfig().noticiasAvisos ?? 'aveces'}`,
     `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
@@ -284,6 +287,26 @@ function registerShortcut() {
   }
 }
 
+// Lo que la IA sabe en cada mensaje (de los mails, solo cuántos hay sin leer, y si pediste los avisos)
+function contextForAI() {
+  const st = mail?.status()
+  const mails = st?.avisos && st.leido ? `\nMails sin leer en Gmail: ${st.sinLeer}.` : ''
+  return `${mind.contextText()}${mails}`
+}
+
+// Una vez, cuando ya está la extensión: ¿querés que te avise de los mails?
+function offerMailAlerts() {
+  const cfg = getConfig()
+  if (cfg.mailAvisos !== undefined || cfg.mailOfrecido) return
+  saveConfig({ mailOfrecido: true })
+  mind?.say({
+    kind: 'mail',
+    text: 'Ahora que tengo mi extensión de Chrome, puedo avisarte cuando te llegue un mail: solo miro quién lo manda y el asunto, no los abro. ¿Querés?',
+    face: 'happy',
+    suggestions: ['sí, avisame de los mails', 'no, gracias']
+  })
+}
+
 async function ask(text) {
   const input = String(text ?? '').slice(0, 500)
 
@@ -305,7 +328,7 @@ async function ask(text) {
   const direct = intents?.some((i) => DIRECT.has(i.action))
   if (ai?.enabled() && !direct && (!intents || social || words > 10)) {
     try {
-      return await ai.chat(input, mind.contextText())
+      return await ai.chat(input, contextForAI())
     } catch (err) {
       const line = `IA (${ai.provider()}): ${err.status ? `${err.status} ` : ''}${err.message}`
       console.error(line)
@@ -332,7 +355,7 @@ async function ask(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre', 'pregunta', 'tema']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
@@ -488,6 +511,7 @@ if (!app.requestSingleInstanceLock()) {
       onConnect: (version) => {
         logAction(`extensión de Chrome ${version}`)
         setTimeout(() => classroom?.refresh(), 5000)
+        setTimeout(() => (getConfig().mailAvisos ? mail?.refresh() : offerMailAlerts()), 15000)
       }
     })
     ai = createAI({ getConfig, ctx, log: logAction })
@@ -522,8 +546,20 @@ if (!app.requestSingleInstanceLock()) {
       eventsBetween: (from, to) => [...calendars.eventsBetween(from, to), ...classroom.eventsBetween(from, to)],
       dueAlerts: (now) => [...calendars.dueAlerts(now), ...classroom.dueAlerts(now)]
     })
+    // Los mails nuevos: solo avisa si se lo pediste («avisame de los mails»)
+    mail = createMail({
+      browser,
+      file: join(app.getPath('userData'), 'mails.json'),
+      getConfig,
+      saveConfig,
+      log: logAction,
+      onNew: (list) => mind.say({ kind: 'mail', text: announceText(list), face: 'surprised', suggestions: ['leémelo', 'abrí Gmail'] }),
+      // Un mail de Classroom (una tarea nueva): vuelve a leer los Pendientes
+      onClassroom: () => setTimeout(() => classroom?.refresh({ force: true }), 3000)
+    })
     calendars.start()
     classroom.start()
+    mail.start()
     // La extensión viaja adentro de Pixie: queda copiada en su carpeta de datos para instalarla en Chrome
     try {
       extensionFiles = installExtensionFiles({
@@ -543,6 +579,7 @@ if (!app.requestSingleInstanceLock()) {
       news,
       calendars,
       classroom,
+      mail,
       phone,
       media,
       voice: tts,
@@ -640,6 +677,7 @@ if (!app.requestSingleInstanceLock()) {
       calendars,
       news,
       classroom,
+      mail,
       extension: () => ({
         carpeta: extensionFiles?.carpeta ?? null,
         version: extensionFiles?.version ?? null,
@@ -696,6 +734,7 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:abrir-google-calendar', () => shell.openExternal(GOOGLE_CALENDAR_SETTINGS_URL))
     handle('ajustes:noticias-probar', () => settings.previewNews())
     handle('ajustes:classroom-leer', () => settings.readClassroom())
+    handle('ajustes:mails-leer', () => settings.readMails())
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
     handle('ajustes:copiar-direccion-extensiones', () => clipboard.writeText('chrome://extensions'))
@@ -815,6 +854,7 @@ if (!app.requestSingleInstanceLock()) {
     media?.stop()
     calendars?.stop()
     classroom?.stop()
+    mail?.stop()
     hands?.stop()
     backup?.backup()
     browser?.close()

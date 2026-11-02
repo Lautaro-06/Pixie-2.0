@@ -241,6 +241,33 @@ const RULES = [
     /^(tengo|me llegaron) (mensajes|whatsapps?)( nuevos)?( en whatsapp)?$/.test(t)
       ? intent('chats_privados')
       : null,
+  // Mails de Gmail: "¿tengo mails nuevos?", "leeme el mail de la profe", "avisame de los mails"
+  (t) => {
+    const MAIL = '(?:mails?|correos?|e-?mails?|gmail)'
+    const STOP = '(?:no me avises|deja de avisarme|no quiero que me avises|no me avises mas|no me avises nunca mas)'
+    let m = new RegExp(`^${STOP}(?: mas)? (?:de |por )?(?:los |las )?${MAIL} (?:de|del|de la|que (?:me )?manda) (.+)$`).exec(t)
+    if (m) return intent('mails', { accion: 'silenciar', de: m[1] })
+    if (new RegExp(`^(?:${STOP}|apaga los avisos)(?: mas)? (?:de |por |cuando me llegan? )?(?:los |un |algun )?${MAIL}(?: nuevos?)?$`).test(t)) {
+      return intent('mails', { accion: 'avisos', on: false })
+    }
+    if (new RegExp(`^(?:si,? )?(?:dale,? )?(?:avisame|aviseme|quiero que me avises|prende los avisos|avisarme)(?: cuando (?:me )?llegue?n?| de| por)? (?:los |un |algun |mis )?${MAIL}(?: nuevos?)?$`).test(t)) {
+      return intent('mails', { accion: 'avisos', on: true })
+    }
+    m = new RegExp(`^(?:lee|leeme|leemelo|que dice|abri|abrime) (?:el )?(primer|primero|segundo|tercer|tercero|ultimo)(?: ${MAIL})?$`).exec(t)
+    if (m) return intent('mails', { accion: 'leer', n: { primer: 1, primero: 1, segundo: 2, tercer: 3, tercero: 3, ultimo: -1 }[m[1]] })
+    m = new RegExp(`^(?:lee|leeme|que dice|de que (?:se )?trata) (?:el|ese) ${MAIL} (?:de|del|de la|que (?:me )?mando) (.+)$`).exec(t)
+    if (m) return intent('mails', { accion: 'leer', de: m[1] })
+    if (/^(?:leemelo|leelo|leemela|leela)$/.test(t)) return intent('mails', { accion: 'leer', solo: true })
+    if (new RegExp(`^(?:lee|leeme) (?:el|ese) ${MAIL}$`).test(t)) return intent('mails', { accion: 'leer' })
+    if (
+      new RegExp(`^(?:tengo|hay|me llego|me llegaron|llego|llegaron|tenes|cuantos)\\b.*\\b${MAIL}\\b`).test(t) ||
+      new RegExp(`^(?:revisa|revisame|chequea|fijate|mira|fijate si tengo|mira si tengo)(?: si tengo| si hay| si me llego)? (?:mis |el |mi |los )?(?:nuevos )?${MAIL}(?: nuevos?)?$`).test(t) ||
+      new RegExp(`\\b${MAIL} (?:sin leer|nuevos?)$`).test(t)
+    ) {
+      return /\b(mand|escrib|envi|respond)/.test(t) ? null : intent('mails', { accion: 'revisar' })
+    }
+    return null
+  },
   // ── Usar las apps ──
   // "escribí hola, ¿cómo estás?" (el texto exacto, con tildes y signos, lo recupera index.js del original)
   (t) => {

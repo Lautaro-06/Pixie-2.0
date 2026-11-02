@@ -208,6 +208,17 @@ export const AI_TOOLS = [
     input_schema: obj()
   },
   {
+    name: 'mails',
+    description:
+      'Mails de Gmail del usuario (con la extensión de Chrome). revisar: cuenta los sin leer (quién y asunto). leer: lee uno (de alguien, o el número n de la lista; sin nada, el que se acaba de avisar). avisos: prende (on true) o apaga los avisos de mails nuevos. silenciar: no avisar más de alguien. Usala solo si pregunta por sus mails o correo.',
+    input_schema: obj({
+      accion: oneOf(['revisar', 'leer', 'avisos', 'silenciar']),
+      de: str('Quién lo manda (nombre, mail o empresa), para leer o silenciar'),
+      n: int('Número del mail en la lista (1 = el más nuevo)', 1, 20),
+      on: { type: 'boolean', description: 'Para avisos: true prende, false apaga' }
+    }, ['accion'])
+  },
+  {
     name: 'conectar_calendario',
     description: 'Abre la sección para sumar el Google Calendar del usuario a la agenda de Pixie y explica cómo (Classroom va con la herramienta classroom)',
     input_schema: obj()

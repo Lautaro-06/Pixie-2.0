@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed version="0.3" xmlns="http://purl.org/atom/ns#">
+<title>Gmail - Recibidos de alumno.prueba@gmail.com</title>
+<tagline>Los mensajes más recientes en tus Recibidos de Gmail</tagline>
+<fullcount>5</fullcount>
+<link rel="alternate" href="https://mail.google.com/mail" type="text/html" />
+<modified>2026-11-02T13:05:00Z</modified>
+<entry>
+<title>Trabajo práctico N°3 &amp; consignas</title>
+<summary>Hola chicos, les dejo las consignas del TP para el jueves. Cualquier duda me escriben.</summary>
+<link rel="alternate" href="https://mail.google.com/mail?account_id=alumno.prueba@gmail.com&amp;message_id=19a1b2c3d4e5f601&amp;view=conv&amp;extsrc=atom" type="text/html" />
+<modified>2026-11-02T13:00:00Z</modified>
+<issued>2026-11-02T13:00:00Z</issued>
+<id>tag:gmail.google.com,2004:1847000000000000001</id>
+<author>
+<name>Profe Química</name>
+<email>profe.quimica@escuela.edu.ar</email>
+</author>
+</entry>
+<entry>
+<title>Nueva tarea: Avance del Proyecto</title>
+<summary>Tu profesor publicó una tarea nueva en 2026 Prácticas Profesionalizantes.</summary>
+<link rel="alternate" href="https://mail.google.com/mail?account_id=alumno.prueba@gmail.com&amp;message_id=19a1b2c3d4e5f602&amp;view=conv&amp;extsrc=atom" type="text/html" />
+<modified>2026-11-02T12:00:00Z</modified>
+<issued>2026-11-02T12:00:00Z</issued>
+<id>tag:gmail.google.com,2004:1847000000000000002</id>
+<author>
+<name>Google Classroom</name>
+<email>no-reply@classroom.google.com</email>
+</author>
+</entry>
+<entry>
+<title>Nuevos estrenos de la semana</title>
+<summary>Mirá lo nuevo que llegó.</summary>
+<link rel="alternate" href="https://mail.google.com/mail?account_id=alumno.prueba@gmail.com&amp;message_id=19a1b2c3d4e5f603&amp;view=conv&amp;extsrc=atom" type="text/html" />
+<modified>2026-11-01T20:00:00Z</modified>
+<issued>2026-11-01T20:00:00Z</issued>
+<id>tag:gmail.google.com,2004:1847000000000000003</id>
+<author>
+<name>Netflix</name>
+<email>info@mailer.netflix.com</email>
+</author>
+</entry>
+</feed>
