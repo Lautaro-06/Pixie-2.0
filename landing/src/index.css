@@ -280,7 +280,7 @@ kbd { font-family: inherit; font-weight: 600; padding: 0 0.35em; border: 1px sol
 
 .closing {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 2rem clamp(2rem, 6vw, 6rem);
   align-items: center;
   padding: clamp(4rem, 12vh, 8rem) var(--gutter);
