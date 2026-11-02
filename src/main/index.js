@@ -12,20 +12,23 @@ import { createAI, aiErrorText, voiceErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
 import { createPhone } from './phone.js'
-import { FriendlyError, isWindows } from './windows.js'
+import { FriendlyError, isWindows, launch, run, powershell } from './windows.js'
 import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
 import { createUpdater } from './updates.js'
 import { createDiagnostics } from './diagnostics.js'
 import { shortcutText } from './shortcut.js'
 import { createSettings, AI_STUDIO_URL, GOOGLE_CALENDAR_SETTINGS_URL } from './settings.js'
-import { openSettingsWindow, getSettingsWindow } from './settings-window.js'
+import { openSettingsWindow, getSettingsWindow, onSettingsClosed } from './settings-window.js'
 import { currentConditions } from './actions/weather.js'
 import { createWakeStore } from './wake-store.js'
 import { createCalendars } from './calendars.js'
 import { createNews } from './news.js'
 import { createClassroom } from './classroom.js'
 import { createMail, announceText } from './mail.js'
+import { createApps, LIST_SCRIPT } from './apps.js'
+import { createMaps, createTransit } from './maps.js'
+import { TRANSIT_SIGNUP } from './actions/maps.js'
 import { compareVersions, updateText } from './changelog.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
@@ -54,6 +57,7 @@ let calendars = null // Google Calendar, Classroom
 let news = null
 let classroom = null // las tareas de Classroom, con la extensión de Chrome
 let mail = null // los mails nuevos de Gmail, con la extensión de Chrome
+let apps = null // las apps instaladas y qué puede hacer Pixie con cada una
 let extensionFiles = null // dónde quedó la extensión para instalarla en Chrome
 let hands = null // escribir, apretar teclas y tocar botones en tus apps
 const OWN_APP = /^(pixie|electron)$/i
@@ -288,6 +292,17 @@ function registerShortcut() {
   }
 }
 
+// ¿Está abierto este programa? (para no abrir Chrome dos veces)
+async function isProcessRunning(exe) {
+  if (process.platform !== 'win32') return false
+  try {
+    const out = await run('tasklist', ['/FI', `IMAGENAME eq ${exe}.exe`, '/NH'])
+    return out.toLowerCase().includes(`${exe}.exe`)
+  } catch {
+    return false
+  }
+}
+
 // Lo que la IA sabe en cada mensaje (de los mails, solo cuántos hay sin leer, y si pediste los avisos)
 function contextForAI() {
   const st = mail?.status()
@@ -370,7 +385,7 @@ async function ask(text) {
   const results = []
   for (const it of intents) {
     // Los textos que se guardan conservan las tildes: "reunion" → "reunión"
-    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
+    for (const key of ['texto', 'nombre', 'pregunta', 'tema', 'de', 'destino', 'direccion']) if (it.params[key]) it.params[key] = restoreAccents(input, it.params[key])
     if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
     const action = actions[it.action]
     if (needsConfirm(action, it.params, ctx)) {
@@ -484,6 +499,7 @@ if (!app.requestSingleInstanceLock()) {
       feeling: mind?.feeling(),
       ai: Boolean(ai?.enabled()),
       palabra: wake?.forWindow() ?? null,
+      escena: mind?.scene() ?? null,
       pantallaReposo: getConfig().pantallaReposo ?? 'cara',
       clima: weatherNow ? { temp: weatherNow.temp, icon: weatherNow.icon } : null
     }))
@@ -522,8 +538,19 @@ if (!app.requestSingleInstanceLock()) {
     })
     browser = createBrowserBridge({
       log: logAction,
+      // Si una función necesita Chrome y está cerrado, lo abre (si la extensión ya se conectó alguna vez)
+      known: () => Boolean(getConfig().extensionNavegador),
+      openBrowser: async () => {
+        const exe = getConfig().extensionNavegador === 'edge' ? 'msedge' : 'chrome'
+        if (await isProcessRunning(exe)) return true
+        await launch({ tipo: 'start', valor: exe })
+        return false
+      },
+      onOpening: (wasOpen) =>
+        sendEvent({ type: 'notice', text: wasOpen ? 'Un segundo, me conecto con Chrome…' : 'Abro Chrome y enseguida lo hago…', face: 'happy', voice: false }),
       // Apenas se conecta la extensión (abriste Chrome), se fija en tus Pendientes de Classroom
-      onConnect: (version) => {
+      onConnect: (version, navegador) => {
+        if (getConfig().extensionNavegador !== navegador) saveConfig({ extensionNavegador: navegador })
         logAction(`extensión de Chrome ${version}`)
         setTimeout(() => classroom?.refresh(), 5000)
         setTimeout(() => (getConfig().mailAvisos ? mail?.refresh() : offerMailAlerts()), 15000)
@@ -572,6 +599,15 @@ if (!app.requestSingleInstanceLock()) {
       // Un mail de Classroom (una tarea nueva): vuelve a leer los Pendientes
       onClassroom: () => setTimeout(() => classroom?.refresh({ force: true }), 3000)
     })
+    // Las apps instaladas (del menú Inicio): «abrí …» las encuentra y en Ajustes → Apps elegís cuáles usa
+    apps = createApps({
+      file: join(app.getPath('userData'), 'apps-instaladas.json'),
+      getConfig,
+      saveConfig,
+      listImpl: isWindows ? () => powershell(LIST_SCRIPT, 90000) : null,
+      log: logAction
+    })
+    if (!apps.updated() || Date.now() - apps.updated() > 12 * 60 * 60 * 1000) setTimeout(() => apps.refresh(), 25000)
     calendars.start()
     classroom.start()
     mail.start()
@@ -595,6 +631,10 @@ if (!app.requestSingleInstanceLock()) {
       calendars,
       classroom,
       mail,
+      apps,
+      // Mapas (OpenStreetMap) y colectivos de la Ciudad
+      maps: createMaps({ getConfig, log: logAction }),
+      transit: createTransit({ getConfig }),
       phone,
       media,
       voice: tts,
@@ -693,6 +733,7 @@ if (!app.requestSingleInstanceLock()) {
       news,
       classroom,
       mail,
+      apps,
       extension: () => ({
         carpeta: extensionFiles?.carpeta ?? null,
         version: extensionFiles?.version ?? null,
@@ -750,6 +791,8 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:noticias-probar', () => settings.previewNews())
     handle('ajustes:classroom-leer', () => settings.readClassroom())
     handle('ajustes:mails-leer', () => settings.readMails())
+    handle('ajustes:apps-buscar', () => settings.searchApps())
+    handle('ajustes:abrir-registro-transporte', () => shell.openExternal(TRANSIT_SIGNUP))
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
     handle('ajustes:copiar-direccion-extensiones', () => clipboard.writeText('chrome://extensions'))
@@ -757,6 +800,8 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:decir', (text) => sendEvent({ type: 'prueba-voz', text: String(text ?? '').slice(0, 400) }))
     // Mientras probás la frase en Ajustes, la ventanita no se despierta
     handle('ajustes:palabra-probando', (on) => sendEvent({ type: 'palabra', ...wake.forWindow(), pausada: Boolean(on) }))
+    // Si cerrás Ajustes a mitad de «Probar ahora», la ventanita vuelve a escuchar «Pixie, ¿estás?»
+    onSettingsClosed(() => wake && sendEvent({ type: 'palabra', ...wake.forWindow(), pausada: false }))
     handle('ajustes:bienvenida-lista', () => {
       settings.finishWelcome()
       getSettingsWindow()?.close()

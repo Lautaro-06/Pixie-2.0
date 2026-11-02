@@ -23,18 +23,18 @@ export class OnlyWindowsError extends FriendlyError {
   }
 }
 
-export function run(file, args) {
+export function run(file, args, timeout = 15000) {
   return new Promise((resolve, reject) => {
-    execFile(file, args, { windowsHide: true, timeout: 15000 }, (err, stdout) => {
+    execFile(file, args, { windowsHide: true, timeout, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => {
       if (err) reject(err)
       else resolve(stdout)
     })
   })
 }
 
-export function powershell(script) {
+export function powershell(script, timeout = 15000) {
   if (!isWindows) throw new OnlyWindowsError()
-  return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script])
+  return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], timeout)
 }
 
 // Teclas virtuales de Windows para volumen y multimedia.

@@ -2,7 +2,7 @@
 // cuenta de Windows (en "cifrado") y Pixie las usa descifradas solo en memoria.
 // Si alguien pega una clave a mano en config.json, se cifra sola la próxima vez que se lee.
 
-export const SECRET_PATHS = [['claveIA'], ['whatsapp', 'apikey']]
+export const SECRET_PATHS = [['claveIA'], ['whatsapp', 'apikey'], ['transporte', 'secreto']]
 const keyOf = (path) => path.join('.')
 
 export function getIn(obj, path) {

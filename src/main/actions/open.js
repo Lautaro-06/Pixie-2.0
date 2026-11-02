@@ -5,7 +5,7 @@ import { launch, closeProcess, BlockedError } from '../windows.js'
 import { checkUrl, checkQuery } from '../safety.js'
 
 export function findTarget(objetivo, ctx) {
-  return resolveTarget(objetivo ?? '', ctx.getConfig().apps ?? [])
+  return resolveTarget(objetivo ?? '', ctx.getConfig().apps ?? [], ctx.apps?.catalog() ?? [])
 }
 
 export const openActions = [
@@ -23,6 +23,10 @@ export const openActions = [
         }
       }
       const { tipo, item } = found
+      // Las apps que sacaste en Ajustes → Apps no las abre
+      if (tipo === 'app' && ctx.apps && !ctx.apps.can('abrir', { nombre: item.nombre, proceso: item.proceso })) {
+        return { text: `No tengo permiso para abrir ${item.nombre}. Lo podés cambiar en mis Ajustes → Apps.`, face: 'idle' }
+      }
       if (tipo === 'sitio') {
         const blocked = checkUrl(item.url, ctx.getConfig().sitiosBloqueados)
         if (blocked) throw new BlockedError(blocked)
@@ -60,6 +64,9 @@ export const openActions = [
       const found = findTarget(objetivo, ctx)
       if (!found || found.tipo !== 'app' || !found.item.proceso) {
         return { text: `No sé cerrar «${objetivo}».`, face: 'confused' }
+      }
+      if (ctx.apps && !ctx.apps.can('usar', { nombre: found.item.nombre, proceso: found.item.proceso })) {
+        return { text: `No tengo permiso para usar ${found.item.nombre}. Lo podés cambiar en mis Ajustes → Apps.`, face: 'idle' }
       }
       try {
         await closeProcess(found.item.proceso)

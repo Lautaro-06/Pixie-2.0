@@ -56,13 +56,14 @@ function findByAlias(list, name) {
 }
 
 // Busca qué quiso abrir la persona. Devuelve { tipo, item } o null.
-export function resolveTarget(rawName, customApps = []) {
+// installed: las apps instaladas en la compu (de apps.js), para lo que no está en la lista de siempre
+export function resolveTarget(rawName, customApps = [], installed = []) {
   const name = fold(rawName).replace(PREFIXES, '').trim()
   const folder = findByAlias(FOLDERS, name)
   if (folder) return { tipo: 'carpeta', item: folder }
   const site = findByAlias(SITES, name)
   if (site) return { tipo: 'sitio', item: site }
-  const app = findByAlias([...customApps, ...APPS], name)
+  const app = findByAlias([...customApps, ...APPS, ...installed], name)
   if (app) return { tipo: 'app', item: app }
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/.test(name)) {
     return { tipo: 'sitio', item: { nombre: name, url: `https://${name}` } }

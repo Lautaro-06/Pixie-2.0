@@ -62,6 +62,8 @@ export default function App() {
   const [micLevel, setMicLevel] = useState(0)
   const [youSaid, setYouSaid] = useState(null) // lo que Pixie entendió de tu voz
   const [voiceShortcut, setVoiceShortcut] = useState(null)
+  const [scene, setScene] = useState(null) // el disfraz según lo que estás haciendo: { escena, auris }
+  const sceneRef = useRef(null)
   const [wakeCfg, setWakeCfg] = useState(null) // «Pixie, ¿estás?»: { activa, plantillas, sensibilidad, pausada }
   const [wakeRestart, setWakeRestart] = useState(0)
   const inputRef = useRef(null)
@@ -193,6 +195,10 @@ export default function App() {
       if (info.pantallaReposo) setStandbyMode(info.pantallaReposo)
       if (info.clima) setWeather(info.clima)
       if (info.palabra) setWakeCfg(info.palabra)
+      if (info.escena) {
+        sceneRef.current = info.escena
+        setScene(info.escena)
+      }
     }).catch(() => {})
     const stopVoices = onVoicesReady(() => setVoiceAvailable(hasSpanishVoice()))
     const stopEvents = api.onEvent((event) => {
@@ -217,6 +223,12 @@ export default function App() {
           setWakeRestart((n) => n + 1)
         }
       }
+      // Cambió lo que estás haciendo: anteojos 3D, auriculares, la compu…
+      if (event.type === 'escena') {
+        const next = { escena: event.escena ?? null, auris: Boolean(event.auris) }
+        sceneRef.current = next
+        setScene(next)
+      }
       if (event.type === 'palabra') {
         wakePaused.current = Boolean(event.pausada)
         // Si es la misma voz grabada, no vuelve a abrir el micrófono
@@ -225,8 +237,11 @@ export default function App() {
       // "Probar voz" desde los ajustes: habla aunque la voz esté apagada
       if (event.type === 'prueba-voz') speak(event.text, 'happy')
       if (event.type === 'presence') {
-        away.current = Boolean(event.away)
-        if (event.away) {
+        // Solo deja de esperar «Pixie, ¿estás?» con la compu bloqueada: si no tocás el teclado
+        // (mirando un video, desde la cama) igual la tenés que poder llamar
+        away.current = Boolean(event.away && event.bloqueada)
+        // Mirando una peli o escuchando música no tocás el teclado: igual te acompaña despierto
+        if (event.away && (event.bloqueada || !sceneRef.current?.escena)) {
           asleepRef.current = true
           setAsleep(true)
         } else {
@@ -267,7 +282,9 @@ export default function App() {
   useEffect(() => {
     const id = setInterval(() => {
       const after = feeling === 'cansado' ? SLEEP_WHEN_TIRED_MS : SLEEP_AFTER_MS
-      if (!expanded && !notice && !game && !asleepRef.current && Date.now() - lastActivity.current > after) {
+      // Si estás viendo algo, trabajando o jugando, te acompaña despierto (con su disfraz)
+      const company = Boolean(sceneRef.current?.escena || sceneRef.current?.auris) && !away.current
+      if (!expanded && !notice && !game && !company && !asleepRef.current && Date.now() - lastActivity.current > after) {
         asleepRef.current = true
         setAsleep(true)
       }
@@ -727,7 +744,7 @@ export default function App() {
       )}
 
       <div className="face" ref={faceRef} title="Arrastrame para moverme · clic derecho: menú">
-        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} />
+        <Face mood={mood} reaction={reaction} speech={speech} cursor={cursor} feeling={feeling} standby={standby} scene={scene} />
       </div>
 
       {!expanded && !notice && (

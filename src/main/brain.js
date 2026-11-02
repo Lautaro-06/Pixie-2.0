@@ -189,6 +189,8 @@ const OPEN_VERBS = new Set([
 const ARTICLES = /^(?:el |la |los |las |mi |mis |un |una |al |a )+/
 const has = (re) => (t) => re.test(t)
 const intent = (action, params = {}) => ({ action, params })
+const modeOf = (t) =>
+  /\b(a pie|caminando)\b/.test(t) ? 'caminando' : /\b(bici|bicicleta)\b/.test(t) ? 'bici' : /\b(auto|taxi|uber|remis|manejando)\b/.test(t) ? 'auto' : /\b(colectivo|bondi|subte|tren)\b/.test(t) ? 'colectivo' : null
 const chat = (tema) => intent('charla', { tema })
 
 const MUSIC_WORDS = /\b(musica|cancion|canciones|tema|temazo|playlist|video)\b/
@@ -272,6 +274,19 @@ const RULES = [
       return /\b(mand|escrib|envi|respond)/.test(t) ? null : intent('mails', { accion: 'revisar' })
     }
     return null
+  },
+  // Mapas y colectivos: "mi casa queda en …", "¿cómo llego al Obelisco en colectivo?", "¿dónde viene el 60?"
+  (t) => {
+    let m = /^(?:mi casa (?:queda|esta) en|mi direccion es|vivo en la calle|guarda(?:te)? que mi casa (?:queda|esta) en|anota que mi casa (?:queda|esta) en)\s+(.+)$/.exec(t)
+    if (m) return intent('mi_casa', { direccion: m[1] })
+    if (/^(?:donde queda mi casa|cual es mi direccion|sabes donde vivo|donde vivo)$/.test(t)) return intent('mi_casa')
+    m = /^(?:donde (?:viene|esta|anda)|cuando (?:pasa|viene|llega)|cuanto (?:le )?falta (?:para|al)|por donde viene|a cuanto esta)\s+(?:el |la )?(?:colectivo |bondi |linea )?(\d{1,3}[a-z]?)$/.exec(t)
+    if (m) return intent('colectivo', { linea: m[1] })
+    m = /^(?:como (?:llego|voy|hago para ir|hago para llegar|se llega)|llevame|indicaciones para (?:ir|llegar)|cuanto (?:tardo|tardaria|se tarda|me tardo)(?: en (?:llegar|ir))?(?: (?:caminando|a pie|en bici|en auto|en colectivo))?)\s+(?:a la |al |a |hasta la |hasta el |hasta )?(.+)$/.exec(t)
+    if (!m) return null
+    const modo = modeOf(t)
+    const destino = m[1].replace(/\s+(?:en|a)\s+(?:colectivo|bondi|subte|tren|auto|bici|bicicleta|pie|taxi|uber|remis)$|\s+caminando$/, '').trim()
+    return destino ? intent('como_llego', { destino, ...(modo ? { modo } : {}) }) : null
   },
   // ── Usar las apps ──
   // "escribí hola, ¿cómo estás?" (el texto exacto, con tildes y signos, lo recupera index.js del original)

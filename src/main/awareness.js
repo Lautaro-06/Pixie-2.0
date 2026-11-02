@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import { powerMonitor, net } from 'electron'
 import { isWindows } from './windows.js'
 import { categorize } from './usage.js'
+import { sceneFor } from './scenes.js'
 
 // Corre de fondo y cada segundo escribe una línea JSON con la ventana activa (la batería se mira cada
 // minuto y el micrófono cada 5 segundos). Así, si le escribís a Pixie, sabe en qué app estabas.
@@ -79,7 +80,8 @@ export function createAwareness() {
     bloqueada: false,
     online: true,
     bateria: null, // { nivel, cargando }
-    microfono: false // otra app está usando el micrófono (una llamada)
+    microfono: false, // otra app está usando el micrófono (una llamada)
+    escena: null // qué disfraz se pone Pixie según lo que hacés (ver scenes.js)
   }
   let lastWindow = null // la última ventana que no es Pixie: { hwnd, proceso, titulo } (solo en memoria)
   let watcher = null
@@ -99,6 +101,7 @@ export function createAwareness() {
     if (o.hwnd && o.proceso && !/^(explorer|searchhost|shellexperiencehost|lockapp)$/i.test(o.proceso)) lastWindow = { hwnd: o.hwnd, proceso: o.proceso, titulo: o.titulo ?? '' }
     else if (o.hwnd && /^explorer$/i.test(o.proceso ?? '') && o.titulo) lastWindow = { hwnd: o.hwnd, proceso: o.proceso, titulo: o.titulo }
     const act = categorize({ titulo: o.titulo, proceso: o.proceso, pantallaCompleta: o.pantallaCompleta })
+    state.escena = sceneFor({ titulo: o.titulo, proceso: o.proceso, pantallaCompleta: o.pantallaCompleta })
     state.pantallaCompleta = Boolean(act) && Boolean(o.pantallaCompleta)
     const before = state.actividad ? `${state.actividad.categoria}|${state.actividad.app}` : ''
     const now = act ? `${act.categoria}|${act.app}` : ''

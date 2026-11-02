@@ -16,7 +16,13 @@ function hands(ctx) {
 // La ventana donde hacerlo (primero se fija que haya manos: si no es Windows, lo dice)
 async function target(ctx) {
   hands(ctx)
-  return ctx.targetWindow()
+  const win = await ctx.targetWindow()
+  // Las apps que sacaste en Ajustes → Apps no las toca
+  if (ctx.apps && !ctx.apps.can('usar', win)) {
+    const name = ctx.apps.appForWindow(win)?.nombre ?? win.proceso ?? 'esa app'
+    throw new FriendlyError(`No tengo permiso para usar ${name}. Lo podés cambiar en mis Ajustes → Apps.`)
+  }
+  return win
 }
 
 // Busca un botón por su nombre en la ventana y lo toca (si no lo encuentra, lo busca en la pantalla con la IA)

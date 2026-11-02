@@ -9,6 +9,12 @@ export function getSettingsWindow() {
 }
 
 // view: 'ajustes' | 'bienvenida' (y una sección: 'ajustes/ia')
+let onClosed = () => {}
+// Cuando se cierra la ventana de Ajustes (aunque sea con la X a mitad de una prueba)
+export function onSettingsClosed(fn) {
+  onClosed = fn
+}
+
 export function openSettingsWindow(view = 'ajustes') {
   const open = getSettingsWindow()
   if (open) {
@@ -38,6 +44,7 @@ export function openSettingsWindow(view = 'ajustes') {
   win.once('ready-to-show', () => win?.show())
   win.on('closed', () => {
     win = null
+    onClosed()
   })
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(`${process.env.ELECTRON_RENDERER_URL}#${view}`)
   else win.loadFile(join(__dirname, '../renderer/index.html'), { hash: view })

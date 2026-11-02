@@ -42,7 +42,8 @@ export const browserActions = [
       const blocked = checkQuery(q)
       if (blocked) throw new BlockedError(blocked)
       // Con la extensión: lo pone en tu pestaña de YouTube y se fija que suene
-      if (ctx.browser?.connected()) {
+      // Si Chrome está cerrado lo abre (si tarda, pone el video directo en el navegador)
+      if (ctx.browser?.connected() || (await ctx.browser?.ensure?.({ timeoutMs: 12000 }))) {
         try {
           const r = await ctx.browser.request('reproducir', { consulta: q }, 30000)
           const bad = checkQuery(r.title)
@@ -70,7 +71,7 @@ export const browserActions = [
     name: 'youtube_click',
     description: 'Pone el video número N de la lista de YouTube que tenés abierta',
     run: async ({ n }, ctx) => {
-      const r = await ctx.browser.request('youtube_click', { n: Number(n) || 1 }, 20000)
+      const r = await (ctx.browser.need ?? ctx.browser.request)('youtube_click', { n: Number(n) || 1 }, 20000)
       const bad = checkQuery(r.title)
       if (bad) {
         await ctx.browser.request('youtube', { accion: 'pausa' }).catch(() => {})
@@ -83,7 +84,7 @@ export const browserActions = [
     name: 'youtube',
     description: 'Interactúa con el video de YouTube abierto en Chrome',
     run: async ({ accion, valor }, ctx) => {
-      const r = await ctx.browser.request('youtube', { accion, valor })
+      const r = await (ctx.browser.need ?? ctx.browser.request)('youtube', { accion, valor })
       return { text: r.text, face: r.ok ? FACE_BY_ACTION[accion] ?? 'happy' : 'confused' }
     }
   },

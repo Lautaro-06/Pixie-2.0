@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('pixie', {
     previewNews: () => ipcRenderer.invoke('ajustes:noticias-probar'),
     readClassroom: () => ipcRenderer.invoke('ajustes:classroom-leer'),
     readMails: () => ipcRenderer.invoke('ajustes:mails-leer'),
+    searchApps: () => ipcRenderer.invoke('ajustes:apps-buscar'),
+    openTransitSignup: () => ipcRenderer.invoke('ajustes:abrir-registro-transporte'),
     openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
     copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),
     onView: (callback) => {

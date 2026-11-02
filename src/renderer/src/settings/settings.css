@@ -612,3 +612,39 @@ body.ventana-ajustes #root {
   color: var(--text);
   line-height: 1.45;
 }
+
+/* ── Apps: qué puede abrir y usar ── */
+.ventana-ajustes .apps-search {
+  width: 100%;
+  margin-top: 14px;
+}
+.ventana-ajustes .apps-list {
+  margin-top: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  border-top: 1px solid var(--card-line);
+}
+.ventana-ajustes .apps-head,
+.ventana-ajustes .apps-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--card-line);
+}
+.ventana-ajustes .apps-head {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ventana-ajustes .apps-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

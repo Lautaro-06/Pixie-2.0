@@ -17,6 +17,10 @@ let streamDone = true
 let received = 0
 let pauseMusic = false
 let speakingNow = false
+// Hasta cuándo puede estar hablando, como mucho. Si el navegador no avisa que terminó (a veces la voz
+// de Windows queda «hablando» para siempre), Pixie no se queda sorda a «Pixie, ¿estás?».
+let systemUntil = 0
+let streamUntil = 0
 
 function spanishVoice() {
   if (!('speechSynthesis' in window)) return null
@@ -64,7 +68,12 @@ function systemSpeak(text, face, id) {
   utterance.rate = SPEED[face] ?? 1.05
   utterance.pitch = 1
   utterance.onstart = () => id === current && setSpeaking(true)
-  utterance.onend = utterance.onerror = () => id === current && setSpeaking(false)
+  utterance.onend = utterance.onerror = () => {
+    if (id !== current) return
+    systemUntil = 0
+    setSpeaking(false)
+  }
+  systemUntil = Date.now() + 4000 + text.length * 110
   window.speechSynthesis.speak(utterance)
 }
 
@@ -103,8 +112,9 @@ api.onEvent((event) => {
 
 // ¿Está hablando ahora (o por empezar)?
 export function isSpeaking() {
-  const system = 'speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)
-  return system || sources.length > 0 || !streamDone
+  const now = Date.now()
+  const system = now < systemUntil && 'speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+  return system || sources.length > 0 || (!streamDone && now < streamUntil)
 }
 
 export function speak(text, face) {
@@ -115,6 +125,7 @@ export function speak(text, face) {
   // La app decide si hay voz natural (si no, contesta enseguida y se usa la de Windows)
   if (!api.voice) return systemSpeak(text, face, id)
   streamDone = false
+  streamUntil = Date.now() + 40000
   received = 0
   api
     .voice({ id, text, face })
@@ -141,6 +152,7 @@ export function stopSpeaking() {
   nextAt = 0
   leftover = null
   streamDone = true
+  systemUntil = 0
   if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   setSpeaking(false)
 }

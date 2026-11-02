@@ -208,6 +208,21 @@ export const AI_TOOLS = [
     input_schema: obj()
   },
   {
+    name: 'como_llego',
+    description: 'Abre en Google Maps cómo llegar a un lugar y dice cuánto se tarda. modo: colectivo (también subte o tren), caminando, bici o auto. destino «casa» es la casa del usuario.',
+    input_schema: obj({ destino: str('A dónde quiere ir (lugar o dirección)'), modo: oneOf(['colectivo', 'caminando', 'bici', 'auto']) }, ['destino'])
+  },
+  {
+    name: 'mi_casa',
+    description: 'Guarda la dirección de la casa del usuario (o dice cuál tiene guardada si no hay dirección)',
+    input_schema: obj({ direccion: str('Calle y altura, barrio o ciudad') })
+  },
+  {
+    name: 'colectivo',
+    description: 'Dice dónde viene un colectivo de la Ciudad de Buenos Aires (el más cercano a la casa del usuario) y cuánto le falta',
+    input_schema: obj({ linea: str('El número de la línea, por ejemplo "60"') }, ['linea'])
+  },
+  {
     name: 'novedades',
     description: 'Cuenta qué hay de nuevo y qué mejoró en la última versión de Pixie. Usala si pregunta qué hay de nuevo, qué cambió o qué sabe hacer ahora.',
     input_schema: obj()

@@ -162,6 +162,7 @@ export function createMail({ browser, file, getConfig = () => ({}), saveConfig =
     const t = now()
     if (!force && leido && t - leido < EVERY_MS - 10 * 1000) return { ...status(), nuevos: [] }
     if (t - lastTry < MIN_GAP_MS) return { ...status(), nuevos: [] }
+    if (!browser?.connected() && force) await browser?.ensure?.()
     if (!browser?.connected()) {
       estado = 'sin-extension'
       return { ...status(), nuevos: [] }

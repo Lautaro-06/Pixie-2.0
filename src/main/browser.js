@@ -14,15 +14,20 @@ export class NoExtensionError extends BrowserError {
   }
 }
 
-export function createBrowserBridge({ log = () => {}, onConnect = () => {} } = {}) {
+// known(): ¿alguna vez se conectó la extensión? (si nunca se instaló, abrir Chrome no sirve)
+// openBrowser(): abre el navegador donde está la extensión; devuelve true si ya estaba abierto
+// onOpening(yaAbierto): para avisar «Abro Chrome…» mientras espera
+export function createBrowserBridge({ log = () => {}, onConnect = () => {}, known = () => false, openBrowser = null, onOpening = () => {}, port = BRIDGE_PORT } = {}) {
   let socket = null
   let version = null // la versión de la extensión (para avisar si hay que recargarla)
   let nextId = 1
   const waiting = new Map()
+  let connectedWaiters = [] // los que esperan a que se conecte
+  let opening = null
 
   const wss = new WebSocketServer({
     host: '127.0.0.1',
-    port: BRIDGE_PORT,
+    port,
     verifyClient: ({ origin }) => typeof origin === 'string' && /^(chrome|moz)-extension:\/\//.test(origin)
   })
 
@@ -39,7 +44,9 @@ export function createBrowserBridge({ log = () => {}, onConnect = () => {} } = {
       }
       if (msg.type === 'hola') {
         version = String(msg.version ?? '')
-        onConnect(version)
+        onConnect(version, msg.navegador === 'edge' ? 'edge' : 'chrome')
+        for (const w of connectedWaiters) w(true)
+        connectedWaiters = []
         return
       }
       const pending = msg.id && waiting.get(msg.id)
@@ -69,7 +76,48 @@ export function createBrowserBridge({ log = () => {}, onConnect = () => {} } = {
     })
   }
 
+  // Que la extensión esté conectada: si Chrome está cerrado lo abre y espera; si está abierto, espera a
+  // que la extensión se reconecte (Chrome la duerme cuando no se usa y se despierta cada 30 segundos).
+  function ensure({ timeoutMs = 35000 } = {}) {
+    if (socket) return Promise.resolve(true)
+    if (!openBrowser || !known()) return Promise.resolve(false)
+    opening ??= (async () => {
+      let giveUp = () => {}
+      const wait = new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), timeoutMs)
+        giveUp = () => {
+          clearTimeout(timer)
+          resolve(false)
+        }
+        connectedWaiters.push((ok) => {
+          clearTimeout(timer)
+          resolve(ok)
+        })
+      })
+      try {
+        const wasOpen = await openBrowser()
+        onOpening(Boolean(wasOpen))
+      } catch (err) {
+        // No se pudo abrir (no está instalado): no tiene sentido esperar
+        log(`abrir el navegador: ${err.message}`)
+        giveUp()
+      }
+      const ok = await wait
+      if (!ok) log('la extensión de Chrome no se conectó a tiempo')
+      return Boolean(socket)
+    })().finally(() => {
+      opening = null
+    })
+    return opening
+  }
+
   return {
+    ensure,
+    // Como request, pero si hace falta abre Chrome primero (para lo que pidió la persona)
+    async need(cmd, args = {}, timeoutMs = 8000) {
+      await ensure()
+      return request(cmd, args, timeoutMs)
+    },
     request,
     connected: () => Boolean(socket),
     version: () => (socket ? version : null),

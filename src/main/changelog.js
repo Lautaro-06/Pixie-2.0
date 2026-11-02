@@ -6,6 +6,19 @@
 
 export const CHANGELOG = [
   {
+    version: '0.13.0',
+    nuevo: [
+      { corto: 'me disfrazo según lo que hacés: anteojos 3D y pochoclos si mirás algo, auriculares si escuchás música y más', detalle: 'Me disfrazo según lo que estás haciendo: anteojos 3D y pochoclos si mirás YouTube, Netflix, Cuevana, Kick, Twitch o Instagram; anteojos y la compu si trabajás en Word, PowerPoint o VS Code; auriculares si escuchás música; un joystick si jugás; un libro si leés; el celu si chateás, y boina y pincel si dibujás.' },
+      { corto: 'te digo cómo llegar a cualquier lado y dónde viene el colectivo', detalle: '«¿Cómo llego al Obelisco?» te abre el recorrido en Google Maps y te dice cuánto tardás desde tu casa. «¿Dónde viene el 60?» te dice dónde está el colectivo más cerca (con una clave gratis de la Ciudad, en Ajustes → Mapas y colectivos).' },
+      { corto: 'elegís qué apps de tu compu puedo abrir y usar', detalle: 'En Ajustes → Apps elegís qué apps de tu compu puedo abrir y cuáles puedo usar. Y ahora abro cualquier app instalada, no solo las que conocía.' }
+    ],
+    mejoras: [
+      { corto: 'me muevo más fluido y tengo gestos nuevos', detalle: 'Me muevo más fluido (sin saltos, a 60 cuadros por segundo y con el brillo de los LEDs) y tengo gestos nuevos: ojos de estrella, mareada, me estiro, estornudo, asiento y bailo.' },
+      { corto: '«Pixie, ¿estás?» ya no se queda sorda si no tocás el teclado', detalle: '«Pixie, ¿estás?» ya no deja de escucharte cuando pasás un rato sin tocar el teclado (mirando un video o desde la cama), ni si cerraste Ajustes a mitad de una prueba, ni si la voz de Windows se trababa.' },
+      { corto: 'si algo necesita Chrome, lo abro yo', detalle: 'Si algo necesita Chrome y está cerrado, lo abro y después hago lo que me pediste (sin decirte que está cerrado).' }
+    ]
+  },
+  {
     version: '0.12.0',
     nuevo: [
       { corto: 'te cuento qué hay de nuevo cada vez que me actualizo', detalle: 'Cada vez que me actualizo te cuento qué hay de nuevo y qué mejoré. Preguntame «¿qué hay de nuevo?» cuando quieras.' },

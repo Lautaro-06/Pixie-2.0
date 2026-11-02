@@ -103,12 +103,74 @@ export const REACTIONS = {
   laugh: [1600, (t) => ({ eyes: 'happy', mouth: Math.floor(t / 120) % 2 ? 'o' : 'talk', dy: Math.floor(t / 120) % 2 ? -1 : 0 })]
 }
 
+// Más gestos
+Object.assign(REACTIONS, {
+  // Orgulloso: ojos de estrella y un saltito
+  proud: [1400, (t) => ({ eyes: 'star', mouth: 'smile', dy: t < 160 ? -2 : t < 320 ? 0 : t < 460 ? -1 : 0 })],
+  // Mareado: ojos en X y se bambolea
+  dizzy: [1600, (t) => ({ eyes: 'dizzy', mouth: 'o', dx: Math.round(Math.sin(t / 90) * 2) })],
+  // Asiente: «dale», «entendido»
+  nod: [900, (t) => ({ mouth: 'smile', ...keyframes(t, [[0, { dy: 0, lookY: 0 }], [150, { dy: 2, lookY: 0.6 }], [300, { dy: 0, lookY: 0 }], [450, { dy: 2, lookY: 0.6 }], [600, { dy: 0, lookY: 0 }]]) })],
+  // Risita
+  giggle: [1100, (t) => ({ eyes: 'happy', mouth: 'smile', dx: Math.floor(t / 60) % 2 ? 1 : 0, dy: Math.floor(t / 180) % 2 ? -1 : 0 })],
+  // Se estira: abre grande los ojos, después los aprieta
+  stretch: [1500, (t) => ({
+    ...keyframes(t, [[0, { openL: 1, openR: 1, dy: 0 }], [400, { openL: 1, openR: 1, dy: -2 }], [700, { openL: 0.4, openR: 0.4, dy: 1 }], [1100, { openL: 0.4, openR: 0.4, dy: 1 }], [1500, { openL: 1, openR: 1, dy: 0 }]]),
+    eyes: t < 400 ? 'wide' : 'normal',
+    mouth: t > 600 && t < 1200 ? 'o' : 'small'
+  })],
+  // Espía para arriba y vuelve
+  peek: [1600, (t) => keyframes(t, [[0, { lookY: 0, lookX: 0 }], [200, { lookY: -1, lookX: -0.4 }], [700, { lookY: -1, lookX: 0.4 }], [1100, { lookY: -1, lookX: 0.4 }], [1600, { lookY: 0, lookX: 0 }]])],
+  // Baila (con música)
+  dance: [2400, (t) => ({ eyes: Math.floor(t / 600) % 2 ? 'happy' : 'normal', mouth: 'smile', dx: Math.round(Math.sin(t / 150) * 2), dy: Math.floor(t / 300) % 2 ? -1 : 0, lookX: Math.sin(t / 300) * 0.6 })],
+  // Estornuda: aprieta los ojos y ¡achís!
+  sneeze: [1300, (t) => ({
+    ...keyframes(t, [[0, { openL: 1, openR: 1, dy: 0 }], [500, { openL: 0.3, openR: 0.3, dy: -2 }], [700, { openL: 0, openR: 0, dy: 2 }], [1000, { openL: 0, openR: 0, dy: 0 }], [1300, { openL: 1, openR: 1, dy: 0 }]]),
+    mouth: t < 650 ? 'o' : t < 1000 ? 'talk' : 'small'
+  })]
+})
+
 // Qué hace solo, de vez en cuando, según cómo se siente.
 export const IDLE_BY_FEELING = {
-  contento: [[0.15, 'wiggle'], [0.25, 'happy']],
-  aburrido: [[0.2, 'sigh'], [0.3, 'lookAround']],
-  cansado: [[0.3, 'yawn']],
-  normal: []
+  contento: [[0.12, 'wiggle'], [0.2, 'happy'], [0.27, 'giggle'], [0.32, 'stretch']],
+  aburrido: [[0.2, 'sigh'], [0.3, 'lookAround'], [0.36, 'peek']],
+  cansado: [[0.3, 'yawn'], [0.36, 'stretch']],
+  normal: [[0.05, 'peek'], [0.09, 'stretch'], [0.11, 'sneeze']]
+}
+
+// Qué hace de vez en cuando según lo que estás haciendo
+export const IDLE_BY_SCENE = {
+  cine: [[0.12, 'laugh'], [0.2, 'surprised']],
+  jugando: [[0.1, 'angry'], [0.2, 'proud']],
+  musica: [[0.25, 'dance']],
+  trabajando: [[0.08, 'nod'], [0.12, 'proud']],
+  programando: [[0.08, 'nod'], [0.13, 'proud'], [0.16, 'dizzy']],
+  leyendo: [[0.08, 'peek']],
+  chateando: [[0.12, 'giggle']],
+  artista: [[0.1, 'proud']]
+}
+
+// Cómo se mueve con cada disfraz (mientras está tranquilo)
+const beat = (t, ms) => Math.floor(t / ms)
+export const SCENE_MOTION = {
+  cine: (t) => {
+    const c = t % 3600
+    // Mira el balde, saca un pochoclo y lo mastica
+    const look = c < 450 ? { lookX: 0.75, lookY: 0.6 } : {}
+    const mouth = c >= 600 && c < 1500 ? (beat(c, 150) % 2 ? 'flat' : 'small') : 'small'
+    return { dx: -2, mouth, ...look }
+  },
+  trabajando: (t) => ({ lookY: 0.6, lookX: Math.sin(t / 700) * 0.25, openL: 0.9, openR: 0.9, mouth: 'flat' }),
+  programando: (t) => ({ lookY: 0.6, lookX: Math.sin(t / 520) * 0.3, openL: 0.9, openR: 0.9, mouth: 'small' }),
+  leyendo: (t) => {
+    const k = (t % 2600) / 2600
+    return { lookY: 0.55, lookX: -0.6 + 1.2 * Math.min(1, k / 0.85), mouth: 'small' }
+  },
+  musica: (t) => ({ dy: beat(t, 250) % 2 ? -1 : 0, eyes: beat(t, 500) % 8 >= 6 ? 'happy' : 'normal', mouth: 'smile' }),
+  jugando: (t) => ({ lookX: beat(t, 650) % 2 ? 0.35 : -0.35, lookY: 0.2, brow: 'angry', mouth: 'flat' }),
+  reunion: () => ({ mouth: 'small' }),
+  chateando: () => ({ dx: -2, lookX: 0.9, lookY: 0.5, mouth: 'small' }),
+  artista: () => ({ dx: -1, lookX: 0.6, lookY: 0.4, mouth: 'smile' })
 }
 
 // Boca que se mueve mientras Pixie "habla".
@@ -119,9 +181,11 @@ export function talking(t) {
 
 // Combina el estado de ánimo con las animaciones activas.
 // overlays: [{ fn, start, duration }] en orden; las últimas mandan.
-export function compose(mood, moodStart, overlays, now, { still = false, follow = null, tired = false } = {}) {
+// scene: { name, start } — el disfraz de lo que estás haciendo (se mueve así solo cuando está tranquilo)
+export function compose(mood, moodStart, overlays, now, { still = false, follow = null, tired = false, scene = null } = {}) {
   const base = MOODS[mood] ?? MOODS.idle
   const params = { ...base(now - moodStart) }
+  if (mood === 'idle' && scene && SCENE_MOTION[scene.name] && now >= scene.start) Object.assign(params, SCENE_MOTION[scene.name](now - scene.start))
   if (mood === 'idle' && follow) Object.assign(params, follow)
   if (tired && mood !== 'sleeping') {
     params.openL = Math.min(params.openL ?? 1, 0.75)

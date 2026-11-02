@@ -12,6 +12,7 @@ import { describeWhen, startOfDay, addDays } from './dates.js'
 import { runAction } from './actions/index.js'
 import { isWindows } from './windows.js'
 import { howItWent } from './brain.js'
+import { combineScene } from './scenes.js'
 
 // Avisos que se dicen menos si no les das bola
 const LEARNS = new Set(['charla', 'agua', 'pausa', 'noticias', 'distraccion'])
@@ -39,6 +40,25 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
   let lastFeeling = null
   let question = null // la última pregunta que hizo por su cuenta, esperando respuesta
   const timers = []
+  // El disfraz de Pixie según lo que hacés, y la música que suena (se mira cada 10 segundos)
+  let scene = { escena: null, auris: false }
+  let media = null
+  let mediaCheckedAt = 0
+
+  function updateScene(snap) {
+    if (ctx.media && Date.now() - mediaCheckedAt > 10000) {
+      mediaCheckedAt = Date.now()
+      ctx.media
+        .info()
+        .then((m) => (media = m))
+        .catch(() => (media = null))
+    }
+    const next = combineScene(snap.escena ?? null, media)
+    if (next.escena !== scene.escena || next.auris !== scene.auris) {
+      scene = next
+      sendEvent({ type: 'escena', ...scene })
+    }
+  }
 
   const isQuiet = () => {
     const snap = awareness.snapshot()
@@ -92,7 +112,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       },
       memory
     )
-    if (presence) sendEvent({ type: 'presence', away: presence === 'ausente' })
+    if (presence) sendEvent({ type: 'presence', away: presence === 'ausente', bloqueada: Boolean(snap.bloqueada) })
+    updateScene(snap)
     for (const n of notices) deliver(n).catch((err) => console.error(err))
     shareFeeling()
   }
@@ -134,6 +155,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       quietUntil = minutes > 0 ? Date.now() + minutes * 60000 : 0
     },
     feeling: () => feeling(memory.getMood(), new Date()),
+    scene: () => scene,
     howAreYou: () => howAreYou(memory.getMood(), new Date()),
     // Lo que la IA necesita saber en cada mensaje
     contextText() {

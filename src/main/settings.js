@@ -50,6 +50,7 @@ export function createSettings({
   news = null,
   classroom = null,
   mail = null,
+  apps = null,
   extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
 }) {
@@ -89,6 +90,13 @@ export function createSettings({
         calendarios: calendars?.status() ?? [],
         classroom: classroom ? { ...classroom.status(), extension: extension() } : null,
         mails: mail ? { ...mail.status(), extension: extension() } : null
+      },
+      apps: apps ? { lista: apps.list(), actualizado: apps.updated(), buscando: apps.searching() } : null,
+      mapas: {
+        casa: cfg.direccionCasa ?? '',
+        transporteId: cfg.transporte?.id ?? '',
+        transporteSecreto: maskSecret(cfg.transporte?.secreto),
+        transporte: Boolean(cfg.transporte?.id && cfg.transporte?.secreto)
       },
       noticias: {
         fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
@@ -131,6 +139,19 @@ export function createSettings({
       if (patch.mailAvisos) mail?.refresh({ force: true, silent: true }).catch(() => {})
     }
     if (typeof patch.mailsDesilenciar === 'string') mail?.unmute(patch.mailsDesilenciar)
+    // Ajustes → Mapas: tu casa y la clave de los colectivos
+    if (typeof patch.direccionCasa === 'string') saveConfig({ direccionCasa: patch.direccionCasa.trim().slice(0, 120) || undefined })
+    if (typeof patch.transporteId === 'string' || typeof patch.transporteSecreto === 'string') {
+      const cur = getConfig().transporte ?? {}
+      const next = { ...cur }
+      if (typeof patch.transporteId === 'string') next.id = patch.transporteId.trim() || undefined
+      if (typeof patch.transporteSecreto === 'string' && patch.transporteSecreto.trim()) next.secreto = patch.transporteSecreto.trim()
+      saveConfig({ transporte: next })
+      if (next.id && next.secreto) mensajes.push('Listo: ya puedo decirte dónde vienen los colectivos. Probá «¿dónde viene el 60?».')
+    }
+    // Ajustes → Apps: qué apps puede abrir y usar
+    if (patch.appPermiso && typeof patch.appPermiso.id === 'string') apps?.set(patch.appPermiso.id, patch.appPermiso)
+    if (typeof patch.appsTodas === 'boolean') apps?.setAll(patch.appsTodas)
     if ('palabraMagica' in patch) wake?.setActive(Boolean(patch.palabraMagica))
     if (typeof patch.sensibilidadPalabra === 'string') wake?.setSensitivity(patch.sensibilidadPalabra)
     if (typeof patch.atajo === 'string') {
@@ -237,6 +258,13 @@ export function createSettings({
     return { ...snapshot(), mensaje }
   }
 
+  // Apps: vuelve a buscar las instaladas
+  async function searchApps() {
+    const list = await apps.refresh()
+    const mensaje = list.length ? `Encontré ${list.length} apps en tu compu.` : 'No encontré apps: esto anda en Windows.'
+    return { ...snapshot(), mensaje }
+  }
+
   // Mails: mira ahora cuántos hay sin leer (con la extensión de Chrome)
   async function readMails() {
     const st = await mail.refresh({ force: true, silent: true })
@@ -268,6 +296,7 @@ export function createSettings({
     snapshot,
     apply,
     readMails,
+    searchApps,
     testKey,
     saveKey,
     forgetKey,

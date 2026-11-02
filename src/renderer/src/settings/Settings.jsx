@@ -8,6 +8,8 @@ const SECTIONS = [
   ['personalizacion', 'Personalización'],
   ['agenda', 'Agenda'],
   ['noticias', 'Noticias'],
+  ['apps', 'Apps'],
+  ['mapas', 'Mapas y colectivos'],
   ['ia', 'Inteligencia artificial'],
   ['voz', 'Voz'],
   ['actualizaciones', 'Actualizaciones'],
@@ -69,6 +71,8 @@ export default function Settings({ section: initial = 'general' }) {
         {section === 'personalizacion' && <Personalization s={s} change={change} />}
         {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
         {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
+        {section === 'apps' && <AppsSection s={s} setS={setS} change={change} say={say} />}
+        {section === 'mapas' && <MapsSection s={s} change={change} />}
         {section === 'ia' && <AISection s={s} change={change} reload={load} say={say} />}
         {section === 'voz' && <VoiceSection s={s} setS={setS} change={change} say={say} />}
         {section === 'actualizaciones' && <Updates s={s} setS={setS} say={say} />}
@@ -90,6 +94,117 @@ function Header({ title, text }) {
       <h1>{title}</h1>
       {text && <p>{text}</p>}
     </header>
+  )
+}
+
+// Tu casa (para los recorridos) y la clave gratis de los colectivos de la Ciudad
+function MapsSection({ s, change }) {
+  const m = s.mapas
+  return (
+    <>
+      <Header title="Mapas y colectivos" text="Preguntame «¿cómo llego al Obelisco?», «¿cuánto tardo caminando a la escuela?» o «¿dónde viene el 60?»." />
+      <Card title="Tu casa" note="Queda solo en esta compu. Para calcular un recorrido se la paso a los mapas de OpenStreetMap y Google Maps.">
+        <Row label="Dirección" hint="Calle y altura, y el barrio o la ciudad." htmlFor="casa">
+          <TextSetting id="casa" value={m.casa} placeholder="Av. Rivadavia 5000, Caballito" onSave={(direccionCasa) => change({ direccionCasa })} />
+        </Row>
+      </Card>
+      <Card
+        title="Colectivos en vivo (Ciudad de Buenos Aires)"
+        note="Con esta clave te digo dónde viene un colectivo y cuánto le falta para tu casa. Es gratis y la da la Ciudad. Sin la clave, te muestro las paradas en Google Maps."
+      >
+        <p className="big-status">{m.transporte ? 'Ya tengo la clave: preguntame «¿dónde viene el 60?».' : 'Todavía no tengo la clave de los colectivos.'}</p>
+        {!m.transporte && (
+          <ol className="news-list">
+            <li>Entrá a la página de registro de la API de Transporte de la Ciudad (botón de abajo) y completá el formulario.</li>
+            <li>Te llega un mail con el <b>client_id</b> y el <b>client_secret</b>.</li>
+            <li>Pegalos acá abajo.</li>
+          </ol>
+        )}
+        <div className="buttons">
+          <button type="button" className="button secondary" onClick={() => api.settings.openTransitSignup()}>
+            Abrir la página de registro
+          </button>
+        </div>
+        <Row label="client_id" htmlFor="transporte-id">
+          <TextSetting id="transporte-id" value={m.transporteId} placeholder="Pegalo acá" onSave={(transporteId) => change({ transporteId })} />
+        </Row>
+        <Row label="client_secret" hint={m.transporteSecreto ? `Guardada: ${m.transporteSecreto}` : 'Se guarda cifrada en esta compu.'} htmlFor="transporte-secreto">
+          <TextSetting id="transporte-secreto" value="" placeholder={m.transporteSecreto ? 'Pegá otra para cambiarla' : 'Pegalo acá'} onSave={(transporteSecreto) => change({ transporteSecreto })} />
+        </Row>
+      </Card>
+    </>
+  )
+}
+
+// Qué apps de la compu puede abrir y usar Pixie
+function AppsSection({ s, setS, change, say }) {
+  const a = s.apps
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  if (!a) return null
+  const q = query.trim().toLowerCase()
+  const list = a.lista.filter((x) => !q || x.nombre.toLowerCase().includes(q))
+  const allowedOpen = a.lista.filter((x) => x.abrir).length
+  const search = async () => {
+    setSearching(true)
+    const r = await api.settings.searchApps()
+    setSearching(false)
+    setS(r)
+    say(r.mensaje)
+  }
+  return (
+    <>
+      <Header title="Apps" text="Elegí qué apps de tu compu puedo abrir («abrí Minecraft») y cuáles puedo usar: escribir, tocar botones, apretar atajos o cerrarlas." />
+      <Card
+        title="Las apps de tu compu"
+        note="La lista sale del menú Inicio. Lo que no tocás queda permitido. Lo que saques, no lo abro ni lo toco aunque me lo pidas (ni con la IA)."
+      >
+        {a.lista.length === 0 ? (
+          <p className="big-status">{a.buscando || searching ? 'Buscando las apps de tu compu…' : 'Todavía no busqué las apps de tu compu.'}</p>
+        ) : (
+          <p className="big-status">
+            Puedo abrir {allowedOpen} de {a.lista.length} apps.
+          </p>
+        )}
+        <div className="buttons">
+          <button type="button" className="button" disabled={searching || a.buscando} onClick={search}>
+            {searching || a.buscando ? 'Buscando…' : 'Buscar apps de nuevo'}
+          </button>
+          <button type="button" className="button secondary" onClick={() => change({ appsTodas: true })}>
+            Permitir todas
+          </button>
+          <button type="button" className="button secondary" onClick={() => change({ appsTodas: false })}>
+            Ninguna
+          </button>
+        </div>
+        {a.lista.length > 0 && (
+          <>
+            <input id="apps-buscar" className="field apps-search" value={query} placeholder="Buscar una app…" aria-label="Buscar una app" onChange={(e) => setQuery(e.target.value)} />
+            <div className="apps-list" role="table" aria-label="Permisos de las apps">
+              <div className="apps-head" role="row">
+                <span role="columnheader">App</span>
+                <span role="columnheader">Abrir</span>
+                <span role="columnheader">Usar</span>
+              </div>
+              {list.map((x) => (
+                <div className="apps-row" role="row" key={x.id}>
+                  <span className="apps-name" role="cell">
+                    {x.nombre}
+                  </span>
+                  <span role="cell">
+                    <Toggle label={`Abrir ${x.nombre}`} on={x.abrir} onChange={(v) => change({ appPermiso: { id: x.id, abrir: v } })} />
+                  </span>
+                  <span role="cell">
+                    <Toggle label={`Usar ${x.nombre}`} on={x.usar} onChange={(v) => change({ appPermiso: { id: x.id, usar: v } })} />
+                  </span>
+                </div>
+              ))}
+              {list.length === 0 && <p className="note">No encontré «{query}» entre tus apps.</p>}
+            </div>
+          </>
+        )}
+      </Card>
+    </>
   )
 }
 

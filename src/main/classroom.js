@@ -124,6 +124,7 @@ export function createClassroom({ browser, file, getConfig = () => ({}), log = (
     const t = now().getTime()
     if (!force && saved.leido && t - saved.leido < EVERY_MS - MIN) return status()
     if (t - lastTry < MIN_GAP_MS) return status()
+    if (!browser?.connected() && force) await browser?.ensure?.()
     if (!browser?.connected()) {
       state = 'sin-extension'
       return status()

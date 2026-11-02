@@ -20,7 +20,7 @@ function problem(st, ctx) {
 
 async function readOne(mail, ctx) {
   // Se abre en Chrome (así lo ves y queda leído) y se lee entero
-  if (mail.link && ctx.browser?.connected()) {
+  if (mail.link && (ctx.browser?.connected() || (await ctx.browser?.ensure?.()))) {
     try {
       const page = await ctx.browser.request('abrir_mail', { link: mail.link }, 40 * 1000)
       let summary = null

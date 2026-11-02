@@ -7,6 +7,17 @@ let fakeSettings = {
   bienvenidaHecha: false,
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true },
   apariencia: { pantallaReposo: 'cara' },
+  mapas: { casa: '', transporteId: '', transporteSecreto: '', transporte: false },
+  apps: {
+    actualizado: Date.now(),
+    buscando: false,
+    lista: ['Calculadora', 'Discord', 'Excel', 'Google Chrome', 'Minecraft Launcher', 'Paint', 'PowerPoint', 'Spotify', 'Steam', 'Visual Studio Code', 'WhatsApp', 'Word'].map((nombre, i) => ({
+      id: `app${i}`,
+      nombre,
+      abrir: nombre !== 'Steam',
+      usar: !['Steam', 'WhatsApp'].includes(nombre)
+    }))
+  },
   agenda: {
     calendarios: [],
     classroom: { estado: 'sin-leer', conectada: false, tareas: 0, conFecha: 0, leido: null, error: null, avisos: true, extension: { carpeta: null, version: '0.11.0', conectada: false, vieja: false } },
@@ -26,8 +37,13 @@ const previewSettings = {
     const g = { ...fakeSettings.general }
     for (const k of ['nombre', 'ciudad', 'arrancarConWindows', 'recordatoriosSalud', 'avisosAlCelular']) if (k in patch) g[k] = patch[k]
     if (patch.atajo) g.atajo = patch.atajo.replace('Control', 'Ctrl').replace('Space', 'Espacio')
+    // Apps: los permisos en la vista previa
+    let apps = fakeSettings.apps
+    if (patch.appPermiso) apps = { ...apps, lista: apps.lista.map((x) => (x.id === patch.appPermiso.id ? { ...x, ...patch.appPermiso } : x)) }
+    if (typeof patch.appsTodas === 'boolean') apps = { ...apps, lista: apps.lista.map((x) => ({ ...x, abrir: patch.appsTodas, usar: patch.appsTodas })) }
     fakeSettings = {
       ...fakeSettings,
+      apps,
       general: g,
       apariencia: patch.pantallaReposo ? { pantallaReposo: patch.pantallaReposo } : fakeSettings.apariencia,
       voz: {
@@ -85,6 +101,11 @@ const previewSettings = {
       agenda: { ...fakeSettings.agenda, classroom: { ...fakeSettings.agenda.classroom, estado: 'ok', tareas: 3, conFecha: 2, leido: Date.now(), extension: { ...fakeSettings.agenda.classroom.extension, conectada: true } } }
     }
     return { ...fakeSettings, mensaje: 'Leí tus Pendientes: tenés 3 tareas.' }
+  },
+  openTransitSignup: async () => window.open('https://api-transporte.buenosaires.gob.ar/registro', '_blank'),
+  searchApps: async () => {
+    await wait(600)
+    return { ...fakeSettings, mensaje: `Encontré ${fakeSettings.apps.lista.length} apps en tu compu.` }
   },
   readMails: async () => {
     await wait(700)

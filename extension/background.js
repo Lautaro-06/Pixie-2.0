@@ -12,7 +12,9 @@ function connect() {
   } catch {
     return
   }
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hola', version: chrome.runtime.getManifest().version }))
+  // Le cuenta a Pixie en qué navegador está (para abrir ese si hace falta)
+  const navegador = /\bEdg\//.test(navigator.userAgent) ? 'edge' : 'chrome'
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'hola', version: chrome.runtime.getManifest().version, navegador }))
   ws.onmessage = async (event) => {
     let msg
     try {

@@ -81,7 +81,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.12)
+## Qué hace (versión 0.13)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -114,6 +114,9 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «dale like», «suscribime», «saltá el anuncio», «poné subtítulos», «adelantá 30 segundos», «velocidad 1,5», «siguiente video», «¿qué estoy viendo?» | YouTube en Chrome (con la extensión) |
 | «resumime este mail», «¿de qué trata esta página?» | Resume el mail abierto en Gmail o la página que estás viendo (con la extensión) |
 | «¿tengo mails nuevos?», «leeme el mail de la profe», «avisame de los mails» | Cuenta tus mails sin leer de Gmail, te lee uno y, si se lo pedís, te avisa cuando llega uno (con la extensión) |
+| «¿cómo llego al Obelisco?», «¿cuánto tardo caminando a la escuela?», «mi casa queda en …» | Abre el recorrido en Google Maps y dice cuánto tardás desde tu casa (OpenStreetMap) |
+| «¿dónde viene el 60?» | Dice dónde está el colectivo más cerca de tu casa (Ciudad de Buenos Aires, con una clave gratis) |
+| «abrí Minecraft» (cualquier app instalada) | Abre cualquier app del menú Inicio, salvo las que le sacaste en Ajustes → Apps |
 | El micrófono de la barra o **Ctrl+Alt+Espacio** | Le hablás por voz (con IA de Gemini o Groq) |
 | «¿qué ves en mi pantalla?», «ayudame con esto», «explicame este error» | Mira tu pantalla y te ayuda (con IA de Gemini o Claude) |
 | «mandame por WhatsApp que compre pan», «mandame mis pendientes por WhatsApp» | Te escribe al celular (ver [WhatsApp](#whatsapp-al-celular)) |
@@ -157,7 +160,7 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu. Para los disfraces, Pixie mira el programa y el título de la ventana que tenés adelante, pero no los guarda. Tu casa queda en `config.json`; cuando le pedís un recorrido, la dirección va a OpenStreetMap y a Google Maps para calcularlo. La clave de los colectivos queda cifrada.
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 
@@ -291,6 +294,25 @@ Se dibuja por código a partir del diseño original del ESP32, así que tiene mu
 - **Solo:** pestañea, mira para los costados, sigue el mouse con la mirada y, si no lo usás por 2 minutos, se duerme (se despierta si acercás el mouse o lo llamás).
 - **Mientras le escribís:** te mira; **mientras piensa**, pone «…».
 - **Cuando responde:** mueve la boca y reacciona según lo que pasó: feliz, enamorado, guiño, confundido, enojado, triste, sorprendido, alarma o música.
+- **Gestos:** ojos de estrella cuando está orgullosa, mareada, se estira, estornuda, asiente, baila, se ríe bajito y espía para arriba.
+- **Fluida:** se dibuja a 60 cuadros por segundo; los ojos y los saltitos se deslizan en vez de saltar, y los píxeles se apagan de a poco como una pantallita de LEDs.
+
+**Se disfraza según lo que estás haciendo** (mira solo el programa y el título de la ventana que tenés adelante, y no guarda nada):
+
+| Si estás… | Pixie |
+|---|---|
+| Mirando YouTube, Netflix, Cuevana, Kick, Twitch, Instagram, TikTok, Disney+, Crunchyroll, VLC… | Anteojos 3D y pochoclos (de vez en cuando se ríe o se asusta con la peli) |
+| En Word, PowerPoint, Excel, Google Docs, Notion… | Anteojos y la compu, tecleando |
+| En VS Code, Visual Studio, la terminal, GitHub… | Anteojos y la compu con `</>` |
+| Leyendo un PDF, Wikipedia, Classroom o el campus | Anteojos redondos y un libro que da vuelta las páginas |
+| Escuchando música (Spotify, YouTube Music…) | Auriculares, notitas y mueve la cabeza al ritmo (con música de fondo mientras trabajás, se pone los auriculares además) |
+| Jugando (Steam, Roblox, Minecraft, Valorant o cualquier juego en pantalla completa) | Un joystick, concentrada |
+| En una llamada de Zoom, Meet o Teams | Auriculares con micrófono |
+| En WhatsApp, Telegram o Discord | El celu con mensajes |
+| En Paint, Photoshop, Canva, Figma… | Boina y pincel |
+| Durmiendo de noche | Gorro de dormir |
+
+Mientras te acompaña así no se duerme, aunque no toques el teclado (mirando una peli no lo tocás).
 
 ## Cómo correrlo
 
@@ -404,6 +426,14 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.13 (acá se probó con la app instalada en Linux y un micrófono simulado; los mapas y los colectivos, con servicios de mentira porque desde el entorno de prueba no se llega a internet):
+
+- **Disfraces:** abrí YouTube o Netflix (anteojos 3D y pochoclos), Word o PowerPoint (anteojos y la compu), Spotify (auriculares), un juego (joystick). Contanos qué app no reconoce.
+- **«Pixie, ¿estás?»:** llamala después de 10 minutos sin tocar el teclado (mirando un video). Tiene que contestar.
+- **Chrome:** con Chrome cerrado, pedile «¿tengo mails?» o «poné goteo de duki»: tiene que abrir Chrome y hacerlo. Recargá la extensión en `chrome://extensions` (pasa a la 0.13.0).
+- **Apps:** en Ajustes → Apps tocá **Buscar apps de nuevo**, sacale el permiso a una y pedile que la abra o que escriba en ella.
+- **Mapas:** «mi casa queda en …» y después «¿cómo llego al Obelisco caminando?». Para los colectivos, sacá la clave en Ajustes → Mapas y colectivos y preguntá «¿dónde viene el 60?».
 
 Lo nuevo de la versión 0.12 (acá se probó con la app instalada en Linux, un micrófono simulado y una memoria de ejemplo):
 

@@ -10,7 +10,7 @@ export const REST = {
   openR: 1,
   lookX: 0, // hacia dónde mira: -1 izquierda … 1 derecha
   lookY: 0, // -1 arriba … 1 abajo
-  eyes: 'normal', // normal | wide | happy | heart
+  eyes: 'normal', // normal | wide | happy | heart | star | dizzy
   brow: 'normal', // normal | angry | sad
   mouth: 'small', // small | smile | frown | flat | talk | o | none
   dx: 0, // desplazamiento de toda la cara (saltitos, temblor)
@@ -30,6 +30,35 @@ const HEART = [
   '....########....',
   '.....######.....',
   '......####......'
+]
+const STAR = [
+  '.......##.......',
+  '.......##.......',
+  '......####......',
+  '......####......',
+  '################',
+  '.##############.',
+  '...##########...',
+  '....########....',
+  '....########....',
+  '...####..####...',
+  '...###....###...',
+  '..###......###..',
+  '..##........##..'
+]
+const DIZZY = [
+  '##........##',
+  '###......###',
+  '.###....###.',
+  '..###..###..',
+  '...######...',
+  '....####....',
+  '....####....',
+  '...######...',
+  '..###..###..',
+  '.###....###.',
+  '###......###',
+  '##........##'
 ]
 const QUESTION = ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '...##...', '........', '...##...', '...##...']
 const EXCLAIM = ['####', '####', '####', '####', '####', '####', '....', '####', '####']
@@ -73,6 +102,14 @@ export function renderFace(params = {}) {
     }
     if (p.eyes === 'heart') {
       glyph(HEART, bodyX0 + lx, 9 + ly)
+      continue
+    }
+    if (p.eyes === 'star') {
+      glyph(STAR, bodyX0 + lx, 8 + ly)
+      continue
+    }
+    if (p.eyes === 'dizzy') {
+      glyph(DIZZY, bodyX0 + 2 + lx, 10 + ly)
       continue
     }
 

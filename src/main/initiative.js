@@ -24,6 +24,7 @@ const FOCUSED = new Set(['estudio', 'juego'])
 
 const DISTRACTIONS = new Set(['video', 'redes'])
 const LEISURE = new Set(['juego', 'video', 'redes'])
+const PASSIVE = new Set(['video', 'musica'])
 const DELIVERY = /\b(entreg\w*|tps?|trabajos? practicos?|pruebas?|examen(es)?|parcial(es)?|evaluaci\w*|finales?|oral(es)?|lecci\w*)\b/
 const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
@@ -110,7 +111,9 @@ export function createInitiative(times = TIMES, rng = Math.random) {
 
     // ¿Está en la compu o se fue?
     const idleMs = (snap.inactivoSeg ?? 0) * 1000
-    const away = snap.bloqueada || idleMs >= times.ausente
+    // Mirando videos o escuchando música no se toca el teclado, pero estás
+    const watching = PASSIVE.has(snap.actividad?.categoria)
+    const away = snap.bloqueada || (idleMs >= times.ausente && !watching)
     if (away) {
       if (!s.ausenteDesde) {
         s.ausenteDesde = t - idleMs
