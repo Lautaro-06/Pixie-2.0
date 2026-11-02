@@ -1,5 +1,5 @@
 import { describeWhen, startOfDay, addDays } from '../dates.js'
-import { similarity } from '../memory.js'
+import { similarity, isTimeBound, ageDays, ageText } from '../memory.js'
 import { summarizeUsage, durationText, CATEGORY_NAMES } from '../usage.js'
 
 // "mi perro se llama Toby" → "tu perro se llama Toby"
@@ -57,7 +57,8 @@ export const memoryActions = [
     description: 'Guarda algo que le contás',
     run: ({ texto }, ctx) => {
       if (!texto) return { text: '¿De qué querés que me acuerde?', face: 'confused' }
-      ctx.memory.addFact(texto)
+      const item = ctx.memory.addFact(texto)
+      if (item.reemplazo) return { text: `Listo, lo cambio: antes me habías dicho que ${toYou(item.reemplazo)}. Ahora me guardo que ${toYou(texto)}.`, face: 'happy' }
       return { text: `Listo, me lo guardo: ${toYou(texto)}.`, face: 'happy' }
     }
   },
@@ -68,10 +69,13 @@ export const memoryActions = [
       const m = ctx.memory
       const parts = []
       if (m.getName()) parts.push(`Sé que te llamás ${m.getName()}.`)
+      const now = new Date()
       const facts = m.listFacts()
-      if (facts.length) parts.push(`Me contaste que ${listText(facts.map((f) => toYou(f.texto)))}.`)
+      // Lo que tenía fecha y ya pasó, con hace cuánto (para que no suene a que viene)
+      const fact = (f) => (isTimeBound(f.texto) && ageDays(f.creado, now) > 1 ? `${toYou(f.texto)} (me lo dijiste ${ageText(f.creado, now)})` : toYou(f.texto))
+      if (facts.length) parts.push(`Me contaste que ${listText(facts.map(fact))}.`)
       const todos = m.listTodos().length
-      const events = m.data.agenda.length
+      const events = m.data.agenda.filter((e) => new Date(e.cuando) >= startOfDay(now)).length
       if (todos || events) parts.push(`Tenés ${todos} pendiente${todos === 1 ? '' : 's'} y ${events} cosa${events === 1 ? '' : 's'} en la agenda.`)
       if (!parts.length) return { text: 'Todavía no me contaste nada. Probá «acordate que…» o «me llamo…».', face: 'confused' }
       return { text: parts.join(' '), face: 'happy' }
@@ -205,7 +209,10 @@ export const memoryActions = [
       const top = candidates[0]
       if (!top) return { text: 'No lo tengo anotado. ¿Querés que lo busque en internet?', face: 'confused', suggestions: [`buscá ${buscar}`] }
       if (top.kind === 'evento') return { text: `${upperFirst(top.item.texto)} es ${describeWhen(top.item.cuando, top.item.conHora, now)}.`, face: 'happy' }
-      if (top.kind === 'dato') return { text: `Me contaste que ${toYou(top.item.texto)}.`, face: 'happy' }
+      if (top.kind === 'dato') {
+        const when = ageDays(top.item.creado, now) > 1 ? ` (me lo dijiste ${ageText(top.item.creado, now)})` : ''
+        return { text: `Me contaste que ${toYou(top.item.texto)}${when}.`, face: 'happy' }
+      }
       return { text: `Lo tenés en pendientes: ${top.item.texto}.`, face: 'happy' }
     }
   }

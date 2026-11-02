@@ -2,6 +2,7 @@
 // No toca Electron directamente: todo lo que necesita le llega armado, así se puede probar.
 import { describeAI, pickProvider, aiErrorText } from './ai.js'
 import { AIHttpError, AIConnectionError } from './ai-compatible.js'
+import { entriesBetween } from './changelog.js'
 import { maskSecret } from './secrets.js'
 import { parseShortcut, shortcutText } from './shortcut.js'
 import { findCalendarUrl } from './calendars.js'
@@ -93,7 +94,11 @@ export function createSettings({
         fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
         avisos: NEWS_ALERTS.includes(cfg.noticiasAvisos) ? cfg.noticiasAvisos : 'aveces'
       },
-      actualizaciones: { ...updates.status(), texto: updates.describe() },
+      actualizaciones: {
+        ...updates.status(),
+        texto: updates.describe(),
+        novedades: entriesBetween(null, version).flatMap((e) => [...e.nuevo.map((x) => ({ tipo: 'nuevo', texto: x.detalle })), ...e.mejoras.map((x) => ({ tipo: 'mejora', texto: x.detalle }))])
+      },
       ayuda: { errores: errorCount() }
     }
   }

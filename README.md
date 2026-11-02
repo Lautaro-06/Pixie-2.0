@@ -20,6 +20,7 @@ En **Ajustes → Voz** (o en la bienvenida) decís tres veces «Pixie, ¿estás?
 - **Aprende con el uso:** cada vez que la llamás y entiende tu pedido, guarda esa forma de decirlo (las últimas 6) y te reconoce mejor. Si te escucha «casi» y lo repetís enseguida, se despierta igual.
 - **No te corta:** escucha según el ruido de tu habitación (anda con micrófonos bajitos y con ruido de fondo) y espera casi 2 segundos de silencio antes de terminar. Para entenderte usa el modelo de Gemini que mejor entiende el audio, sabiendo que le hablás en castellano rioplatense y con los nombres de tus apps.
 - **Funciona en la compu:** compara lo que oye con tus grabaciones (sin internet). No manda audio a ningún lado hasta que la llamás. De tu voz guarda solo una huella (números) en `palabra-magica.json`, que no va al respaldo.
+- **Se arregla sola:** si el micrófono se queda mudo (pasaba después de actualizarla, al volver de suspender la compu o al cambiar de micrófono), se da cuenta y lo vuelve a abrir. En `historial.txt` queda con qué micrófono escucha y cada vez que lo reabrió.
 - Mientras está prendido, Windows muestra el ícono del micrófono en la barra de tareas.
 - Si se despierta sola, elegí **Menos** en «Qué tan fácil me despierto»; si no te escucha, **Más**, o grabá tu voz de nuevo en el lugar donde la vas a usar. **Probar ahora** te muestra si te reconoce.
 - Con el micrófono de unos auriculares Bluetooth no se queda escuchando (el sonido quedaría «de llamada»): usá el de la compu u otro.
@@ -80,7 +81,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.11)
+## Qué hace (versión 0.12)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -127,6 +128,8 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 
 **Se acuerda.** Guarda tu nombre, lo que le contás, tus pendientes y tu agenda. Los eventos con hora te los avisa 15 minutos antes y a la hora; los que son de un día, la noche anterior y esa mañana. Los avisos siguen andando aunque reinicies la compu.
 
+**Sabe cuándo le contaste cada cosa.** A la IA le pasa lo que le contaste con hace cuánto («mi perro se llama Toby, hace 2 meses»), así no habla de algo viejo como si fuera nuevo. Lo que tenía fecha («mañana tengo prueba», «el viernes juego al fútbol») deja de contarlo después de 10 días: ya pasó. Si le contás algo nuevo sobre lo mismo («mi perro se llama Rocky»), reemplaza lo viejo y te lo dice. Los pendientes de hace semanas no te los recuerda como si fueran de hoy: te pregunta una vez si siguen («ya lo hice» o «borralo» lo saca de la lista, «sigue» lo deja). Cada usuario de Windows tiene su propia memoria.
+
 **Se da cuenta.** Sabe qué tipo de cosa estás haciendo (estudio, videos, redes, juegos, música…) y cuánto tiempo, si te fuiste de la compu, si se cortó internet y cuánta batería queda.
 
 **Habla primero.** Sin que le preguntes:
@@ -139,6 +142,10 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 - Después de algo que tenías agendado, te pregunta cómo te fue («Hoy tenías la prueba de historia. ¿Cómo te fue?») y se acuerda de lo que le contestes.
 - Si hace más de una hora y media que no charlan, te habla de algo: te invita a un Pong, te cuenta un chiste o un dato curioso, te recuerda un pendiente o te pregunta si tomaste agua. Como mucho 4 veces por día, entre las 10 y las 22, y nunca si estás estudiando, jugando o en un Pomodoro.
 - Cada dos horas sin anotar un vaso de agua te pregunta si tomaste (se apaga con `"recordatoriosSalud": false`).
+- **Aprende qué avisos te sirven:** si no le das bola al agua, las pausas, las charlas, las noticias o el aviso de distracción, los dice menos seguido (el doble de espaciados, hasta 8 veces). Cuando le contestás uno, vuelve a lo normal.
+- **Entregas:** si a la noche estás jugando o mirando videos y al otro día tenés una entrega o una prueba (de tu agenda, Google Calendar o Classroom), te lo recuerda una vez y te ofrece un Pomodoro.
+- **Cuando volvés** te cuenta los mails que llegaron mientras no estabas (si pediste los avisos de mails) y lo próximo de tu agenda de hoy.
+- **Cuando se actualiza** te cuenta qué hay de nuevo y qué mejoró. Preguntale «¿qué hay de nuevo?» cuando quieras; también está en Ajustes → Actualizaciones.
 - En pantalla completa (juegos, videos, presentaciones), **en una reunión o llamada** (Zoom, Meet, Teams o cualquier app usando el micrófono) o en modo no molestar se queda callado. Solo los recordatorios y la batería muy baja avisan igual, sin voz.
 - Si no estás frente a la compu (bloqueada o 5 minutos sin tocarla), los recordatorios y los timers te llegan por WhatsApp.
 
@@ -311,7 +318,8 @@ npm run dist:win  # arma el instalador en dist/
 GitHub Actions ([`.github/workflows/pixie.yml`](.github/workflows/pixie.yml)) corre las pruebas y arma el instalador en una compu con Windows con cada cambio en `main` (el instalador queda para bajar en la pestaña **Actions**). Para que les llegue a todos:
 
 1. Subí el número de `"version"` en `package.json` (por ejemplo, de 0.6.0 a 0.6.1).
-2. Subí el cambio a `main`.
+2. Sumá qué hay de nuevo y qué mejoró en [`src/main/changelog.js`](src/main/changelog.js), arriba de todo. Pixie lo cuenta sola la primera vez que arranca con la versión nueva, lo repite con «¿qué hay de nuevo?» y lo muestra en Ajustes → Actualizaciones. Si te lo olvidás, las pruebas fallan.
+3. Subí el cambio a `main`.
 
 GitHub Actions crea la etiqueta `v0.6.1`, publica la Release con el instalador y, en unas horas como mucho, cada Pixie instalada ofrece actualizarse. Si la versión no cambió, no publica nada: así un arreglo a medias no le llega a nadie.
 
@@ -396,6 +404,14 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 3. Sumá frases de ejemplo en `test/brain.test.js` y corré `npm test`.
 
 ## Para probar en Windows
+
+Lo nuevo de la versión 0.12 (acá se probó con la app instalada en Linux, un micrófono simulado y una memoria de ejemplo):
+
+- **Novedades:** al arrancar la 0.12 Pixie tiene que decir «¡Me actualicé a la versión 0.12! Lo nuevo: …». Después, «¿qué hay de nuevo?» y Ajustes → Actualizaciones.
+- **«Pixie, ¿estás?» después de actualizar:** que siga andando sin reiniciar nada. Probá también suspender la compu y volver, y enchufar o desenchufar un micrófono o auriculares. Si falla, pasanos las líneas `palabra mágica:` de `historial.txt` (dicen con qué micrófono escucha y si lo tuvo que reabrir).
+- **Memoria:** «¿qué sabés de mí?» tiene que decir hace cuánto le contaste las cosas con fecha. Contale «mi perro se llama Toby» y después «mi perro se llama Rocky»: tiene que decir que lo cambia.
+- **Pendientes viejos:** si tenés uno anotado hace más de 3 semanas, en algún momento del día te pregunta si sigue. Probá «ya lo hice», «sigue» y «borralo».
+- **Entrega mañana:** con una prueba agendada para mañana, a la noche jugá o mirá videos 20 minutos: te lo tiene que recordar una vez.
 
 Lo nuevo de la versión 0.11 (acá se probó con un Chrome de verdad y un Gmail de ejemplo; falta con tu Gmail):
 

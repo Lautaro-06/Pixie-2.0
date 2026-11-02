@@ -140,6 +140,7 @@ export function createMail({ browser, file, getConfig = () => ({}), saveConfig =
   let reading = null
   let timer = null
   let told = { mails: [], at: 0 } // lo último que avisó o contó (para «leémelo»)
+  let arrivals = [] // cuándo vio llegar cada mail nuevo (para «mientras no estabas te llegaron…»)
 
   try {
     const data = JSON.parse(readFileSync(file, 'utf8'))
@@ -181,6 +182,7 @@ export function createMail({ browser, file, getConfig = () => ({}), saveConfig =
         save()
         // La primera vez no avisa de todo lo que ya tenías sin leer
         if (first) nuevos = []
+        arrivals = [...arrivals, ...nuevos.map((m) => ({ id: m.id, at: now() }))].slice(-100)
         if (nuevos.some(fromClassroom)) onClassroom()
         const toTell = nuevos.filter((m) => !isMuted(m))
         if (toTell.length && alertsOn() && !silent) {
@@ -221,6 +223,8 @@ export function createMail({ browser, file, getConfig = () => ({}), saveConfig =
     refresh,
     status,
     mailbox: () => box,
+    // Los que llegaron desde un momento y siguen sin leer
+    arrivedSince: (since) => arrivals.filter((a) => a.at >= since && box.mails.some((m) => m.id === a.id)),
     // Lo que contó hace poco (para «leémelo»), o nada
     recent: () => (now() - told.at < RECENT_MS ? told.mails : []),
     remember(mails) {

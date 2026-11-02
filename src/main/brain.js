@@ -220,6 +220,11 @@ const RULES = [
       ? intent('actualizar')
       : null,
   (t) => (/\b(que version (tenes|sos|es|estas usando|usas)|en que version estas|tu version|version de pixie)\b/.test(t) ? intent('version') : null),
+  // "¿qué hay de nuevo?", "¿qué cambió en la actualización?", "novedades"
+  (t) =>
+    /^(que hay de nuevo|que tenes de nuevo|que (trae|tiene) de nuevo( la (version|actualizacion))?|novedades|(contame |decime )?(las )?novedades( de la (version|actualizacion))?|que (cambio|cambiaste|mejoraste|hay nuevo)( en la (ultima )?(version|actualizacion))?|que (trajo|trae) la (ultima )?(version|actualizacion)|que (cosas )?nuevas (sabes hacer|haces|tenes))$/.test(t)
+      ? intent('novedades')
+      : null,
   (t) =>
     /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
       ? intent('diagnostico')

@@ -208,6 +208,11 @@ export const AI_TOOLS = [
     input_schema: obj()
   },
   {
+    name: 'novedades',
+    description: 'Cuenta qué hay de nuevo y qué mejoró en la última versión de Pixie. Usala si pregunta qué hay de nuevo, qué cambió o qué sabe hacer ahora.',
+    input_schema: obj()
+  },
+  {
     name: 'mails',
     description:
       'Mails de Gmail del usuario (con la extensión de Chrome). revisar: cuenta los sin leer (quién y asunto). leer: lee uno (de alguien, o el número n de la lista; sin nada, el que se acaba de avisar). avisos: prende (on true) o apaga los avisos de mails nuevos. silenciar: no avisar más de alguien. Usala solo si pregunta por sus mails o correo.',

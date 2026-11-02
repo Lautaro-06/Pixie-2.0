@@ -1,6 +1,7 @@
 // Acciones sobre Pixie misma: actualizarse, decir su versión, su atajo, cerrarse y armar el informe de diagnóstico.
 import { parseShortcut, shortcutText } from '../shortcut.js'
 import { describeWhen } from '../dates.js'
+import { whatsNewText } from '../changelog.js'
 
 export const appActions = [
   {
@@ -145,6 +146,11 @@ export const appActions = [
     name: 'version',
     description: 'Dice qué versión de Pixie está instalada y si hay una nueva',
     run: (_params, ctx) => ({ text: ctx.updates?.describe() ?? 'Todavía estoy arrancando.', face: 'idle' })
+  },
+  {
+    name: 'novedades',
+    description: 'Cuenta qué hay de nuevo y qué mejoró en la última versión de Pixie',
+    run: (_params, ctx) => ({ text: whatsNewText(ctx.updates?.status().current ?? ctx.appVersion ?? '0.0.0'), face: 'love' })
   },
   {
     name: 'diagnostico',

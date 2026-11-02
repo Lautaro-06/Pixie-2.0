@@ -13,6 +13,10 @@ import { runAction } from './actions/index.js'
 import { isWindows } from './windows.js'
 import { howItWent } from './brain.js'
 
+// Avisos que se dicen menos si no les das bola
+const LEARNS = new Set(['charla', 'agua', 'pausa', 'noticias', 'distraccion'])
+const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¡!¿?.,]/g, ' ').trim()
+
 const TICK_MS = 5000
 const QUESTION_MS = 20 * 60 * 1000 // cuánto espera la respuesta a "¿cómo te fue?"
 
@@ -63,6 +67,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       showWindow?.() // aunque lo hayas escondido, los recordatorios aparecen
     }
     if (n.pregunta) question = { ...n.pregunta, hasta: Date.now() + QUESTION_MS }
+    if (LEARNS.has(n.kind)) memory.noticeSent(n.kind)
     sendEvent({ type: 'notice', text: n.text, face: n.face, voice: !quiet, suggestions: n.suggestions })
     ctx.ai?.note(`Pixie le dijo por su cuenta: «${n.text}».`)
     log(`aviso (${n.kind}): ${n.text}`)
@@ -76,12 +81,37 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     }
     const { notices, presence } = initiative.tick(
       now,
-      { ...snap, silencioHasta: quietUntil, pomodoro: isPomodoroRunning(), salud: ctx.getConfig().recordatoriosSalud !== false, noticias: ctx.getConfig().noticiasAvisos ?? 'aveces' },
+      {
+        ...snap,
+        silencioHasta: quietUntil,
+        pomodoro: isPomodoroRunning(),
+        salud: ctx.getConfig().recordatoriosSalud !== false,
+        noticias: ctx.getConfig().noticiasAvisos ?? 'aveces',
+        // Cuántos mails llegaron desde un momento (si pediste los avisos de mails)
+        mailsDesde: (since) => (ctx.mail?.status().avisos ? ctx.mail.arrivedSince(since).length : 0)
+      },
       memory
     )
     if (presence) sendEvent({ type: 'presence', away: presence === 'ausente' })
     for (const n of notices) deliver(n).catch((err) => console.error(err))
     shareFeeling()
+  }
+
+  // «¿Sigue pendiente?»: «ya lo hice» / «borralo» lo saca; «sigue» lo deja
+  function answerOldTodo(text) {
+    const t = fold(text)
+    const { id, texto } = question
+    const keep = /\b(sigue|todavia|aun|falta|dejalo|dejala|si sigue)\b/.test(t) || /^si$/.test(t)
+    const done = /\b(ya (lo |la )?hice|ya esta|lo termine|la termine|hecho|listo)\b/.test(t)
+    const remove = /\b(borra(lo|la)?|saca(lo|la)?|ya fue|ya no|olvida(lo|la)?|no va mas)\b/.test(t) || /^no$/.test(t)
+    if (!keep && !done && !remove) return null
+    question = null
+    if (keep) {
+      memory.touchTodo(id)
+      return { text: `Dale, dejo «${texto}» en la lista. Te vuelvo a preguntar en unas semanas.`, face: 'happy' }
+    }
+    memory.removeTodo(id)
+    return done ? { text: '¡Bien ahí! Lo saco de la lista.', face: 'love' } : { text: `Listo, borré «${texto}».`, face: 'happy' }
   }
 
   return {
@@ -121,10 +151,11 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       const health = memory.getHealth(now)
       if (health.agua || health.pausas) lines.push(`Hoy tomó ${health.agua} vasos de agua e hizo ${health.pausas} pausas.`)
       lines.push(`Cómo se siente Pixie: ${feeling(memory.getMood(), now)}.`)
-      const facts = memory.listFacts().slice(-15).map((f) => f.texto)
+      // Con hace cuánto: «mañana tengo prueba» de hace un mes ya pasó
+      const facts = memory.factsForAI(now)
       if (facts.length) lines.push(`Lo que contó: ${facts.join('; ')}.`)
-      const todos = memory.listTodos()
-      if (todos.length) lines.push(`Pendientes: ${todos.map((t, i) => `${i + 1}) ${t.texto}`).join('; ')}.`)
+      const todos = memory.todosForAI(now)
+      if (todos.length) lines.push(`Pendientes: ${todos.join('; ')}.`)
       const events = memory.eventsBetween(startOfDay(now), addDays(startOfDay(now), 8))
       if (events.length) lines.push(`Agenda: ${events.map((e) => `${e.texto} ${describeWhen(e.cuando, e.conHora, now)}`).join('; ')}.`)
       const timers = timersSummary()
@@ -137,6 +168,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     answerQuestion(text) {
       if (!question || Date.now() > question.hasta) return null
       if (String(text).trim().split(/\s+/).length > 12) return null
+      if (question.tipo === 'pendiente_viejo') return answerOldTodo(text)
       const how = howItWent(text)
       if (!how) return null
       const { evento } = question
@@ -145,8 +177,9 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       memory.addFact(`${evento}: me fue ${r.dijo}`)
       return { text: r.text[Math.floor(Math.random() * r.text.length)], face: r.face, suggestions: r.suggestions }
     },
-    // Cada vez que le hablás, su ánimo cambia
+    // Cada vez que le hablás, su ánimo cambia (y si fue después de un aviso, ese aviso sirvió)
     interacted(kind) {
+      memory.noticeAnswered()
       memory.setMood(afterInteraction(memory.getMood(), kind))
       shareFeeling()
     }

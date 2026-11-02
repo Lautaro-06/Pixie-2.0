@@ -13,7 +13,8 @@ const EMPTY = () => ({
   uso: {}, // { 'AAAA-MM-DD': { total, categorias: {}, apps: {} } }
   animo: { valor: 65, ultimoContacto: null },
   salud: {}, // { 'AAAA-MM-DD': { agua, pausas } } y ultimaAgua
-  hechos: {} // cosas que Pixie ya hizo hoy: { resumen: 'AAAA-MM-DD', ... }
+  hechos: {}, // cosas que Pixie ya hizo hoy: { resumen: 'AAAA-MM-DD', ... }
+  iniciativa: {} // cómo le fue a cada tipo de aviso: { agua: { ignorados, esperando, at } }
 })
 
 const STOPWORDS = new Set([
@@ -52,6 +53,53 @@ function best(list, query, min = 0.34) {
 
 const nextId = (list) => list.reduce((m, x) => Math.max(m, x.id), 0) + 1
 const MIN = 60 * 1000
+const DAY = 24 * 60 * MIN
+
+// ── Las cosas con fecha ──
+// "mañana tengo prueba" vale unos días, no para siempre: si fue hace un mes, eso ya pasó.
+const TIME_BOUND =
+  /\b(hoy|manana|pasado manana|ayer|anoche|esta (noche|tarde|manana|semana)|(el|del|este|esta|la|el proximo|la proxima) (lunes|martes|miercoles|jueves|viernes|sabado|domingo|finde|fin de semana)|el (mes|ano) que viene|la semana que viene|la proxima semana|este (mes|ano)|en (un|una|dos|tres|cuatro|cinco|\d+) (dias?|semanas?|meses|mes)|dentro de|el \d{1,2} de [a-z]+)\b/
+export const isTimeBound = (text) => TIME_BOUND.test(fold(text))
+export const TIME_BOUND_DAYS = 10 // después de esto, lo que tenía fecha ya no se cuenta como algo que viene
+
+const startDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+export const ageDays = (iso, now = new Date()) => (iso ? Math.round((startDay(now) - startDay(new Date(iso))) / DAY) : 9999)
+
+// "hoy", "ayer", "hace 3 días", "hace 2 semanas", "hace 4 meses"
+export function ageText(iso, now = new Date()) {
+  if (!iso) return 'hace mucho'
+  const days = ageDays(iso, now)
+  if (days <= 0) return 'hoy'
+  if (days === 1) return 'ayer'
+  if (days < 7) return `hace ${days} días`
+  if (days < 30) {
+    const w = Math.round(days / 7)
+    return w === 1 ? 'hace una semana' : `hace ${w} semanas`
+  }
+  if (days < 365) {
+    const m = Math.round(days / 30)
+    return m === 1 ? 'hace un mes' : `hace ${m} meses`
+  }
+  const y = Math.round(days / 365)
+  return y === 1 ? 'hace un año' : `hace ${y} años`
+}
+
+// De qué habla un dato, para reemplazar lo viejo: "mi perro se llama Rocky" pisa a "mi perro se llama Toby"
+export function factKey(text) {
+  const t = fold(text)
+    .replace(/[^a-z0-9ñ ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(que|acordate que|sabes que|te cuento que) /, '')
+  let m = /^(?:mi|mis) ([a-zñ ]{2,30}?) (se llama|se llaman|es|son|tiene|tienen|vive|viven|cumple|cumplen|juega|juegan|trabaja)\b/.exec(t)
+  if (m) return `mi ${m[1]} ${m[2].replace(/n$/, '')}`
+  m = /^(?:no )?me (gusta|gustan|encanta|encantan) (?:mucho |mas )?(.{2,40})$/.exec(t)
+  if (m) return `gusta ${m[2]}`
+  if (/^(estoy en|voy a|curso) .*\b(ano|grado|primaria|secundaria)\b/.test(t)) return 'curso'
+  if (/^(vivo en|soy de) /.test(t)) return 'vivo en'
+  if (/^mi (cumple|cumpleanos) es /.test(t)) return 'mi cumple'
+  return null
+}
 
 // Cuándo avisar de un evento: con hora, 15 minutos antes y a la hora;
 // sin hora, la noche anterior a las 20 y ese día a las 8.
@@ -127,12 +175,21 @@ export function createMemory(file) {
       save()
     },
 
-    // Datos que le contás
-    addFact(texto) {
-      const item = { id: nextId(data.datos), texto, creado: new Date().toISOString() }
-      data.datos.push(item)
+    // Datos que le contás. Si es sobre lo mismo que algo viejo ("mi perro se llama…"), lo reemplaza.
+    addFact(texto, now = new Date()) {
+      const key = factKey(texto)
+      const old = key ? data.datos.filter((x) => factKey(x.texto) === key) : []
+      const item = { id: nextId(data.datos), texto, creado: now.toISOString() }
+      data.datos = [...data.datos.filter((x) => !old.includes(x)), item]
       save()
-      return item
+      return old.length ? { ...item, reemplazo: old.at(-1).texto } : item
+    },
+    // Lo que la IA tiene que saber: con hace cuánto te lo contó, y sin lo que tenía fecha y ya pasó
+    factsForAI(now = new Date(), max = 15) {
+      return data.datos
+        .filter((f) => !(isTimeBound(f.texto) && ageDays(f.creado, now) > TIME_BOUND_DAYS))
+        .slice(-max)
+        .map((f) => `${f.texto} (te lo contó ${ageText(f.creado, now)})`)
     },
     listFacts: () => [...data.datos],
     findFact: (query) => best(data.datos, query),
@@ -159,6 +216,38 @@ export function createMemory(file) {
       return item
     },
     listTodos: () => [...data.pendientes],
+    // Para la IA: con hace cuánto lo anotaste
+    todosForAI(now = new Date()) {
+      return data.pendientes.map((t, i) => `${i + 1}) ${t.texto} (anotado ${ageText(t.creado, now)})`)
+    },
+    // Un pendiente viejo para preguntar si sigue (de los que tenían fecha, a la semana; los demás, a las 3 semanas)
+    oldTodo(now = new Date()) {
+      return (
+        data.pendientes.find((t) => {
+          const age = ageDays(t.creado, now)
+          const due = isTimeBound(t.texto) ? 7 : 21
+          return age >= due && (!t.revisado || ageDays(t.revisado, now) >= 30)
+        }) ?? null
+      )
+    },
+    // Los recientes (para recordártelos por su cuenta: los viejos se preguntan aparte)
+    recentTodos(now = new Date(), days = 14) {
+      return data.pendientes.filter((t) => ageDays(t.creado, now) < days)
+    },
+    touchTodo(id, now = new Date()) {
+      const t = data.pendientes.find((x) => x.id === id)
+      if (!t) return null
+      t.revisado = now.toISOString()
+      save()
+      return t
+    },
+    removeTodo(id) {
+      const t = data.pendientes.find((x) => x.id === id)
+      if (!t) return null
+      data.pendientes = data.pendientes.filter((x) => x !== t)
+      save()
+      return t
+    },
     completeTodo({ buscar, numero }) {
       const item = numero ? data.pendientes[numero - 1] : best(data.pendientes, buscar)
       if (!item) return null
@@ -242,6 +331,31 @@ export function createMemory(file) {
       if (!e) return
       e.seguimiento = true
       save()
+    },
+
+    // ¿Le das bola a los avisos? Si ignorás seguido uno, Pixie lo dice menos seguido.
+    noticeSent(kind, now = new Date()) {
+      const e = (data.iniciativa[kind] ??= { ignorados: 0, esperando: false, at: null })
+      if (e.esperando) e.ignorados = Math.min(20, e.ignorados + 1) // el anterior quedó sin respuesta
+      e.esperando = true
+      e.at = now.toISOString()
+      save()
+    },
+    // Le hablaste: si fue poco después de un aviso, ese aviso te sirvió
+    noticeAnswered(now = new Date()) {
+      let changed = false
+      for (const e of Object.values(data.iniciativa)) {
+        if (e.esperando && now - new Date(e.at) < 3 * MIN) {
+          e.esperando = false
+          e.ignorados = 0
+          changed = true
+        }
+      }
+      if (changed) save()
+    },
+    noticeFactor(kind) {
+      const e = data.iniciativa[kind]
+      return e ? 2 ** Math.min(3, Math.floor(e.ignorados / 2)) : 1
     },
 
     // Uso de la compu

@@ -83,6 +83,8 @@ export default function App() {
   const startListeningRef = useRef(() => {})
   const wakeRef = useRef(null) // el que escucha la palabra mágica
   const wakePaused = useRef(false) // mientras la probás en Ajustes
+  const lastMic = useRef(null) // con qué micrófono escucha (para el historial)
+  const silentRestarts = useRef(0) // veces seguidas que lo reabrió porque estaba mudo
   const away = useRef(false)
   const voiceSession = useRef(null) // charla que empezó con «Pixie, ¿estás?»: { turns }
   const onWakeRef = useRef(() => {})
@@ -208,6 +210,13 @@ export default function App() {
       if (event.type === 'feeling') setFeeling(event.feeling)
       if (event.type === 'ajustes' && event.pantallaReposo) setStandbyMode(event.pantallaReposo)
       if (event.type === 'clima') setWeather({ temp: event.temp, icon: event.icon })
+      // Volviste de suspender o desbloqueaste la compu: el micrófono suele quedar muerto, se reabre
+      if (event.type === 'microfono') {
+        if (!listeningRef.current) {
+          api.wakeLog?.(`${event.motivo ?? 'volviste'}: vuelvo a abrir el micrófono`)
+          setWakeRestart((n) => n + 1)
+        }
+      }
       if (event.type === 'palabra') {
         wakePaused.current = Boolean(event.pausada)
         // Si es la misma voz grabada, no vuelve a abrir el micrófono
@@ -301,6 +310,19 @@ export default function App() {
     if (isPreview || !wakeTemplates) return
     let stopped = false
     let listener = null
+    let watchdog = null
+    let devicesTimer = null
+    // Si el micrófono se murió sin avisar, lo vuelve a abrir (antes se quedaba escuchando «nada»)
+    const restart = (why) => {
+      if (stopped || listeningRef.current) return
+      api.wakeLog?.(why)
+      setWakeRestart((n) => n + 1)
+    }
+    const onDevices = () => {
+      clearTimeout(devicesTimer)
+      devicesTimer = setTimeout(() => restart('cambiaron los micrófonos de la compu: vuelvo a abrir el que corresponde'), 1500)
+    }
+    navigator.mediaDevices?.addEventListener?.('devicechange', onDevices)
     startWakeListener({
       templates: wakeTemplates,
       learned: wakeLearned ?? [],
@@ -316,6 +338,25 @@ export default function App() {
         micFailures.current = 0
         listener = l
         wakeRef.current = l
+        const first = l.health()
+        if (first.micro !== lastMic.current) {
+          lastMic.current = first.micro
+          api.wakeLog?.(`escucho «Pixie, ¿estás?» con ${first.micro}`)
+        }
+        const started = performance.now()
+        watchdog = setInterval(() => {
+          if (listeningRef.current) return // te está escuchando con este mismo audio
+          const h = l.health()
+          // Llega sonido de verdad: el micrófono anda
+          if (performance.now() - started > 10000 && h.silencioMs === 0 && h.sinAudioMs < 1000) silentRestarts.current = 0
+          const silenceLimit = 45000 * Math.min(8, 2 ** silentRestarts.current)
+          if (h.terminado) restart(`${h.micro} se desconectó: lo vuelvo a abrir`)
+          else if (h.sinAudioMs > 8000) restart(`no me llega audio de ${h.micro}: lo vuelvo a abrir`)
+          else if (h.silencioMs > silenceLimit) {
+            silentRestarts.current++
+            restart(`${h.micro} está en silencio total${h.muteado ? ' (parece silenciado en Windows)' : ''}: lo vuelvo a abrir`)
+          }
+        }, 5000)
       })
       .catch((err) => {
         if (err instanceof HandsFreeError) {
@@ -335,6 +376,9 @@ export default function App() {
       })
     return () => {
       stopped = true
+      clearInterval(watchdog)
+      clearTimeout(devicesTimer)
+      navigator.mediaDevices?.removeEventListener?.('devicechange', onDevices)
       listener?.stop()
       wakeRef.current = null
     }

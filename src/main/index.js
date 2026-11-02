@@ -1,4 +1,4 @@
-import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer, clipboard, safeStorage, shell } from 'electron'
+import { app, ipcMain, globalShortcut, Notification, screen, desktopCapturer, clipboard, safeStorage, shell, powerMonitor } from 'electron'
 import { join } from 'node:path'
 import { release } from 'node:os'
 import { autoUpdater } from 'electron-updater'
@@ -26,6 +26,7 @@ import { createCalendars } from './calendars.js'
 import { createNews } from './news.js'
 import { createClassroom } from './classroom.js'
 import { createMail, announceText } from './mail.js'
+import { compareVersions, updateText } from './changelog.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
 import { textToWrite } from './control.js'
@@ -294,6 +295,20 @@ function contextForAI() {
   return `${mind.contextText()}${mails}`
 }
 
+// La primera vez que arranca con una versión nueva, cuenta qué hay de nuevo y qué mejoró
+function announceUpdate() {
+  const cfg = getConfig()
+  const current = app.getVersion()
+  const seen = cfg.versionVista
+  if (seen === current) return
+  saveConfig({ versionVista: current })
+  // Instalación nueva: la bienvenida ya presenta todo
+  if (!seen && cfg.bienvenidaHecha !== true) return
+  if (seen && compareVersions(current, seen) <= 0) return
+  logAction(`actualizada: ${seen ?? 'una versión anterior'} → ${current}`)
+  setTimeout(() => mind?.say({ kind: 'novedades', text: updateText(seen, current), face: 'love', suggestions: ['¿qué hay de nuevo?'] }), 10000)
+}
+
 // Una vez, cuando ya está la extensión: ¿querés que te avise de los mails?
 function offerMailAlerts() {
   const cfg = getConfig()
@@ -321,6 +336,10 @@ async function ask(text) {
   const intents = interpretAll(input, options)
   mind?.interacted(moodKind(intents))
 
+  // ¿Es la respuesta a algo que Pixie preguntó por su cuenta? ("¿Cómo te fue?", "¿Sigue pendiente?")
+  const answer = mind?.answerQuestion(input)
+  if (answer) return answer
+
   // Con IA: charla, preguntas, frases largas y lo que las reglas no entienden.
   // Las órdenes cortas siguen por las reglas, que son instantáneas y gratis.
   const words = input.trim().split(/\s+/).length
@@ -338,10 +357,6 @@ async function ask(text) {
       if (msg) return { text: msg, face: 'confused' }
     }
   }
-
-  // ¿Es la respuesta a algo que Pixie preguntó por su cuenta? ("Hoy tenías prueba. ¿Cómo te fue?")
-  const answer = mind?.answerQuestion(input)
-  if (answer) return answer
 
   if (!intents) {
     return {
@@ -759,6 +774,10 @@ if (!app.requestSingleInstanceLock()) {
       saveConfig({ arranqueConfigurado: true })
     }
 
+    // Al volver de suspender o desbloquear la compu, la ventanita reabre el micrófono de «Pixie, ¿estás?»
+    announceUpdate()
+    powerMonitor.on('resume', () => setTimeout(() => sendEvent({ type: 'microfono', motivo: 'la compu volvió de suspenderse' }), 3000))
+    powerMonitor.on('unlock-screen', () => setTimeout(() => sendEvent({ type: 'microfono', motivo: 'desbloqueaste la compu' }), 2000))
     createPixieWindow({
       onProblem: (what) => {
         logAction(`ventana: ${what}`)

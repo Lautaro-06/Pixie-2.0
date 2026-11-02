@@ -1,7 +1,8 @@
 // Iniciativa: Pixie habla primero cuando tiene sentido. Cada 5 segundos mira
 // cómo está todo y decide si avisar algo. No molesta en pantalla completa ni
 // en modo "no molestar" (salvo recordatorios y batería muy baja).
-import { dayKey } from './dates.js'
+import { dayKey, startOfDay, addDays } from './dates.js'
+import { ageText } from './memory.js'
 import { feeling } from './feelings.js'
 import { JOKES, FACTS } from './content.js'
 
@@ -14,13 +15,26 @@ export const TIMES = {
   sinInternet: 30 * 1000,
   charla: 90 * MIN, // habla de algo por su cuenta si no charlaron en este rato
   charlaTrasVolver: 15 * MIN, // pero no apenas te sentás
-  agua: 2 * 60 * MIN // recuerda tomar agua si no anotaste un vaso en este rato
+  agua: 2 * 60 * MIN, // recuerda tomar agua si no anotaste un vaso en este rato
+  ocioAntesDeEntrega: 20 * MIN // jugando o con videos a la noche y mañana entregás algo
 }
 const CHARLAS_POR_DIA = 4
 // No interrumpe si estás concentrado
 const FOCUSED = new Set(['estudio', 'juego'])
 
 const DISTRACTIONS = new Set(['video', 'redes'])
+const LEISURE = new Set(['juego', 'video', 'redes'])
+const DELIVERY = /\b(entreg\w*|tps?|trabajos? practicos?|pruebas?|examen(es)?|parcial(es)?|evaluaci\w*|finales?|oral(es)?|lecci\w*)\b/
+const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+// Lo que tenés que entregar o rendir mañana (de tu agenda, Google Calendar o Classroom)
+function tomorrowDeliveries(memory, now) {
+  const from = addDays(startOfDay(now), 1)
+  const to = new Date(addDays(from, 1).getTime() - 1)
+  return (memory.eventsBetween?.(from, to) ?? []).filter((e) => e.entrega || DELIVERY.test(fold(e.texto)))
+}
+
+const hhmm = (d) => d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 // Noticias por su cuenta: cuántas por día según noticiasAvisos (de 9 a 22 h, espaciadas)
 const NEWS_PER_DAY = { nunca: 0, aveces: 2, seguido: 4 }
 
@@ -41,7 +55,8 @@ function smallTalk(snap, memory, now, rng, last) {
     () => ({ tipo: 'dato', text: `Me acordé de un dato curioso: ${pick(FACTS)}`, face: 'surprised', suggestions: ['otro dato curioso', 'contame un chiste'] }),
     () => ({ tipo: 'chiste', text: `Se me ocurrió un chiste: ${pick(JOKES)}`, face: 'wink', suggestions: ['jajaja', 'otro chiste'] })
   ]
-  const todos = memory.listTodos()
+  // Solo los pendientes recientes: de los viejos pregunta aparte si siguen
+  const todos = memory.recentTodos?.(now) ?? memory.listTodos()
   if (todos.length) {
     options.push(() => ({ tipo: 'pendiente', text: `Te quedó pendiente «${pick(todos).texto}». ¿Le damos ahora?`, face: 'happy', suggestions: ['¿qué tengo pendiente?', 'ahora no'] }))
   }
@@ -69,8 +84,11 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     bateriaAvisada: null,
     offlineDesde: null,
     offlineAvisado: false,
-    ultimaNoticia: 0
+    ultimaNoticia: 0,
+    ocioDesde: null
   }
+  // Si no le das bola a un tipo de aviso, lo dice menos seguido (x2, x4, hasta x8)
+  const factor = (memory, kind) => Math.max(1, memory.noticeFactor?.(kind) ?? 1)
 
   // snap: { inactivoSeg, bloqueada, online, bateria, pantallaCompleta, enReunion, actividad, silencioHasta, pomodoro, salud }
   // memory: la memoria de Pixie. Devuelve { notices, presence }.
@@ -106,7 +124,14 @@ export function createInitiative(times = TIMES, rng = Math.random) {
         presence = 'volvio'
         if (fuera >= times.saludoAlVolver && memory.doneToday('resumen', now)) {
           const nombre = memory.getName()
-          say({ kind: 'volvio', text: `¡Volviste${nombre ? `, ${nombre}` : ''}!`, face: 'happy' })
+          // Lo que pasó mientras no estabas y lo que viene hoy
+          const extra = []
+          const mails = snap.mailsDesde?.(t - fuera) ?? 0
+          if (mails) extra.push(mails === 1 ? 'Mientras no estabas te llegó un mail.' : `Mientras no estabas te llegaron ${mails} mails.`)
+          const end = new Date(addDays(startOfDay(now), 1).getTime() - 1)
+          const next = (memory.eventsBetween?.(now, end) ?? []).find((e) => e.conHora && new Date(e.cuando) > now)
+          if (next) extra.push(`A las ${hhmm(new Date(next.cuando))} tenés ${next.texto}.`)
+          say({ kind: 'volvio', text: [`¡Volviste${nombre ? `, ${nombre}` : ''}!`, ...extra].join(' '), face: 'happy', suggestions: mails ? ['¿tengo mails?'] : undefined })
         }
       }
       s.activoDesde ??= t
@@ -119,11 +144,12 @@ export function createInitiative(times = TIMES, rng = Math.random) {
       }
 
       // Pausa activa
-      if (t - s.activoDesde >= times.pausaCada && !snap.pomodoro) {
+      if (t - s.activoDesde >= times.pausaCada * factor(memory, 'pausa') && !snap.pomodoro) {
+        const minutos = Math.round((t - s.activoDesde) / MIN)
         s.activoDesde = t
         say({
           kind: 'pausa',
-          text: `Llevás ${Math.round(times.pausaCada / MIN)} minutos seguidos en la compu. Estirate un poco y tomá agua.`,
+          text: `Llevás ${minutos} minutos seguidos en la compu. Estirate un poco y tomá agua.`,
           face: 'happy',
           suggestions: ['ya me estiré', 'tomé agua']
         })
@@ -136,7 +162,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
         if (snap.pomodoro && !s.pomodoroAvisado) {
           s.pomodoroAvisado = true
           say({ kind: 'distraccion', text: `¡Ey! Estamos en pleno Pomodoro y te veo en ${act.app}.`, face: 'angry' })
-        } else if (!s.racha.avisada && t - s.racha.desde >= times.distraccion) {
+        } else if (!s.racha.avisada && t - s.racha.desde >= times.distraccion * factor(memory, 'distraccion')) {
           s.racha.avisada = true
           say({
             kind: 'distraccion',
@@ -150,8 +176,24 @@ export function createInitiative(times = TIMES, rng = Math.random) {
       }
       if (!snap.pomodoro) s.pomodoroAvisado = false
 
-      // Muy tarde
+      // A la noche jugando o con videos, y mañana entregás algo: te lo recuerda una vez
       const h = now.getHours() + now.getMinutes() / 60
+      if (act && LEISURE.has(act.categoria)) s.ocioDesde ??= t
+      else if (act) s.ocioDesde = null
+      if (s.ocioDesde && t - s.ocioDesde >= times.ocioAntesDeEntrega && h >= 18 && h < 23.5 && !quiet && !memory.doneToday('entrega-manana', now)) {
+        const ev = tomorrowDeliveries(memory, now)[0]
+        if (ev) {
+          memory.markDone('entrega-manana', now)
+          say({
+            kind: 'entrega',
+            text: `Che, mañana tenés ${ev.texto}. ¿Ya lo tenés listo? Si querés, arrancamos un pomodoro.`,
+            face: 'surprised',
+            suggestions: ['arrancá un pomodoro', 'ya está listo']
+          })
+        }
+      }
+
+      // Muy tarde
       if (h >= 0.5 && h < 5 && !memory.doneToday('tarde', now) && !quiet) {
         memory.markDone('tarde', now)
         say({ kind: 'tarde', text: 'Ya es re tarde… ¿y si seguimos mañana? Descansar también suma.', face: 'sad' })
@@ -198,6 +240,18 @@ export function createInitiative(times = TIMES, rng = Math.random) {
           suggestions: ['¡Re bien!', 'Más o menos', 'Mal'],
           pregunta: { tipo: 'como_fue', evento: evento.texto }
         })
+      } else if (wantsTodoReview(now, snap, memory)) {
+        // Un pendiente de hace semanas: ¿sigue o lo borramos? (una vez por día como mucho)
+        const todo = memory.oldTodo(now)
+        memory.markDone('repaso-pendiente', now)
+        memory.touchTodo(todo.id, now)
+        notices.push({
+          kind: 'pendiente_viejo',
+          text: `Tenés anotado «${todo.texto}» desde ${ageText(todo.creado, now)}. ¿Sigue pendiente?`,
+          face: 'idle',
+          suggestions: ['ya lo hice', 'sigue pendiente', 'borralo'],
+          pregunta: { tipo: 'pendiente_viejo', id: todo.id, texto: todo.texto }
+        })
       } else if (wantsWater(now, snap, memory)) {
         s.ultimoAvisoAgua = t
         const vasos = memory.getHealth(now).agua
@@ -233,7 +287,16 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     if (h < 9 || h >= 22 || snap.pomodoro) return false
     if (!s.activoDesde || t - s.activoDesde < 20 * MIN) return false
     const lastWater = memory.lastWater()?.getTime() ?? 0
-    return t - Math.max(s.inicio, lastWater, s.ultimoAvisoAgua) >= times.agua
+    return t - Math.max(s.inicio, lastWater, s.ultimoAvisoAgua) >= times.agua * factor(memory, 'agua')
+  }
+
+  // ¿Pregunto por un pendiente viejo? De día, sin cortarte la concentración, una vez por día
+  function wantsTodoReview(now, snap, memory) {
+    if (!memory.oldTodo || memory.doneToday('repaso-pendiente', now)) return false
+    const h = now.getHours()
+    if (h < 10 || h >= 21 || snap.pomodoro || FOCUSED.has(snap.actividad?.categoria)) return false
+    if (!s.activoDesde || now.getTime() - s.activoDesde < times.charlaTrasVolver) return false
+    return Boolean(memory.oldTodo(now))
   }
 
   // Cuántas noticias contó hoy (queda anotado en la memoria, así no se repite si reiniciás la compu)
@@ -253,7 +316,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     if (FOCUSED.has(snap.actividad?.categoria)) return false
     if (!s.activoDesde || t - s.activoDesde < times.charlaTrasVolver) return false
     if (newsToday(now, snap, memory) >= perDay) return false
-    return t - s.ultimaNoticia >= (13 * 60 * MIN) / perDay
+    return t - s.ultimaNoticia >= ((13 * 60 * MIN) / perDay) * factor(memory, 'noticias')
   }
 
   // ¿Tiene sentido hablar de algo ahora? Pocas veces por día, de día y sin cortarte la concentración.
@@ -265,7 +328,7 @@ export function createInitiative(times = TIMES, rng = Math.random) {
     if (s.charlas.dia === dayKey(now) && s.charlas.n >= CHARLAS_POR_DIA) return false
     if (!s.activoDesde || t - s.activoDesde < times.charlaTrasVolver) return false
     const lastTalk = Math.max(s.inicio, s.ultimaCharla, memory.getMood().ultimoContacto ?? 0)
-    return t - lastTalk >= times.charla
+    return t - lastTalk >= times.charla * factor(memory, 'charla')
   }
 
   return { tick, state: s }

@@ -535,6 +535,17 @@ function Updates({ s, setS, say }) {
           )}
         </div>
       </Card>
+      {u.novedades?.length > 0 && (
+        <Card title={`Qué hay de nuevo en la ${String(s.version).replace(/\.0$/, '')}`} note="Cada vez que me actualizo te lo cuento. También podés preguntarme «¿qué hay de nuevo?».">
+          <ul className="news-list">
+            {u.novedades.map((n) => (
+              <li key={n.texto}>
+                <b>{n.tipo === 'nuevo' ? 'Nuevo' : 'Mejor'}:</b> {n.texto}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </>
   )
 }
