@@ -6,6 +6,25 @@
 
 export const CHANGELOG = [
   {
+    version: '0.16.1',
+    nuevo: [],
+    mejoras: [
+      {
+        corto: 'hago tus pedidos al instante, sin esperar a la IA',
+        detalle: 'Hago tus pedidos al instante aunque la frase sea larga («recordame mañana a las 8 que tengo que llevar el TP», «poné un timer de 10 minutos para los fideos»): la IA queda para charlar y para lo que no entiendo sola.'
+      },
+      {
+        corto: 'si la IA está saturada, igual hago lo que me pediste',
+        detalle: 'Si la IA de Google está saturada (el error 503), pruebo con otro modelo y otra vez un segundo después; y si sigue sin andar, hago igual lo que entendí. Ya no te muestro códigos de error.'
+      },
+      {
+        corto: 'Classroom contesta enseguida y busca en todas tus cuentas',
+        detalle: 'Classroom contesta enseguida con lo último que leí (y lo vuelvo a leer de fondo), y lo busco en todas tus cuentas de Google, no solo en la primera. Para eso hay que recargar una vez mi extensión en chrome://extensions; de ahora en más se actualiza sola.'
+      },
+      { corto: '«agendalo en el calendar» lo anoto en mi agenda', detalle: '«Agendá en el calendar que el viernes tengo prueba» lo anoto en mi agenda y te aviso yo (a tu Google Calendar no puedo escribir, solo lo leo).' }
+    ]
+  },
+  {
     version: '0.16.0',
     nuevo: [
       {

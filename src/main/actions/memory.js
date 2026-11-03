@@ -211,13 +211,15 @@ export const memoryActions = [
   {
     name: 'agendar',
     description: 'Agenda algo para un día y hora',
-    run: ({ texto, cuando, conHora }, ctx) => {
+    run: ({ texto, cuando, conHora, calendario }, ctx) => {
       const now = new Date()
       if (!texto) return { text: `¿Qué tenés ${describeWhen(cuando, conHora, now)}?`, face: 'confused' }
       if (conHora && new Date(cuando) < now) return { text: 'Ese horario ya pasó. ¿Para cuándo lo agendo?', face: 'confused' }
       ctx.memory.addEvent({ texto, cuando, conHora })
       const aviso = conHora ? 'Te aviso 15 minutos antes y a la hora.' : 'Te aviso la noche anterior y ese día a la mañana.'
-      return { text: `Agendado: ${texto}, ${describeWhen(cuando, conHora, now)}. ${aviso}`, face: 'happy' }
+      // A tu Google Calendar no puede escribir (solo lo lee): lo guarda en su agenda y avisa ella
+      const nota = calendario ? ' En tu Google Calendar no puedo escribir (solo lo leo), así que lo guardé en mi agenda y te aviso yo.' : ''
+      return { text: `Agendado: ${texto}, ${describeWhen(cuando, conHora, now)}. ${aviso}${nota}`, face: 'happy' }
     }
   },
   {

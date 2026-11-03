@@ -505,21 +505,24 @@ export function parseLocation(text) {
 // Mensaje claro según el error de la IA. null = seguir con las reglas sin decir nada.
 // Qué decir cuando no pudo pasar tu voz a texto (sin culpar a internet si no fue eso)
 export function voiceErrorText(err) {
-  const friendly = aiErrorText(err)
-  if (friendly) return friendly
   if (err instanceof AIConnectionError && err.timeout) return 'La IA tardó demasiado en entenderte. ¿Me lo repetís?'
   if (err instanceof AIConnectionError) return 'No me pude conectar para entenderte. ¿Hay internet?'
+  if (err instanceof AIHttpError && [500, 502, 503, 504].includes(err.status)) return 'La IA que pasa tu voz a texto está saturada. ¿Me lo repetís en un ratito, o me lo escribís?'
+  const friendly = aiErrorText(err)
+  if (friendly) return friendly
   return 'Se me trabó algo al entenderte. ¿Me lo repetís?'
 }
 
 export function aiErrorText(err) {
   if (err instanceof FriendlyError) return err.message
-  if (err instanceof AIConnectionError) return null
+  if (err instanceof AIConnectionError) return err.timeout ? 'La IA está tardando demasiado en contestar. Probá de nuevo en un ratito; los pedidos simples los hago igual.' : null
   if (err instanceof AIHttpError) {
     if (err.status === 401 || err.status === 403 || /api.?key/i.test(err.message)) return 'La clave de IA no funciona. Revisala en config.json.'
     if (err.status === 404 && err.local) return `No tengo el modelo «${err.model}» en Ollama. Bajalo con «ollama pull ${err.model}».`
     if (err.status === 404) return `No encontré el modelo de IA «${err.model}». Revisá modeloIA en config.json.`
-    if (err.status === 429) return 'Llegué al límite de uso gratis de la IA por ahora. Probá en un rato.'
+    if (err.status === 429) return 'Llegué al límite de uso gratis de la IA por ahora. Probá en un rato; los pedidos simples los hago igual.'
+    // Saturada o caída un momento (es de Google, no de tu compu)
+    if ([500, 502, 503, 504].includes(err.status)) return 'La IA está saturada en este momento (pasa a veces con la de Google). Probá de nuevo en un ratito; los pedidos simples los hago igual.'
     if (/tool_use_failed|failed to call a function/i.test(err.message)) return null // el modelo se trabó: siguen las reglas
     return `La IA tuvo un problema (${err.status}). Probá de nuevo.`
   }

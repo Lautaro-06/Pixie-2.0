@@ -3,6 +3,36 @@ import { parseShortcut, shortcutText } from '../shortcut.js'
 import { describeWhen } from '../dates.js'
 import { whatsNewText } from '../changelog.js'
 
+// Cuánto espera la primera lectura de Classroom antes de contestar «te cuento apenas termine»
+const CLASSROOM_WAIT_MS = 8000
+
+// Lo que dice de Classroom según cómo salió la lectura (o lo último que leyó)
+export function classroomReply(c, st, ctx, now = new Date()) {
+  if (st.estado === 'sin-extension' && !st.leido) {
+    ctx.openSettings?.('ajustes/agenda')
+    return {
+      text: 'Las materias de Classroom no tienen dirección secreta, así que las leo con mi extensión de Chrome. Te abrí mis ajustes: en Agenda y Gmail está cómo instalarla (es una sola vez).',
+      face: 'idle'
+    }
+  }
+  if (st.estado === 'extension-vieja') return { text: 'Mi extensión de Chrome está desactualizada: en chrome://extensions tocá recargar en «Pixie para Chrome».', face: 'confused' }
+  if (st.estado === 'error' && !st.leido) {
+    const why = String(st.error ?? '').replace(/^No pude leer Classroom[.:]?\s*/i, '').trim()
+    return { text: `No pude leer Classroom. ${why || 'Probá de nuevo en un rato.'}`, face: 'confused' }
+  }
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tasks = c.tasks()
+  const upcoming = tasks.filter((x) => x.cuando && new Date(x.cuando) >= today).sort((a, b) => new Date(a.cuando) - new Date(b.cuando))
+  const old = st.estado === 'error' ? ' (es lo último que leí: ahora no pude volver a mirar)' : ''
+  if (!tasks.length) return { text: `En Classroom no tenés tareas pendientes.${old}`, face: 'happy' }
+  const names = upcoming.slice(0, 3).map((x) => `${x.titulo}${x.materia ? ` (${x.materia})` : ''} ${describeWhen(new Date(x.cuando), false, now)}`)
+  const sinFecha = tasks.length - upcoming.length
+  const total = tasks.length === 1 ? 'una tarea pendiente' : `${tasks.length} tareas pendientes`
+  const next = names.length ? ` Lo próximo: ${names.join('; ')}.` : ''
+  const rest = sinFecha ? ` ${sinFecha === 1 ? 'Una no tiene' : `${sinFecha} no tienen`} fecha de entrega.` : ''
+  return { text: `En Classroom tenés ${total}.${next}${rest}${old}`, face: upcoming.length ? 'surprised' : 'happy' }
+}
+
 export const appActions = [
   {
     name: 'ajustes',
@@ -63,30 +93,24 @@ export const appActions = [
   {
     name: 'classroom',
     description: 'Lee tus Pendientes de Classroom (con la extensión de Chrome) y cuenta qué tenés que entregar',
+    // Contesta al instante con lo último que leyó y lo vuelve a leer de fondo (leer Classroom tarda);
+    // si todavía no leyó nunca, espera un poco y, si tarda más, avisa cuando termina.
     run: async (_params, ctx) => {
-      if (!ctx.classroom) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
-      const st = await ctx.classroom.refresh({ force: true })
-      if (st.estado === 'sin-extension' && !st.leido) {
-        ctx.openSettings?.('ajustes/agenda')
-        return {
-          text: 'Las materias de Classroom no tienen dirección secreta, así que las leo con mi extensión de Chrome. Te abrí mis ajustes: en Agenda está cómo instalarla (es una sola vez).',
-          face: 'idle'
-        }
+      const c = ctx.classroom
+      if (!c) return { text: 'Todavía estoy arrancando. Pedímelo en un ratito.', face: 'confused' }
+      if (ctx.extensionOld?.()) {
+        return { text: 'Actualicé mi extensión de Chrome y hay que recargarla una vez: en chrome://extensions tocá recargar en «Pixie para Chrome». Después pedímelo de nuevo.', face: 'confused' }
       }
-      if (st.estado === 'extension-vieja') return { text: 'Mi extensión de Chrome está desactualizada: en chrome://extensions tocá recargar en «Pixie para Chrome».', face: 'confused' }
-      if (st.estado === 'error' && !st.leido) return { text: `No pude leer Classroom: ${st.error}`, face: 'confused' }
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const tasks = ctx.classroom.tasks()
-      const upcoming = tasks.filter((x) => x.cuando && new Date(x.cuando) >= today).sort((a, b) => new Date(a.cuando) - new Date(b.cuando))
-      const old = st.estado === 'ok' ? '' : ' (es lo último que leí: ahora no pude volver a mirar)'
-      if (!tasks.length) return { text: `En Classroom no tenés tareas asignadas.${old}`, face: 'happy' }
-      const names = upcoming.slice(0, 3).map((x) => `${x.titulo}${x.materia ? ` (${x.materia})` : ''} ${describeWhen(new Date(x.cuando), false, now)}`)
-      const sinFecha = tasks.length - upcoming.length
-      const total = tasks.length === 1 ? 'una tarea pendiente' : `${tasks.length} tareas pendientes`
-      const next = names.length ? ` Lo próximo: ${names.join('; ')}.` : ''
-      const rest = sinFecha ? ` ${sinFecha === 1 ? 'Una no tiene' : `${sinFecha} no tienen`} fecha de entrega.` : ''
-      return { text: `En Classroom tenés ${total}.${next}${rest}${old}`, face: upcoming.length ? 'surprised' : 'happy' }
+      const before = c.status()
+      const reading = Promise.resolve(c.refresh({ force: !before.leido || Date.now() - before.leido > 30 * 60 * 1000 }))
+      if (before.leido) {
+        reading.catch(() => {})
+        return classroomReply(c, before, ctx)
+      }
+      const st = await Promise.race([reading, new Promise((r) => setTimeout(() => r(null), CLASSROOM_WAIT_MS))])
+      if (st) return classroomReply(c, st, ctx)
+      reading.then((done) => ctx.say?.({ kind: 'classroom', ...classroomReply(c, done, ctx) })).catch(() => {})
+      return { text: 'Estoy leyendo tu Classroom en Chrome (tarda unos segundos). Te cuento apenas termine.', face: 'idle' }
     }
   },
   {

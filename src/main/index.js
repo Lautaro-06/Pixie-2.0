@@ -26,7 +26,8 @@ import { FriendlyError, isWindows, launch, run, powershell } from './windows.js'
 import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
 import { createUpdater } from './updates.js'
-import { createDiagnostics } from './diagnostics.js'
+import { createDiagnostics, usefulLogLines, tailFile } from './diagnostics.js'
+import { wantsAI } from './routing.js'
 import { shortcutText } from './shortcut.js'
 import { createSettings, AI_STUDIO_URL, GOOGLE_CALENDAR_SETTINGS_URL } from './settings.js'
 import { openSettingsWindow, getSettingsWindow, onSettingsClosed } from './settings-window.js'
@@ -84,12 +85,6 @@ process.on('unhandledRejection', (err) => {
   diagnostics.record('principal', err)
 })
 
-// Lo que conviene mandarle a la IA aunque las reglas lo entiendan: charla y preguntas
-const AI_PREFERRED = new Set(['saludo', 'charla', 'gracias', 'ayuda', 'consultar_memoria'])
-// Usar las apps: si las reglas lo entendieron, se hace tal cual (el texto a escribir no pasa por la IA)
-const DIRECT = new Set(['escribir', 'teclas', 'atajo', 'clic', 'desplazar', 'ventana', 'ir_a', 'ver_elementos'])
-
-
 function shortcutLabel() {
   if (!activeShortcut) return 'el ícono de la barra de tareas'
   return shortcutText(activeShortcut)
@@ -122,6 +117,8 @@ const ctx = {
   changeShortcut,
   log: logAction,
   emit: sendEvent,
+  // Un aviso más tarde (por ejemplo, cuando termina de leer Classroom)
+  say: (notice) => mind?.say(notice),
   reportError: (source, err) => diagnostics.record(source, err),
   // Copia el informe de diagnóstico y devuelve cuántos errores tiene
   copyDiagnostics: () => {
@@ -228,8 +225,8 @@ function diagnosticsReport() {
     `Mails: ${mail ? `${mail.status().estado}, avisos ${mail.status().avisos ? 'sí' : 'no'}` : 'sin arrancar'}`,
     `Calendarios: ${calendars?.status().map((c) => `${c.nombre}${c.error ? ' (no anda)' : ''}`).join(', ') || 'ninguno'}`,
     `Noticias por su cuenta: ${getConfig().noticiasAvisos ?? 'aveces'}`,
-    `Extensión de Chrome: ${browser?.connected() ? 'conectada' : 'no conectada'}`
-  ])
+    `Extensión de Chrome: ${browser?.connected() ? `conectada (${browser.version() ?? '?'}${extensionFiles?.version ? `, Pixie trae la ${extensionFiles.version}` : ''})` : 'no conectada'}`
+  ], usefulLogLines(tailFile(join(app.getPath('userData'), 'historial.txt'))))
 }
 
 // El resumen en reposo muestra el clima: se actualiza cada 30 minutos mientras esté elegido
@@ -556,7 +553,11 @@ function offerPomodoro(input, result) {
 
 async function ask(text) {
   const input = String(text ?? '').slice(0, 500)
+  const started = Date.now()
   const result = await respond(input, text)
+  // Si tardó, queda anotado (para el informe de diagnóstico): cuánto y si fue con la IA
+  const ms = Date.now() - started
+  if (ms > 2000) logAction(`tardé ${(ms / 1000).toFixed(1)} s en contestar «${input.slice(0, 40)}» (${route})`)
   // Todo lo que hablan queda en el diario (en la compu), para acordarse aunque se cierre.
   // Las órdenes que entienden las reglas («abrí Spotify») quedan marcadas como pedidos.
   if (result?.text) journal?.record(input, result.text, { pedido: Boolean(interpretAll(input, { customApps: getConfig().apps ?? [] })?.length) })
@@ -578,8 +579,12 @@ async function respond(input, text) {
   return offerPomodoro(input, await askInner(text))
 }
 
+// Por dónde salió la última respuesta (para anotar en el historial si tardó)
+let route = 'reglas'
+
 async function askInner(text) {
   const input = String(text ?? '').slice(0, 500)
+  route = 'reglas'
 
   if (pending) {
     const waiting = pending
@@ -597,20 +602,23 @@ async function askInner(text) {
   if (answer) return answer
 
   // Con IA: charla, preguntas, frases largas y lo que las reglas no entienden.
-  // Las órdenes cortas siguen por las reglas, que son instantáneas y gratis.
-  const words = input.trim().split(/\s+/).length
-  const social = intents?.every((i) => AI_PREFERRED.has(i.action) || i.knowledge)
-  const direct = intents?.some((i) => DIRECT.has(i.action))
-  if (ai?.enabled() && !direct && (!intents || social || words > 10)) {
+  // Las órdenes que las reglas entienden van por las reglas, que son instantáneas y gratis.
+  if (ai?.enabled() && wantsAI(input, intents)) {
+    route = 'IA'
     try {
       return await ai.chat(input, contextForAI(input))
     } catch (err) {
+      route = 'IA falló, reglas'
       const line = `IA (${ai.provider()}): ${err.status ? `${err.status} ` : ''}${err.message}`
       console.error(line)
       logAction(line)
       diagnostics.record('ia', { message: line, stack: err.stack })
-      const msg = aiErrorText(err)
-      if (msg) return { text: msg, face: 'confused' }
+      // Si la IA falla (saturada, sin internet, tarda), lo que entendieron las reglas se hace igual
+      if (intents) logAction('IA: falló, lo hago con las reglas')
+      else {
+        const msg = aiErrorText(err)
+        if (msg) return { text: msg, face: 'confused', suggestions: suggest(input, options) }
+      }
     }
   }
 
@@ -725,8 +733,12 @@ if (!app.requestSingleInstanceLock()) {
       const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio ?? [])
       if (!bytes.length || bytes.length > MAX_AUDIO_BYTES) return { error: 'El audio quedó vacío o muy largo.' }
       tts?.prepare?.() // mientras te entiende, la voz ya se va cargando para contestarte
+      const started = Date.now()
       try {
-        return { text: await ai.transcribe(bytes, voiceHints()) }
+        const text = await ai.transcribe(bytes, voiceHints())
+        const ms = Date.now() - started
+        if (ms > 2500) logAction(`voz: tardé ${(ms / 1000).toFixed(1)} s en pasar tu voz a texto`)
+        return { text }
       } catch (err) {
         logAction(`voz: ${err.status ? `${err.status} ` : ''}${err.message}`)
         diagnostics.record('micrófono', err)
@@ -810,6 +822,13 @@ if (!app.requestSingleInstanceLock()) {
       onConnect: (version, navegador) => {
         if (getConfig().extensionNavegador !== navegador) saveConfig({ extensionNavegador: navegador })
         logAction(`extensión de Chrome ${version}`)
+        // Si es más vieja que la que trae Pixie, se recarga sola (desde la 0.16.1 sabe hacerlo; las de antes, a mano)
+        if (extensionFiles?.version && olderThan(version, extensionFiles.version)) {
+          browser
+            ?.request('recargar', {}, 5000)
+            .then(() => logAction(`extensión de Chrome: se recargó a la ${extensionFiles.version}`))
+            .catch(() => logAction(`extensión de Chrome: hay que recargarla a mano (tiene la ${version}, hay la ${extensionFiles.version})`))
+        }
         setTimeout(() => classroom?.refresh(), 5000)
         setTimeout(() => (getConfig().mailAvisos ? mail?.refresh() : offerMailAlerts()), 15000)
       }
@@ -912,6 +931,8 @@ if (!app.requestSingleInstanceLock()) {
       news,
       calendars,
       classroom,
+      // ¿La extensión de Chrome conectada es más vieja que la que trae Pixie? (hay que recargarla)
+      extensionOld: () => Boolean(browser?.connected() && extensionFiles?.version && olderThan(browser.version(), extensionFiles.version)),
       mail,
       apps,
       // Mapas (OpenStreetMap; los recorridos en colectivo, en Google Maps)

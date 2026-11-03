@@ -229,8 +229,10 @@ const NOTE_VERBS = /\b(anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame
 const REMIND_VERBS = /\b(recordame|recuerdame|recordarme|avisame|avisa|avises|despertame|haceme acordar)\b/
 const AGENDA_WORDS = /\b(tengo|tenemos|hay|me toca|voy a|vamos a|es el|es la|cumple|cumpleanos|examen|prueba|parcial|turno|entrega|reunion|partido|clase|viaje|cita|dentista|medico)\b/
 const STOP_NAMES = new Set(['yo', 'un', 'una', 'el', 'la', 'la hora', 'algo'])
-const EVENT_LEAD = /^(es|son|haceme acordar|recordame|recorda|recuerdame|recordarme|acordate|acordame|avisame|avisa|avises|anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar|despertame|guarda|guardate|memoriza|no te olvides|que|de|el|la|los|las|tengo|tenemos|hay|me toca|voy a|vamos a|para|y|en la lista|en mis pendientes|a la lista|a mis pendientes)\b\s*/
-const EVENT_TAIL = /\s*\b(es|son|el|la|para|de|que|a|y|en la lista|a la lista|en mis pendientes|a mis pendientes|en pendientes)$/
+const EVENT_LEAD = /^(me podes|me podrias|podes|podrias|es|son|haceme acordar|recordame|recorda|recuerdame|recordarme|acordate|acordame|avisame|avisa|avises|anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar|despertame|guarda|guardate|memoriza|no te olvides|que|de|el|la|los|las|tengo|tenemos|hay|me toca|voy a|vamos a|para|y|en la lista|en mis pendientes|a la lista|a mis pendientes)\b\s*/
+const EVENT_TAIL = /\s*\b(es|son|el|la|para|de|del|al|que|a|y|en la lista|a la lista|en mis pendientes|a mis pendientes|en pendientes)$/
+// «agendá en el Google Calendar…»: Pixie lo anota en su agenda (al Calendar de Google no puede escribir)
+const IN_CALENDAR = /\b(?:en|a|al) (?:el |mi |tu )?(?:google calendar|calendar|calendario(?: de google)?|agenda de google)\b/
 
 function cleanEventText(s) {
   let out = s.trim()
@@ -520,7 +522,12 @@ const RULES = [
     return m ? intent('completar_pendiente', { buscar: m[1] }) : null
   },
   // Classroom (con la extensión): "¿qué tengo en Classroom?", "revisá Classroom", "conectá Classroom"
-  (t) => (/\bclassroom\b/.test(t) && !/^(abri|abrir|abrime|entra a|anda a)\b/.test(t) ? intent('classroom') : null),
+  // (conectarla o instalar la extensión es otra cosa: te lleva a Ajustes)
+  (t) => {
+    if (!/\bclassroom\b/.test(t) || /^(abri|abrir|abrime|entra a|anda a)\b/.test(t)) return null
+    if (/\b(conecta|conectar|conectame|conecto|vincula|vincular|vinculo|instala|instalar|instalo|configura|configurar|extension)\b/.test(t)) return intent('conectar_calendario')
+    return intent('classroom')
+  },
   // Calendarios de afuera: "conectá mi Google Calendar"; y las entregas
   (t) =>
     /\b(conecta|conectar|conectame|suma|sumar|sumame|agrega|agregar|agregame|vincula|vincular|pone|poner|poneme)\b.*\b(calendario|google calendar|calendar|classroom|agenda de google)\b/.test(t)
@@ -555,8 +562,13 @@ const RULES = [
     const remind = REMIND_VERBS.test(t)
     const when = parseDuration(t) ? null : parseWhen(t, ctx.now)
     if (when && (remember || note || remind || AGENDA_WORDS.test(t))) {
-      const texto = cleanEventText(withoutSpans(t, when.spans))
-      return intent('agendar', { texto, cuando: when.date.toISOString(), conHora: when.hasTime })
+      const rest = withoutSpans(t, when.spans)
+      const calendar = IN_CALENDAR.test(rest)
+      const texto = cleanEventText(rest.replace(IN_CALENDAR, ' ').replace(/\s+/g, ' '))
+      const it = intent('agendar', { texto, cuando: when.date.toISOString(), conHora: when.hasTime, ...(calendar ? { calendario: true } : {}) })
+      // Lo pediste con un verbo («recordame», «agendá»): es un pedido seguro aunque la frase sea larga
+      if (remember || note || remind) it.pedido = true
+      return it
     }
     if (parseDuration(t)) return null // "recordame en 10 minutos…" es un timer
     if (note || remind) return intent('agregar_pendiente', { texto: cleanEventText(t) })

@@ -114,13 +114,46 @@ test('le preguntás por Classroom y te cuenta lo próximo', async () => {
     { titulo: 'TP 2', materia: 'Física', cuando: soon(1) },
     { titulo: 'Leer', materia: 'Lengua', cuando: null }
   ]
-  const ctx = { log: () => {}, classroom: { refresh: async () => ({ estado: 'ok', leido: Date.now() }), tasks: () => tasks } }
+  // Ya leyó hace poco: contesta al instante con eso y vuelve a leer de fondo
+  let refreshed = 0
+  const fake = (st, list = tasks) => ({ status: () => st, refresh: async () => (refreshed++, st), tasks: () => list })
+  const ctx = { log: () => {}, classroom: fake({ estado: 'ok', leido: Date.now() }) }
   const r = await runAction('classroom', {}, ctx)
   assert.match(r.text, /^En Classroom tenés 2 tareas pendientes\. Lo próximo: TP 2 \(Física\) mañana\. Una no tiene fecha de entrega\.$/)
+  assert.equal(refreshed, 1)
   let opened = null
-  const none = await runAction('classroom', {}, { log: () => {}, openSettings: (v) => (opened = v), classroom: { refresh: async () => ({ estado: 'sin-extension', leido: null }), tasks: () => [] } })
+  const none = await runAction('classroom', {}, { log: () => {}, openSettings: (v) => (opened = v), classroom: fake({ estado: 'sin-extension', leido: null }, []) })
   assert.match(none.text, /extensión de Chrome/)
   assert.equal(opened, 'ajustes/agenda')
+})
+
+test('Classroom: el error no se repite, la extensión vieja se avisa y lo de conectarla va a Ajustes', async () => {
+  const fake = (st) => ({ status: () => ({ estado: 'sin-leer', leido: null }), refresh: async () => st, tasks: () => [] })
+  const err = await runAction('classroom', {}, { log: () => {}, classroom: fake({ estado: 'error', leido: null, error: 'No pude leer Classroom. ¿Se abre bien classroom.google.com en Chrome?' }) })
+  assert.equal(err.text, 'No pude leer Classroom. ¿Se abre bien classroom.google.com en Chrome?')
+  const old = await runAction('classroom', {}, { log: () => {}, extensionOld: () => true, classroom: fake({ estado: 'ok', leido: Date.now() }) })
+  assert.match(old.text, /recargar en «Pixie para Chrome»/)
+  for (const t of ['conectá classroom', '¿cómo hago para conectar classroom con vos?', 'instalá la extensión de classroom']) assert.deepEqual(interpretAll(t)?.map((i) => i.action), ['conectar_calendario'], t)
+})
+
+test('Classroom la primera vez: si tarda, contesta enseguida y avisa cuando termina', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let finish
+  const said = []
+  const classroom = {
+    status: () => ({ estado: 'sin-leer', leido: null }),
+    refresh: () => new Promise((r) => (finish = r)),
+    tasks: () => [{ titulo: 'TP 3', materia: 'Química', cuando: null }]
+  }
+  const pending = runAction('classroom', {}, { log: () => {}, classroom, say: (n) => said.push(n) })
+  t.mock.timers.tick(8000)
+  const r = await pending
+  assert.match(r.text, /Estoy leyendo tu Classroom/)
+  finish({ estado: 'ok', leido: Date.now() })
+  await new Promise((r) => setImmediate(r))
+  assert.equal(said.length, 1)
+  assert.equal(said[0].kind, 'classroom')
+  assert.match(said[0].text, /^En Classroom tenés una tarea pendiente\./)
 })
 
 test('la extensión viaja con Pixie y se copia cuando cambia de versión', () => {

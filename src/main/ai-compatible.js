@@ -5,7 +5,8 @@ import { AI_TOOLS } from './ai-tools.js'
 
 export const PROVIDERS = {
   // Flash-Lite responde en un segundo; si se acaba su límite gratis o está saturado, prueba con Flash
-  gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-flash-lite-latest', fallback: 'gemini-flash-latest', timeout: 60000 },
+  // (si en 25 segundos no contestó, está trabada: se prueba con el otro modelo en vez de esperar más)
+  gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-flash-lite-latest', fallback: 'gemini-flash-latest', timeout: 25000 },
   groq: { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', timeout: 60000 },
   ollama: { url: 'http://127.0.0.1:11434/v1/chat/completions', model: 'qwen2.5:7b', timeout: 180000, local: true }
 }
@@ -91,21 +92,37 @@ function errorMessage(body) {
   return typeof e === 'string' ? e : e?.message ?? ''
 }
 
+// Fallas que se arreglan probando con otro modelo o un ratito después: límite gratis (429), el servicio
+// saturado o caído un momento (500, 502, 503, 504) o que no contestó a tiempo
+const OVERLOADED = new Set([500, 502, 503, 504])
+export const transientError = (err) =>
+  (err instanceof AIHttpError && (err.status === 429 || OVERLOADED.has(err.status))) || (err instanceof AIConnectionError && err.timeout)
+
 // thinking: cuánto piensa el modelo (ver thinkingFor); null = lo que traiga el modelo
-export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch, thinking = null }) {
+export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch, thinking = null, wait = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   async function post(body) {
+    let first
     try {
       return await sendTuned(body)
     } catch (err) {
-      // Límite gratis agotado (429) o servicio saturado (503): cada modelo tiene su propio límite
-      const busy = err instanceof AIHttpError && (err.status === 429 || err.status === 503)
-      if (busy && preset.fallback && body.model !== preset.fallback) {
-        const next = withoutThinking({ ...body, model: preset.fallback })
-        const effort = body.reasoning_effort && thinkingFor(preset.fallback)
-        return sendTuned(effort ? { ...next, reasoning_effort: effort } : next)
-      }
-      throw err
+      if (!transientError(err)) throw err
+      first = err
     }
+    // 1) Otro modelo: tiene su propio límite y su propia capacidad
+    if (preset.fallback && body.model !== preset.fallback) {
+      const next = withoutThinking({ ...body, model: preset.fallback })
+      const effort = body.reasoning_effort && thinkingFor(preset.fallback)
+      try {
+        return await sendTuned(effort ? { ...next, reasoning_effort: effort } : next)
+      } catch (err) {
+        if (!transientError(err)) throw err
+      }
+    }
+    // 2) «Saturado» (503) suele durar segundos: un ratito después, otra vez con el mismo modelo.
+    // Si fue el límite gratis o no contestó a tiempo, reintentar enseguida no sirve.
+    if (!(first instanceof AIHttpError && OVERLOADED.has(first.status))) throw first
+    await wait(900)
+    return sendTuned(body)
   }
 
   // Si el modelo no acepta que le digan cuánto pensar, se manda sin eso (y no se le vuelve a decir)

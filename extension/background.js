@@ -142,6 +142,11 @@ async function handle(cmd, args) {
   }
   // Tus Pendientes de Classroom (para la agenda de Pixie)
   if (cmd === 'classroom') return readClassroom()
+  // Pixie trae una versión nueva de la extensión: se recarga sola desde la carpeta
+  if (cmd === 'recargar') {
+    setTimeout(() => chrome.runtime.reload(), 300)
+    return { ok: true }
+  }
   // Tus mails sin leer (quién y el asunto), para avisarte cuando llega uno
   if (cmd === 'mails') return readMails()
   // «Leeme el mail de la profe»: lo abre en Chrome y lo lee entero
@@ -164,28 +169,46 @@ async function handle(cmd, args) {
 }
 
 // Abre tus Pendientes de Classroom en una pestaña de fondo, los lee y la cierra. Usa la sesión
-// que ya tenés en Chrome. Si en esa cuenta no hay nada y tenés otras, prueba la siguiente.
+// que ya tenés en Chrome. Prueba tus cuentas de Google (la primera puede ser la personal, sin clases):
+// se queda con la primera que tenga tareas, o con una que se haya podido leer.
 async function readClassroom() {
   const tab = await chrome.tabs.create({ url: 'about:blank', active: false })
   try {
-    let last = null
+    let best = null
+    let login = false
     for (let u = 0; u < 4; u++) {
       await chrome.tabs.update(tab.id, { url: `https://classroom.google.com/u/${u}/a/not-turned-in/all` })
       await loaded(tab.id, 20000)
+      const where = await run(tab.id, classroomWhere).catch(() => null)
+      // Te mandó a iniciar sesión, o esa cuenta no existe (te devolvió a otra): no hay más cuentas
+      if (where && where.host !== 'classroom.google.com') {
+        if (u === 0) login = true
+        break
+      }
+      if (where?.u != null && where.u !== u) break
       await sleep(1500) // la lista aparece un rato después de cargar
       await poll(tab.id, expandClassroomSections, [], 3, 400)
-      const r = await poll(tab.id, readClassroomTodo, [], 25, 600)
-      if (!r || r.login) {
-        if (u === 0) throw new Error(r?.login ? 'Entrá a Classroom en Chrome con tu cuenta y probá de nuevo.' : 'No pude leer Classroom. ¿Se abre bien classroom.google.com en Chrome?')
-        break // esa cuenta no existe: nos quedamos con lo que ya leímos
+      const r = await poll(tab.id, readClassroomTodo, [], 15, 600)
+      if (r?.login) {
+        if (u === 0) login = true
+        break
       }
-      last = { ...r, cuenta: u }
-      if (r.items.length) return last
+      if (!r) continue // esta no se pudo leer: prueba la siguiente cuenta
+      const found = { ...r, cuenta: u }
+      if (r.items.length) return found
+      best ??= found
     }
-    return last
+    if (best) return best
+    throw new Error(login ? 'Entrá a Classroom en Chrome con tu cuenta y probá de nuevo.' : 'No encontré la lista de tareas en Classroom. ¿Se abre bien classroom.google.com en Chrome?')
   } finally {
     chrome.tabs.remove(tab.id).catch(() => {})
   }
+}
+
+// En qué página quedó (para saber si te mandó a iniciar sesión o a otra cuenta)
+function classroomWhere() {
+  const m = /\/u\/(\d+)(\/|$)/.exec(location.pathname)
+  return { host: location.hostname, u: m ? Number(m[1]) : null }
 }
 
 // Los mails sin leer de Gmail: el aviso de Gmail (el que usan los avisadores de mails) con la sesión
@@ -431,7 +454,9 @@ function readClassroomTodo() {
   const links = [...document.querySelectorAll('a[href]')].filter((a) => /\/c\/[^/]+\/[a-z]{1,3}\/[^/]+/.test(a.getAttribute('href') || ''))
   if (!links.length) {
     // Sin tareas: la página lo dice (o todavía está cargando)
-    if (/no hay trabajo|no ten[eé]s (trabajos|tareas)|todo (al d[ií]a|listo)|no work|nothing to do|no tienes trabajo/i.test(text)) return { items: [], vacio: true }
+    if (/no hay (trabajos?|tareas|nada)|no ten[eé]s (trabajos?|tareas|nada)|no tienes (trabajos?|tareas|nada)|sin tareas|nada pendiente|todo (al d[ií]a|listo)|bien hecho|no work|nothing to do|all caught up|no assigned work|woohoo/i.test(text)) return { items: [], vacio: true }
+    // Una cuenta sin clases
+    if (/[uú]nete a una clase|unite a una clase|join a class|no (tienes|ten[eé]s) clases|no est[aá]s inscript/i.test(text)) return { items: [], sinClases: true }
     return null
   }
   const headings = [...document.querySelectorAll('h1, h2, h3, h4, [role="heading"]')]
