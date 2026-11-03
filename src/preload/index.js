@@ -58,7 +58,8 @@ contextBridge.exposeInMainWorld('pixie', {
     pomodoroAdvice: () => ipcRenderer.invoke('ajustes:pomodoro-consejos'),
     syllabus: (req) => ipcRenderer.invoke('ajustes:temario', req),
     clearStudy: () => ipcRenderer.invoke('ajustes:estudio-borrar'),
-    openTransitSignup: () => ipcRenderer.invoke('ajustes:abrir-registro-transporte'),
+    whatsapp: (req) => ipcRenderer.invoke('ajustes:whatsapp', req),
+    forgetMemory: (req) => ipcRenderer.invoke('ajustes:memoria-borrar', req),
     openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
     copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),
     onView: (callback) => {

@@ -1,8 +1,7 @@
-// Mapas y colectivos, gratis y sin clave (salvo los colectivos en vivo):
+// Mapas, gratis y sin clave:
 //   - Dónde queda un lugar: OpenStreetMap (Nominatim), con preferencia por Argentina y tu ciudad
 //   - Cuánto se tarda caminando, en bici o en auto: OSRM (el servidor público de OpenStreetMap)
-//   - Cómo llegar en colectivo, subte o tren: se abre Google Maps con el recorrido
-//   - Dónde viene el colectivo: la API de Transporte de la Ciudad de Buenos Aires (pide una clave gratis)
+//   - Cómo llegar en colectivo, subte o tren: se abre Google Maps con el recorrido (con los horarios)
 // Solo se manda el lugar que pediste (y tu casa, si la guardaste) a esos servicios.
 
 const UA = 'Pixie/0.13 (asistente de escritorio de la E.T. N36)'
@@ -98,38 +97,4 @@ export function createMaps({ fetchImpl = (...a) => fetch(...a), getConfig = () =
   }
 
   return { geocode, route, directionsUrl, cache }
-}
-
-// ── Colectivos de la Ciudad (API Transporte del GCBA) ──
-// Las posiciones en vivo de una línea: [{ lat, lon, destino, velocidad }]
-export function parseVehicles(list, linea) {
-  const want = String(linea).toLowerCase()
-  return (Array.isArray(list) ? list : [])
-    .filter((v) => String(v.route_short_name ?? v.linea ?? '').toLowerCase().replace(/[^0-9a-z]/g, '').startsWith(want.replace(/[^0-9a-z]/g, '')))
-    .map((v) => ({
-      lat: Number(v.latitude ?? v.lat),
-      lon: Number(v.longitude ?? v.lon ?? v.lng),
-      destino: String(v.trip_headsign ?? v.destino ?? '').trim(),
-      velocidad: Number(v.speed ?? 0)
-    }))
-    .filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lon) && v.lat !== 0)
-}
-
-export function createTransit({ fetchImpl = (...a) => fetch(...a), getConfig = () => ({}) } = {}) {
-  const creds = () => {
-    const t = getConfig().transporte ?? {}
-    return t.id && t.secreto ? { id: String(t.id).trim(), secreto: String(t.secreto).trim() } : null
-  }
-  return {
-    configured: () => Boolean(creds()),
-    async vehicles(linea) {
-      const c = creds()
-      if (!c) return null
-      const p = new URLSearchParams({ client_id: c.id, client_secret: c.secreto, route_short_name: String(linea) })
-      const res = await fetchImpl(`https://apitransporte.buenosaires.gob.ar/colectivos/vehiclePositionsSimple?${p}`, { signal: AbortSignal.timeout(12000) })
-      if (res.status === 401 || res.status === 403) throw new Error('la clave de la API de Transporte no funciona')
-      if (!res.ok) throw new Error(`la API de Transporte respondió ${res.status}`)
-      return parseVehicles(await res.json(), linea)
-    }
-  }
 }

@@ -15,7 +15,7 @@ Todo se hace desde la ventanita: **clic derecho en la cara** (o el botón **⋯*
 
 ### Llamarla con la voz: «Pixie, ¿estás?»
 
-En **Ajustes → Voz** (o en la bienvenida) decís tres veces «Pixie, ¿estás?» y aprende tu voz. Desde ahí la llamás así, sin tocar nada: hace un sonidito, te escucha y, cuando dejás de hablar, hace lo que le pediste. Si le seguís hablando, te sigue escuchando; cuando te quedás callado, vuelve a esperar la frase.
+En **Ajustes → Voz y escucha** (o en la bienvenida) decís tres veces «Pixie, ¿estás?» y aprende tu voz. Desde ahí la llamás así, sin tocar nada: hace un sonidito, te escucha y, cuando dejás de hablar, hace lo que le pediste. Si le seguís hablando, te sigue escuchando; cuando te quedás callado, vuelve a esperar la frase.
 
 - **Aprende con el uso:** cada vez que la llamás y entiende tu pedido, guarda esa forma de decirlo (las últimas 6) y te reconoce mejor. Si te escucha «casi» y lo repetís enseguida, se despierta igual.
 - **No te corta:** escucha según el ruido de tu habitación (anda con micrófonos bajitos y con ruido de fondo) y espera casi 2 segundos de silencio antes de terminar. Para entenderte usa el modelo de Gemini que mejor entiende el audio, sabiendo que le hablás en castellano rioplatense y con los nombres de tus apps.
@@ -89,22 +89,27 @@ Todo queda en `estudio.json`, en la carpeta de Pixie, y se borra con **Borrar mi
 
 ### Pixie se corre si le dejás el mouse encima
 
-Si dejás el mouse quieto encima de Pixie (cuando está chiquita), se corre un poco para no taparte un botón. Para llamarla usá el atajo o «Pixie, ¿estás?»; para moverla a mano, llamala y arrastrala con la barra abierta. Se apaga en **Ajustes → General → Correrme si dejás el mouse encima**.
+Si dejás el mouse quieto encima de Pixie (cuando está chiquita), se corre un poco para no taparte un botón. Para llamarla usá el atajo o «Pixie, ¿estás?»; para moverla a mano, llamala y arrastrala con la barra abierta. Se apaga en **Ajustes → Vos y Pixie → Correrme si dejás el mouse encima**.
 
 ### Ajustes
 
 Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajustes»). Ahí está todo sin tocar `config.json`:
 
-- **General:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud, avisos al celular y si se corre cuando le dejás el mouse encima.
-- **Agenda**, **Pomodoro**, **Mi estudio** y **Noticias** (ver arriba).
-- **Personalización:** qué muestra Pixie cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima. Cuando habla, reacciona o la llamás, vuelve la cara.
-- **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
-- **Voz:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
-- **Actualizaciones** y **Ayuda** (el informe de diagnóstico y la carpeta de Pixie).
+- **Inicio:** de un vistazo, qué está listo y qué falta (la IA, «Pixie, ¿estás?», WhatsApp, la extensión de Chrome, tu estudio y la versión), con un botón para ir a configurarlo. También tiene ejemplos de cosas para pedirle.
+- **Pixie**
+  - **Vos y Pixie:** tu nombre, tu ciudad, el atajo (apretás las teclas que quieras), arrancar con Windows, recordatorios de salud, si se corre cuando le dejás el mouse encima y qué muestra cuando no la usás: **su carita**, un **reloj** con la hora grande y la fecha, o un **resumen** con su carita en chiquito, la hora y el clima.
+  - **Voz y escucha:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
+  - **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
+  - **Memoria y privacidad:** cuántas charlas tiene anotadas, de qué hablaron los últimos días, lo que le contaste y los botones para borrar las charlas o todo (ver [Se acuerda de todo](#se-acuerda-de-todo-lo-que-hablaron)).
+- **Estudio:** **Pomodoro** y **Mi estudio** (ver arriba).
+- **Conexiones:** **WhatsApp** (ver [WhatsApp al celular](#whatsapp-al-celular)), **Agenda y Gmail**, **Noticias** y **Apps y mapas** (qué apps puede abrir y usar, y tu casa para los recorridos).
+- **Sistema:** **Actualizaciones y ayuda** (qué hay de nuevo, el informe de diagnóstico y la carpeta de Pixie).
+
+Pixie no usa emojis: ni en lo que dice, ni en sus avisos, ni en Ajustes (si la IA o un titular traen alguno, lo saca).
 
 ### Si el atajo no anda
 
-Si otro programa ya usa **Ctrl+Espacio** (por ejemplo Claude), Pixie toma otro atajo y te avisa cuál: casi siempre **Ctrl+Shift+Espacio**. Lo ves también en el primer renglón del menú de su ícono. Para elegir otro, decile «cambiá el atajo a Ctrl+Alt+P» o cambialo en **Ajustes → General** apretando las teclas (tiene que llevar Ctrl o Alt); si ese también está ocupado, te lo dice. «¿Cuál es tu atajo?» te dice el que tiene ahora.
+Si otro programa ya usa **Ctrl+Espacio** (por ejemplo Claude), Pixie toma otro atajo y te avisa cuál: casi siempre **Ctrl+Shift+Espacio**. Lo ves también en el primer renglón del menú de su ícono. Para elegir otro, decile «cambiá el atajo a Ctrl+Alt+P» o cambialo en **Ajustes → Vos y Pixie** apretando las teclas (tiene que llevar Ctrl o Alt); si ese también está ocupado, te lo dice. «¿Cuál es tu atajo?» te dice el que tiene ahora.
 
 ### Si algo falla
 
@@ -112,7 +117,7 @@ Pixie anota sus errores. Decile «copiame el informe» (o ícono → **Copiar in
 
 Si la cara se cuelga o se cierra de golpe, se vuelve a cargar sola.
 
-## Qué hace (versión 0.15)
+## Qué hace (versión 0.16)
 
 Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en los nombres («abrí yutub») y varios pedidos juntos («abrí YouTube y subí el volumen»). Si no entiende, te propone opciones. **Con una clave de IA entiende cualquier cosa** y conversa de verdad (ver [Con IA](#con-ia-entiende-cualquier-cosa)).
 
@@ -141,6 +146,7 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «¿qué tengo esta semana?», «¿cuándo es la prueba?» | Consulta la agenda |
 | «anotá comprar cartuchos», «¿qué tengo pendiente?», «ya compré los cartuchos» | Lista de pendientes |
 | «acordate que mi color favorito es el azul», «¿cuál es mi color favorito?», «¿qué sabés de mí?» | Recuerda lo que le contás |
+| «¿de qué hablamos ayer?», «¿qué te conté del viaje?», «olvidate de nuestras charlas» | Se acuerda de lo que hablaron (aunque se haya cerrado o actualizado) |
 | «¿qué estoy haciendo?», «¿cuánto usé la compu hoy?», «¿cuánto estuve en YouTube?» | Se da cuenta de lo que hacés |
 | «no me molestes por media hora», «ya podés hablar» | Modo no molestar |
 | «juguemos», «jugamos al pong», «revancha» | Pong contra Pixie: su cara se vuelve el juego |
@@ -148,8 +154,8 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 | «resumime este mail», «¿de qué trata esta página?» | Resume el mail abierto en Gmail o la página que estás viendo (con la extensión) |
 | «¿tengo mails nuevos?», «leeme el mail de la profe», «avisame de los mails» | Cuenta tus mails sin leer de Gmail, te lee uno y, si se lo pedís, te avisa cuando llega uno (con la extensión) |
 | «¿cómo llego al Obelisco?», «¿cuánto tardo caminando a la escuela?», «mi casa queda en …» | Abre el recorrido en Google Maps y dice cuánto tardás desde tu casa (OpenStreetMap) |
-| «¿dónde viene el 60?» | Dice dónde está el colectivo más cerca de tu casa (Ciudad de Buenos Aires, con una clave gratis) |
-| «abrí Minecraft» (cualquier app instalada) | Abre cualquier app del menú Inicio, salvo las que le sacaste en Ajustes → Apps |
+| «¿dónde para el 152?», «¿por dónde pasa el 60?» | Abre en Google Maps las paradas de esa línea cerca de tu casa |
+| «abrí Minecraft» (cualquier app instalada) | Abre cualquier app del menú Inicio, salvo las que le sacaste en Ajustes → Apps y mapas |
 | El micrófono de la barra o **Ctrl+Alt+Espacio** | Le hablás por voz (con IA de Gemini o Groq) |
 | «¿qué ves en mi pantalla?», «ayudame con esto», «explicame este error» | Mira tu pantalla y te ayuda (con IA de Gemini o Claude) |
 | «mandame por WhatsApp que compre pan», «mandame mis pendientes por WhatsApp» | Te escribe al celular (ver [WhatsApp](#whatsapp-al-celular)) |
@@ -162,7 +168,20 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 
 ## Pixie se acuerda, se da cuenta y habla primero
 
-**Se acuerda.** Guarda tu nombre, lo que le contás, tus pendientes y tu agenda. Los eventos con hora te los avisa 15 minutos antes y a la hora; los que son de un día, la noche anterior y esa mañana. Los avisos siguen andando aunque reinicies la compu.
+**Se acuerda.** Guarda tu nombre, lo que le contás, tus pendientes y tu agenda. Los eventos con hora te los avisa 15 minutos antes y a la hora; los que son de un día, la noche anterior y esa mañana. Los avisos siguen andando aunque reinicies la compu. «Recordame mañana a las 8 que tengo que llevar el TP», «avisame a las 18 que tengo fútbol» o «haceme acordar el viernes de la prueba» quedan agendados.
+
+### Se acuerda de todo lo que hablaron
+
+Cada charla queda anotada en la compu (`charlas.jsonl`), así Pixie se acuerda aunque la cierres, se apague la compu o se actualice, como una persona: «¿de qué hablamos ayer?», «¿de qué hablamos el martes?», «¿qué te conté del viaje?». A la IA le pasa lo último que hablaron (aunque haya sido ayer), lo que charlaron antes sobre el tema de ahora y un resumen de cada día de la semana, así sigue la charla donde quedó.
+
+- **Lo personal no lo saca ella.** Si le contás algo sensible (tu salud, la terapia, tu familia, tu pareja, la plata, tus creencias, algo legal), se lo acuerda pero no lo nombra en los resúmenes, no te pregunta «¿cómo te fue con el psicólogo?» y no se lo pasa a la IA salvo que vos lo vuelvas a traer. Lo de la escuela no cuenta como personal («prueba de Política», «TP de enfermedades»).
+- **Lo privado no se guarda nunca.** Las contraseñas, los números de tarjeta, el CBU, el DNI y las claves se tapan («[dato privado]») antes de anotar nada.
+- **Si alguien dice que se quiere hacer daño,** Pixie contesta con cuidado y con a quién llamar (135 desde CABA y Gran Buenos Aires, (011) 5275-1135 desde todo el país, 911 si hay peligro).
+- En **Ajustes → Memoria y privacidad** ves cuántas charlas tiene, de qué hablaron los últimos días y lo que le contaste, y podés borrar las charlas o todo. Por voz: «olvidate de nuestras charlas».
+
+### Si se actualiza, sigue donde estaba
+
+Antes de actualizarse o cerrarse (y cada 20 segundos, por si se corta la luz) Pixie anota lo que estaba haciendo en `estado.json`. Al volver, el Pomodoro sigue en el mismo bloque (el tiempo que estuvo cerrada también cuenta; si pasó mucho, lo termina donde quedó), los timers siguen andando (si alguno se cumplió mientras tanto, suena enseguida y te avisa que fue mientras se reiniciaba) y la charla con la IA sigue donde estaba. Te lo cuenta: «Ya volví de actualizarme. Seguimos con tu Pomodoro: el bloque 2 de 4, faltan 18 minutos».
 
 **Sabe cuándo le contaste cada cosa.** A la IA le pasa lo que le contaste con hace cuánto («mi perro se llama Toby, hace 2 meses»), así no habla de algo viejo como si fuera nuevo. Lo que tenía fecha («mañana tengo prueba», «el viernes juego al fútbol») deja de contarlo después de 10 días: ya pasó. Si le contás algo nuevo sobre lo mismo («mi perro se llama Rocky»), reemplaza lo viejo y te lo dice. Los pendientes de hace semanas no te los recuerda como si fueran de hoy: te pregunta una vez si siguen («ya lo hice» o «borralo» lo saca de la lista, «sigue» lo deja). Cada usuario de Windows tiene su propia memoria.
 
@@ -183,7 +202,7 @@ Le hablás como a una persona: entiende sinónimos, voseo, errores de tipeo en l
 - **Cuando volvés** te cuenta los mails que llegaron mientras no estabas (si pediste los avisos de mails) y lo próximo de tu agenda de hoy.
 - **Cuando se actualiza** te cuenta qué hay de nuevo y qué mejoró. Preguntale «¿qué hay de nuevo?» cuando quieras; también está en Ajustes → Actualizaciones.
 - En pantalla completa (juegos, videos, presentaciones), **en una reunión o llamada** (Zoom, Meet, Teams o cualquier app usando el micrófono) o en modo no molestar se queda callado. Solo los recordatorios y la batería muy baja avisan igual, sin voz.
-- Si no estás frente a la compu (bloqueada o 5 minutos sin tocarla), los recordatorios y los timers te llegan por WhatsApp.
+- Los recordatorios y los timers te llegan por WhatsApp apenas se cumplen (si lo activaste en Ajustes → WhatsApp): siempre, o solo cuando no estás frente a la compu, como elijas.
 
 Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas haciendo.
 
@@ -191,9 +210,9 @@ Los avisos aparecen arriba de la cara sin sacarte el teclado de lo que estabas h
 
 ### Privacidad
 
-Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria.
+Todo queda en la compu, en `%APPDATA%\Pixie`: `memoria.json` (lo que Pixie sabe), `charlas.jsonl` (lo que hablaron, sin contraseñas ni datos privados), `estado.json` (lo que estaba haciendo, mientras se actualiza) e `historial.txt` (lo que hizo). Del uso de la compu solo guarda el tipo de actividad y el nombre de la app, nunca el título de las ventanas ni lo que escribís. «olvidate de todo» borra la memoria y «olvidate de nuestras charlas», las charlas (también en Ajustes → Memoria y privacidad).
 
-La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu. Para los disfraces, Pixie mira el programa y el título de la ventana que tenés adelante, pero no los guarda. En un Pomodoro sí anota, en `estudio.json`, los temas (los títulos limpios de lo que estudiaste, como «Fotosíntesis») para el resumen y el seguimiento; nunca los de lo que te distrajo. Tu casa queda en `config.json`; cuando le pedís un recorrido, la dirección va a OpenStreetMap y a Google Maps para calcularlo. La clave de los colectivos queda cifrada.
+La pantalla solo se mira cuando se lo pedís: la foto va a la IA para responderte y no se guarda. **Si tenés adelante una app de chat (WhatsApp, Telegram, Discord), pregunta antes**, porque la foto llevaría tus chats. Pixie no puede entrar a tu WhatsApp ni a tus cuentas: si le pedís «revisá mi WhatsApp», te lo dice. De Gmail solo ve, con su extensión de Chrome, quién te mandó los mails sin leer y el asunto, y únicamente si se lo pedís; un mail entero lo abre solo cuando le pedís que te lo lea. Con «Pixie, ¿estás?» prendido escucha el micrófono todo el tiempo, pero lo analiza en la compu y lo tira; lo que decís después de llamarla (o con el botón del micrófono) va a la IA para pasarlo a texto. Los WhatsApp que te manda pasan por CallMeBot, un servicio gratuito de terceros. Para las noticias, Pixie solo pide los titulares a Infobae, TN o Google Noticias: no les manda nada tuyo. Las direcciones de tus calendarios quedan cifradas en la compu. Para los disfraces, Pixie mira el programa y el título de la ventana que tenés adelante, pero no los guarda. En un Pomodoro sí anota, en `estudio.json`, los temas (los títulos limpios de lo que estudiaste, como «Fotosíntesis») para el resumen y el seguimiento; nunca los de lo que te distrajo. Tu casa queda en `config.json`; cuando le pedís un recorrido o las paradas de un colectivo, la dirección va a OpenStreetMap y a Google Maps para calcularlo.
 
 Con la IA activada, cada mensaje que va a la IA viaja a ese servicio junto con el contexto que necesita: fecha, qué app estás usando, tu nombre, lo que le contaste, tus pendientes y tu agenda. Cuando le pedís resumir un mail o una página, también se manda ese texto. **En el plan gratis de Gemini, Google puede usar lo que se manda para mejorar sus productos**: no le cuentes nada que no quieras compartir. Con Ollama nada sale de la compu. La clave queda solo en tu compu, cifrada en `config.json`, y **no viaja con el respaldo**: en otra compu Pixie arranca sin clave y con la bienvenida.
 
@@ -234,19 +253,17 @@ También puede usar la voz de Gemini («usá la voz de Gemini»), pero el plan g
 
 ## WhatsApp al celular
 
-Pixie te puede escribir por WhatsApp, **solo a tu número**, usando [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) (gratis para uso personal). Se activa una vez:
+Pixie te puede escribir por WhatsApp, **solo a tu número**, usando [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) (gratis para uso personal). Cada uno lo activa con su número en **Ajustes → WhatsApp**, en 3 pasos:
 
-1. Agendá en el celular el número **+34 684 77 00 05** (CallMeBot).
-2. Mandale por WhatsApp: `I allow callmebot to send me messages`
-3. Te responde con tu **apikey**. Ponela en `config.json` junto con tu número (con código de país):
+1. **Tu número**, con el código de país (en Argentina: +54 9 y el número sin el 15).
+2. **Abrir WhatsApp:** se abre el chat del bot de CallMeBot (**+34 684 77 00 05**) con el mensaje `I allow callmebot to send me messages` ya escrito. Tocás Enviar desde ese celular y el bot te contesta con tu clave (**APIKEY**).
+3. **La clave:** la pegás, o copiás el mensaje entero del bot y tocás **Buscar en lo copiado**.
 
-   ```json
-   "whatsapp": { "telefono": "+5491112345678", "apikey": "123456" }
-   ```
+Después, **Mandarme un mensaje de prueba**: si algo está mal (el número, la clave, el bot sin activar), te dice qué. El número y la clave quedan solo en tu compu (la clave, cifrada).
 
-4. Guardá (Pixie lo lee solo, no hace falta reiniciarlo) y decile «probá el WhatsApp».
+Con eso, los recordatorios de tu agenda y los timers te llegan al celular **apenas se cumplen**. En **Cuándo te escribo** elegís **Siempre** o **Solo si no estás en la compu** (bloqueada o 5 minutos sin tocarla). Los mensajes salen en fila, de a uno, y si CallMeBot no responde, reintenta. Para que no te escriba más, apagá **Avisarte al celular**. También le podés pedir «mandame por WhatsApp que compre pan» o «probá el WhatsApp».
 
-Con eso, si no estás frente a la compu, los recordatorios y los timers te llegan al celular (como mucho uno por minuto). Para que no lo haga: `"avisosAlCelular": false`.
+Si el bot no contesta, fijate en [la página de CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) que el número no haya cambiado (está el botón en Ajustes → WhatsApp → Si no te llega).
 
 ## Respaldo en la nube
 
@@ -403,6 +420,7 @@ src/
     browser.js     ← la conexión con la extensión de Chrome
     content.js     ← chistes y datos curiosos
     tts.js         ← la voz natural (Gemini, en streaming)
+    speech-text.js ← parte los textos largos en frases para que ninguna voz se corte (y saca los emojis)
     media-session.js ← la música que suena en Windows (pausar mientras habla, qué canción es)
     phone.js       ← los WhatsApp al celular
     backup.js      ← el respaldo en OneDrive
@@ -411,6 +429,8 @@ src/
     calc.js        ← la calculadora
     dates.js       ← entiende fechas y horas («el martes a las 6 de la tarde»)
     memory.js      ← la memoria: nombre, datos, pendientes, agenda y uso
+    journal.js     ← el diario de charlas: de qué hablaron y cuándo (charlas.jsonl)
+    sensitive.js   ← los temas sensibles que no saca ella y los datos privados que tapa
     awareness.js   ← lo que ve de la compu (ventana activa, inactividad, batería, internet)
     usage.js       ← qué tipo de actividad es cada app
     initiative.js  ← decide cuándo hablar primero
@@ -472,13 +492,23 @@ Desde el ícono de Pixie → «Abrir config.json», agregá la app en `apps`:
 
 ## Para probar en Windows
 
+Lo nuevo de la versión 0.16 (acá se probó con la app instalada en Linux; WhatsApp, con un servicio de mentira porque desde el entorno de prueba no se llega a internet):
+
+- **WhatsApp:** en Ajustes → WhatsApp, los 3 pasos con tu número y **Mandarme un mensaje de prueba**. Después, «recordame en 2 minutos que saque la ropa» (o un timer de 1 minuto) y fijate que llegue al celular enseguida, con la compu desbloqueada (en **Siempre**) y bloqueada (en **Solo si no estás en la compu**).
+- **Recordatorios:** «recordame mañana a las 8 que tengo que llevar el TP» tiene que contestar que lo agendó, y aparecer en «¿qué tengo mañana?».
+- **Actualizarse sin olvidarse:** arrancá un Pomodoro y un timer de 10 minutos, y actualizá (o cerrá Pixie y abrila enseguida). Tiene que decir «Ya volví…» con el bloque y el timer, y seguir donde estaba.
+- **Memoria:** contale algo, cerrala, abrila y preguntale «¿de qué hablamos hoy?» y, al otro día, «¿de qué hablamos ayer?». Contale algo personal y fijate que no lo nombre sola ni aparezca en Ajustes → Memoria y privacidad.
+- **Voz larga:** pedile algo largo («explicame la fotosíntesis con detalle») con cada voz (natural, Windows y Gemini): tiene que leerlo entero.
+- **Ajustes:** que arranquen en Inicio y se entiendan los grupos. Contanos qué sección cuesta encontrar.
+- **Sin emojis:** que no aparezca ninguno en sus respuestas, sus avisos ni Ajustes.
+
 Lo nuevo de la versión 0.13 (acá se probó con la app instalada en Linux y un micrófono simulado; los mapas y los colectivos, con servicios de mentira porque desde el entorno de prueba no se llega a internet):
 
 - **Disfraces:** abrí YouTube o Netflix (anteojos 3D y pochoclos), Word o PowerPoint (anteojos y la compu), Spotify (auriculares), un juego (joystick). Contanos qué app no reconoce.
 - **«Pixie, ¿estás?»:** llamala después de 10 minutos sin tocar el teclado (mirando un video). Tiene que contestar.
 - **Chrome:** con Chrome cerrado, pedile «¿tengo mails?» o «poné goteo de duki»: tiene que abrir Chrome y hacerlo. Recargá la extensión en `chrome://extensions` (pasa a la 0.13.0).
-- **Apps:** en Ajustes → Apps tocá **Buscar apps de nuevo**, sacale el permiso a una y pedile que la abra o que escriba en ella.
-- **Mapas:** «mi casa queda en …» y después «¿cómo llego al Obelisco caminando?». Para los colectivos, sacá la clave en Ajustes → Mapas y colectivos y preguntá «¿dónde viene el 60?».
+- **Apps:** en Ajustes → Apps y mapas tocá **Buscar apps de nuevo**, sacale el permiso a una y pedile que la abra o que escriba en ella.
+- **Mapas:** «mi casa queda en …» y después «¿cómo llego al Obelisco caminando?». (Los colectivos en vivo se sacaron en la 0.16: ahora «¿dónde para el 60?» abre las paradas en Google Maps.)
 
 Lo nuevo de la versión 0.12 (acá se probó con la app instalada en Linux, un micrófono simulado y una memoria de ejemplo):
 

@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { dayKey } from './dates.js'
+import { sensitiveTopic, redactSecrets } from './sensitive.js'
 
 const EMPTY = () => ({
   nombre: null,
@@ -22,6 +23,9 @@ const STOPWORDS = new Set([
   'mi', 'mis', 'me', 'te', 'tu', 'tus', 'se', 'lo', 'le', 'con', 'por', 'para', 'cual', 'cuales', 'cuando', 'como',
   'donde', 'tengo', 'tenia', 'hay', 'ya', 'hice', 'son', 'fue', 'esta', 'este', 'sobre'
 ])
+
+// Lo sensible se detecta también en lo guardado antes de esta versión
+const isSensitive = (item) => Boolean(item.sensible ?? sensitiveTopic(item.texto))
 
 const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -176,22 +180,29 @@ export function createMemory(file) {
     },
 
     // Datos que le contás. Si es sobre lo mismo que algo viejo ("mi perro se llama…"), lo reemplaza.
-    addFact(texto, now = new Date()) {
+    // Lo sensible (salud, familia, pareja…) queda marcado para no sacarlo; los datos privados se tapan.
+    addFact(rawTexto, now = new Date()) {
+      const texto = redactSecrets(rawTexto)
       const key = factKey(texto)
       const old = key ? data.datos.filter((x) => factKey(x.texto) === key) : []
-      const item = { id: nextId(data.datos), texto, creado: now.toISOString() }
+      const sensible = sensitiveTopic(texto)
+      const item = { id: nextId(data.datos), texto, creado: now.toISOString(), ...(sensible ? { sensible } : {}) }
       data.datos = [...data.datos.filter((x) => !old.includes(x)), item]
       save()
       return old.length ? { ...item, reemplazo: old.at(-1).texto } : item
     },
     // Lo que la IA tiene que saber: con hace cuánto te lo contó, y sin lo que tenía fecha y ya pasó
-    factsForAI(now = new Date(), max = 15) {
+    // Lo sensible solo entra si el mensaje de ahora es sobre eso (lo trajo el usuario)
+    factsForAI(now = new Date(), max = 15, query = '') {
       return data.datos
         .filter((f) => !(isTimeBound(f.texto) && ageDays(f.creado, now) > TIME_BOUND_DAYS))
+        .filter((f) => !isSensitive(f) || (query && similarity(query, f.texto) >= 0.34))
         .slice(-max)
         .map((f) => `${f.texto} (te lo contó ${ageText(f.creado, now)})`)
     },
     listFacts: () => [...data.datos],
+    // Lo que puede nombrar sin que se lo pidas (sin lo sensible)
+    publicFacts: () => data.datos.filter((f) => !isSensitive(f)),
     findFact: (query) => best(data.datos, query),
     forget(query) {
       const item = best([...data.datos, ...data.pendientes, ...data.agenda], query)
@@ -263,10 +274,13 @@ export function createMemory(file) {
     },
 
     // Agenda
-    addEvent({ texto, cuando, conHora }) {
+    addEvent({ texto: rawTexto, cuando, conHora }) {
+      const texto = redactSecrets(rawTexto)
+      const sensible = sensitiveTopic(texto)
       const item = {
         id: nextId(data.agenda),
         texto,
+        ...(sensible ? { sensible } : {}),
         cuando: new Date(cuando).toISOString(),
         conHora,
         avisos: alertsFor(cuando, conHora),
@@ -311,17 +325,18 @@ export function createMemory(file) {
           if (now - at < 6 * 60 * MIN) due.push({ evento: e, clave: a.clave })
         }
       }
-      // Limpia eventos que pasaron hace más de 2 días
+      // Se acuerda de lo que pasó hasta 3 meses atrás («¿cuándo fue la prueba de química?»)
       const before = data.agenda.length
-      data.agenda = data.agenda.filter((e) => now - new Date(e.cuando) < 2 * 24 * 60 * MIN)
+      data.agenda = data.agenda.filter((e) => now - new Date(e.cuando) < 90 * 24 * 60 * MIN)
       if (changed || data.agenda.length !== before) save()
       return [...due, ...external.dueAlerts(now)]
     },
 
     // Eventos que ya pasaron y todavía no le preguntó cómo le fue
+    // (Lo sensible no se pregunta: «¿cómo te fue con el psicólogo?» no lo dice ella)
     followUpsDue(now = new Date()) {
       return data.agenda.filter((e) => {
-        if (e.seguimiento) return false
+        if (e.seguimiento || isSensitive(e)) return false
         const at = followUpAt(e.cuando, e.conHora)
         return at <= now && now - at < FOLLOW_UP_WINDOW
       })

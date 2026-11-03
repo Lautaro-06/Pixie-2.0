@@ -14,6 +14,7 @@ export function createUpdater({
   reportError = () => {},
   onChange = () => {},
   onReady = () => {},
+  beforeInstall = () => {}, // guarda lo que estaba haciendo antes de cerrarse para actualizar
   timers = { setTimeout, setInterval }
 }) {
   let state = packaged ? 'idle' : 'dev' // idle | checking | downloading | ready | error | offline | dev
@@ -91,6 +92,11 @@ export function createUpdater({
   function install() {
     if (state !== 'ready') return false
     log(`actualizaciones: instalando la versión ${available}`)
+    try {
+      beforeInstall()
+    } catch {
+      // si no se pudo guardar, igual se actualiza
+    }
     updater.quitAndInstall(true, true)
     return true
   }

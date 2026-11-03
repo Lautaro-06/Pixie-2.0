@@ -6,6 +6,31 @@
 
 export const CHANGELOG = [
   {
+    version: '0.16.0',
+    nuevo: [
+      {
+        corto: 'me acuerdo de todo lo que hablamos, aunque me cierres o me actualice',
+        detalle:
+          'Me acuerdo de todo lo que hablamos, aunque me cierres, se apague la compu o me actualice: queda guardado solo en tu compu. Preguntame «¿de qué hablamos ayer?», «¿qué te conté del viaje?» o «¿qué sabés de mí?». Lo personal (tu salud, tu familia, tu pareja, la plata, tus creencias) me lo acuerdo pero no lo saco yo: solo hablo de eso si vos lo traés. Las contraseñas, tarjetas y claves no las guardo nunca. Lo ves y lo borrás en Ajustes → Memoria y privacidad.'
+      },
+      {
+        corto: 'si me actualizo en medio de algo, sigo donde estaba',
+        detalle: 'Si me actualizo o me reinicio en medio de algo, sigo donde estaba: el Pomodoro sigue en el mismo bloque, los timers siguen andando (y si alguno se cumplió mientras tanto, te aviso enseguida) y la charla sigue donde la dejamos.'
+      },
+      {
+        corto: 'te mando los recordatorios y los timers por WhatsApp apenas se cumplen',
+        detalle: 'Te mando por WhatsApp los recordatorios de tu agenda y los timers apenas se cumplen. Cada uno lo activa con su número en Ajustes → WhatsApp, en 3 pasos y gratis, y elige si le escribo siempre o solo cuando no está en la compu.'
+      }
+    ],
+    mejoras: [
+      { corto: 'leo los textos largos enteros, sin cortarme a la mitad', detalle: 'Leo los textos largos enteros, con cualquier voz: la natural, la de Gemini o la de Windows. Antes me cortaba a la mitad.' },
+      { corto: 'los Ajustes están ordenados y arrancan con un resumen de cómo está todo', detalle: 'Los Ajustes están ordenados en grupos (Pixie, Estudio, Conexiones y Sistema) y arrancan en Inicio, que te muestra de un vistazo qué está listo y qué falta configurar.' },
+      { corto: '«recordame mañana a las 8 que tengo…» ya se guarda bien', detalle: '«Recordame mañana a las 8 que tengo que llevar el TP» ahora se guarda como recordatorio (antes a veces lo tomaba como una pregunta y no lo anotaba).' },
+      { corto: 'ya no uso emojis', detalle: 'Ya no uso emojis: ni en lo que digo, ni en mis avisos, ni en Ajustes.' },
+      { corto: 'los colectivos los buscás en Google Maps', detalle: 'Saqué lo de dónde viene el colectivo en vivo (necesitaba una clave de la Ciudad que no se podía conseguir). «¿Dónde para el 152?» te abre las paradas en Google Maps, y «¿cómo llego a…?» te arma el recorrido.' }
+    ]
+  },
+  {
     version: '0.15.0',
     nuevo: [
       {
@@ -25,7 +50,7 @@ export const CHANGELOG = [
         corto: 'te recomiendo el método según lo que vas a estudiar',
         detalle: 'Te recomiendo el método según lo que vas a hacer: para memorizar, repaso activo y repetición espaciada; para ejercicios o programación, bloques largos; para leer teoría, resumen propio y técnica Feynman. Si no sé qué vas a estudiar, te pregunto.'
       },
-      { corto: 'si dejás el mouse encima mío, me corro', detalle: 'Si dejás el mouse encima mío, me corro para no taparte un botón (se apaga en Ajustes → General). Para llamarme, usá el atajo.' }
+      { corto: 'si dejás el mouse encima mío, me corro', detalle: 'Si dejás el mouse encima mío, me corro para no taparte un botón (se apaga en Ajustes → Vos y Pixie). Para llamarme, usá el atajo.' }
     ],
     mejoras: [
       { corto: 'sé mejor qué te distrae: la música no, un video de una clase tampoco', detalle: 'Sé mejor qué te distrae en un bloque: la música no; un video de YouTube de una clase tampoco; las redes, el streaming, los juegos y las compras sí; un chat, si te quedás más de 3 minutos.' },

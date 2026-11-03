@@ -17,7 +17,8 @@ import { combineScene } from './scenes.js'
 // Avisos que se dicen menos si no les das bola
 const LEARNS = new Set(['charla', 'agua', 'pausa', 'noticias', 'distraccion'])
 // En un bloque de Pomodoro solo se dicen estos; el resto se guarda para el descanso
-const DURING_FOCUS = new Set(['pomodoro', 'distraccion'])
+// En un bloque de estudio solo se dice lo del Pomodoro, las distracciones y el «Ya volví» después de actualizarse
+const DURING_FOCUS = new Set(['pomodoro', 'distraccion', 'volvio'])
 const fold = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¡!¿?.,]/g, ' ').trim()
 
 const TICK_MS = 5000
@@ -92,7 +93,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     const quiet = isQuiet()
     if (n.urgent) {
       notify('Pixie', n.text)
-      ctx.phoneIfAway?.(n.text)
+      // Los recordatorios de la agenda también al WhatsApp (la batería baja, no)
+      if (n.kind === 'recordatorio') (ctx.phoneNotify ?? ctx.phoneIfAway)?.(n.text)
       showWindow?.() // aunque lo hayas escondido, los recordatorios aparecen
     }
     if (n.pregunta) question = { ...n.pregunta, hasta: Date.now() + QUESTION_MS }
@@ -195,7 +197,8 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     heldNotices: () => [...held],
     howAreYou: () => howAreYou(memory.getMood(), new Date()),
     // Lo que la IA necesita saber en cada mensaje
-    contextText() {
+    // query: lo que dijo ahora (lo sensible que guardó solo entra si habla de eso)
+    contextText(query = '') {
       const now = new Date()
       const when = `${now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}, ${now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}`
       const lines = [`Ahora: ${when}.`]
@@ -211,7 +214,7 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       if (health.agua || health.pausas) lines.push(`Hoy tomó ${health.agua} vasos de agua e hizo ${health.pausas} pausas.`)
       lines.push(`Cómo se siente Pixie: ${feeling(memory.getMood(), now)}.`)
       // Con hace cuánto: «mañana tengo prueba» de hace un mes ya pasó
-      const facts = memory.factsForAI(now)
+      const facts = memory.factsForAI(now, 15, query)
       if (facts.length) lines.push(`Lo que contó: ${facts.join('; ')}.`)
       const todos = memory.todosForAI(now)
       if (todos.length) lines.push(`Pendientes: ${todos.join('; ')}.`)

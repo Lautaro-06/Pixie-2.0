@@ -8,6 +8,7 @@ import { parseShortcut, shortcutText } from './shortcut.js'
 import { findCalendarUrl } from './calendars.js'
 import { buildPlan, blockTips, advicePrompt, pomodoroView, clampMinutes, METHODS, TASK_TYPES } from './study.js'
 import { DEFAULT_GOAL } from './study-log.js'
+import { cleanPhone, findWhatsappKey, activationLink, WHEN, CALLMEBOT_PAGE } from './phone.js'
 
 export const STANDBY_MODES = ['cara', 'reloj', 'resumen']
 export const NEWS_SOURCES = ['infobae', 'tn']
@@ -56,6 +57,9 @@ export function createSettings({
   apps = null,
   pomodoro = null, // la sesión (pomodoro.js)
   studyLog = null, // el seguimiento de estudio y el temario (study-log.js)
+  phone = null, // WhatsApp (phone.js)
+  journal = null, // el diario de charlas (journal.js)
+  openExternal = () => {},
   runPomodoro = null, // async (accion) → lo que dice Pixie (arrancar, pausar, seguir, saltar, terminar)
   extension = () => ({ carpeta: null, version: null, conectada: false, vieja: false }),
   version = '0.0.0'
@@ -116,13 +120,10 @@ export function createSettings({
       },
       apps: apps ? { lista: apps.list(), actualizado: apps.updated(), buscando: apps.searching() } : null,
       pomodoro: pomodoroSnapshot(),
+      whatsapp: phone ? { ...phone.status(), avisos: cfg.avisosAlCelular !== false } : null,
+      memoria: memorySnapshot(),
       estudio: studySnapshot(),
-      mapas: {
-        casa: cfg.direccionCasa ?? '',
-        transporteId: cfg.transporte?.id ?? '',
-        transporteSecreto: maskSecret(cfg.transporte?.secreto),
-        transporte: Boolean(cfg.transporte?.id && cfg.transporte?.secreto)
-      },
+      mapas: { casa: cfg.direccionCasa ?? '' },
       noticias: {
         fuentes: Array.isArray(cfg.noticiasFuentes) ? cfg.noticiasFuentes.filter((f) => NEWS_SOURCES.includes(f)) : NEWS_SOURCES,
         avisos: NEWS_ALERTS.includes(cfg.noticiasAvisos) ? cfg.noticiasAvisos : 'aveces'
@@ -165,16 +166,18 @@ export function createSettings({
       if (patch.mailAvisos) mail?.refresh({ force: true, silent: true }).catch(() => {})
     }
     if (typeof patch.mailsDesilenciar === 'string') mail?.unmute(patch.mailsDesilenciar)
-    // Ajustes → Mapas: tu casa y la clave de los colectivos
-    if (typeof patch.direccionCasa === 'string') saveConfig({ direccionCasa: patch.direccionCasa.trim().slice(0, 120) || undefined })
-    if (typeof patch.transporteId === 'string' || typeof patch.transporteSecreto === 'string') {
-      const cur = getConfig().transporte ?? {}
+    // Ajustes → WhatsApp: tu número, la clave del bot y cuándo te escribe
+    if (typeof patch.whatsappTelefono === 'string' || typeof patch.whatsappClave === 'string' || typeof patch.whatsappCuando === 'string') {
+      const cur = getConfig().whatsapp ?? {}
       const next = { ...cur }
-      if (typeof patch.transporteId === 'string') next.id = patch.transporteId.trim() || undefined
-      if (typeof patch.transporteSecreto === 'string' && patch.transporteSecreto.trim()) next.secreto = patch.transporteSecreto.trim()
-      saveConfig({ transporte: next })
-      if (next.id && next.secreto) mensajes.push('Listo: ya puedo decirte dónde vienen los colectivos. Probá «¿dónde viene el 60?».')
+      if (typeof patch.whatsappTelefono === 'string') next.telefono = cleanPhone(patch.whatsappTelefono) || undefined
+      if (typeof patch.whatsappClave === 'string' && patch.whatsappClave.trim()) next.apikey = (findWhatsappKey(patch.whatsappClave) ?? patch.whatsappClave).trim()
+      if (WHEN.includes(patch.whatsappCuando)) next.cuando = patch.whatsappCuando
+      saveConfig({ whatsapp: next })
+      if (phone?.configured() && (typeof patch.whatsappClave === 'string' || typeof patch.whatsappTelefono === 'string')) mensajes.push('Listo. Tocá «Mandarme un mensaje de prueba» para ver que llegue.')
     }
+    // Ajustes → Apps y mapas: tu casa
+    if (typeof patch.direccionCasa === 'string') saveConfig({ direccionCasa: patch.direccionCasa.trim().slice(0, 120) || undefined })
     // Ajustes → Pomodoro
     if ('pomodoroMinutos' in patch) saveConfig({ pomodoroMinutos: clampMinutes(patch.pomodoroMinutos) })
     if (typeof patch.pomodoroMetodo === 'string' && (METHODS[patch.pomodoroMetodo] || patch.pomodoroMetodo === 'auto')) saveConfig({ pomodoroMetodo: patch.pomodoroMetodo })
@@ -358,6 +361,56 @@ export function createSettings({
     return { ...snapshot(), mensaje: 'Borré tu historial de estudio.' }
   }
 
+  // WhatsApp: abrir el chat del bot con el mensaje de activación, buscar la clave copiada o mandar una prueba
+  async function whatsapp({ accion } = {}) {
+    if (accion === 'activar') {
+      openExternal(activationLink())
+      return { ...snapshot(), mensaje: 'Te abrí WhatsApp con el mensaje ya escrito: tocá Enviar. El bot te contesta con tu clave (APIKEY).' }
+    }
+    if (accion === 'pagina') {
+      openExternal(CALLMEBOT_PAGE)
+      return { ...snapshot(), mensaje: null }
+    }
+    if (accion === 'portapapeles') {
+      const key = findWhatsappKey(readClipboard())
+      if (!key) return { ...snapshot(), mensaje: 'No encontré la clave en lo que copiaste. Copiá el mensaje del bot (el que dice «APIKEY») y tocá de nuevo.' }
+      const cur = getConfig().whatsapp ?? {}
+      saveConfig({ whatsapp: { ...cur, apikey: key } })
+      return { ...snapshot(), mensaje: 'Encontré tu clave y la guardé (cifrada).' }
+    }
+    if (accion === 'probar') {
+      if (!phone?.configured()) return { ...snapshot(), mensaje: 'Primero poné tu número y la clave que te mandó el bot.' }
+      try {
+        await phone.send('Pixie: ¡Hola! Así te van a llegar mis recordatorios y los timers.')
+        return { ...snapshot(), mensaje: '¡Te lo mandé! Fijate en tu WhatsApp.' }
+      } catch (err) {
+        return { ...snapshot(), mensaje: err.message }
+      }
+    }
+    return { ...snapshot(), mensaje: null }
+  }
+
+  // Ajustes → Memoria: cuánto se acuerda, lo personal que no nombra, y borrar
+  function memorySnapshot() {
+    const facts = memory?.listFacts?.() ?? []
+    const open = memory?.publicFacts?.() ?? facts
+    return {
+      charlas: journal?.count() ?? 0,
+      datos: open.map((f) => ({ texto: f.texto, creado: f.creado })).slice(-30).reverse(),
+      personales: facts.length - open.length,
+      dias: journal?.summaries(7).map((d) => ({ fecha: d.fecha, temas: d.temas, charlas: d.charlas })) ?? []
+    }
+  }
+
+  function forget({ que } = {}) {
+    if (que === 'charlas') journal?.forgetAll()
+    if (que === 'todo') {
+      journal?.forgetAll()
+      memory?.forgetAll?.()
+    }
+    return { ...snapshot(), mensaje: que === 'todo' ? 'Listo, me olvidé de todo.' : que === 'charlas' ? 'Listo, me olvidé de nuestras charlas.' : null }
+  }
+
   // Los últimos titulares, para ver cómo quedan
   async function previewNews() {
     try {
@@ -389,6 +442,8 @@ export function createSettings({
     pomodoroControl,
     pomodoroAdvice,
     syllabus,
-    clearStudy
+    clearStudy,
+    whatsapp,
+    forget
   }
 }

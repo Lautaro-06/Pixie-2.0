@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createPhone, whatsappConfig } from '../src/main/phone.js'
+import { createPhone, whatsappConfig, cleanPhone, findWhatsappKey, serviceError, activationLink } from '../src/main/phone.js'
 import { createMemory } from '../src/main/memory.js'
 import { runAction } from '../src/main/actions/index.js'
 import { interpretAll } from '../src/main/brain.js'
@@ -15,7 +15,13 @@ function fakeFetch(body = 'Message queued. You will receive it in a few seconds.
 const config = { whatsapp: { telefono: '+54 9 11 2345-6789', apikey: '123456' } }
 
 test('lee el número y la clave de WhatsApp', () => {
-  assert.deepEqual(whatsappConfig(config), { telefono: '+5491123456789', apikey: '123456' })
+  assert.deepEqual(whatsappConfig(config), { telefono: '+5491123456789', apikey: '123456', cuando: 'siempre' })
+  assert.equal(whatsappConfig({ whatsapp: { ...config.whatsapp, cuando: 'ausente' } }).cuando, 'ausente')
+  assert.equal(cleanPhone('54 9 11 2345-6789'), '+5491123456789')
+  assert.equal(cleanPhone(''), '')
+  assert.equal(findWhatsappKey('Your APIKEY is 7654321, use it to send messages'), '7654321')
+  assert.equal(findWhatsappKey('hola'), null)
+  assert.match(activationLink(), /^https:\/\/wa\.me\/\d+\?text=I%20allow%20callmebot%20to%20send%20me%20messages$/)
   assert.equal(whatsappConfig({ whatsapp: { telefono: '+54911' } }), null)
   assert.equal(whatsappConfig({}), null)
 })
@@ -31,20 +37,36 @@ test('manda el WhatsApp por CallMeBot', async () => {
   assert.equal(url.searchParams.get('apikey'), '123456')
 })
 
-test('los automáticos no se repiten enseguida', async () => {
+test('los mensajes salen en fila (con un ratito entre uno y otro) y no se pierde ninguno', async () => {
   const f = fakeFetch()
-  const phone = createPhone({ getConfig: () => config, fetchImpl: f.fn })
-  assert.equal(await phone.send('uno', { auto: true }), true)
-  assert.equal(await phone.send('dos', { auto: true }), false)
-  assert.equal(await phone.send('pedido a mano'), true) // si se lo pedís, lo manda igual
-  assert.equal(f.urls.length, 2)
+  const waits = []
+  const phone = createPhone({ getConfig: () => config, fetchImpl: f.fn, wait: async (ms) => waits.push(ms) })
+  const all = await Promise.all([phone.send('uno', { auto: true }), phone.send('dos', { auto: true }), phone.send('pedido a mano')])
+  assert.deepEqual(all, [true, true, true])
+  assert.deepEqual(f.urls.map((u) => new URL(u).searchParams.get('text')), ['uno', 'dos', 'pedido a mano'])
+  assert.equal(waits.length, 2, 'espera entre uno y otro')
+  assert.equal(phone.status().ultimo.ok, true)
+})
+
+test('si el servicio falla, reintenta; si la clave está mal, no insiste', async () => {
+  let calls = 0
+  const flaky = async () => (++calls < 3 ? { ok: false, status: 503, text: async () => 'Service unavailable' } : { ok: true, status: 200, text: async () => 'Message queued' })
+  const phone = createPhone({ getConfig: () => config, fetchImpl: flaky, wait: async () => {} })
+  assert.equal(await phone.send('hola'), true)
+  assert.equal(calls, 3)
+  let bad = 0
+  const invalid = createPhone({ getConfig: () => config, fetchImpl: async () => (bad++, { ok: true, status: 200, text: async () => 'APIKey is invalid' }), wait: async () => {} })
+  await assert.rejects(invalid.send('hola'), /La clave no es la de ese número/)
+  assert.equal(bad, 1)
+  assert.match(invalid.status().ultimo.error, /La clave no es la de ese número/)
+  assert.match(serviceError(200, 'Phone not activated'), /todavía no está activado/)
 })
 
 test('si la clave está mal o no está, lo explica', async () => {
   const bad = createPhone({ getConfig: () => config, fetchImpl: fakeFetch('APIKey is invalid').fn })
-  await assert.rejects(bad.send('hola'), /no aceptó el mensaje/)
+  await assert.rejects(bad.send('hola'), /La clave no es la de ese número/)
   const none = createPhone({ getConfig: () => ({}), fetchImpl: fakeFetch().fn })
-  await assert.rejects(none.send('hola'), /Todavía no tengo tu WhatsApp/)
+  await assert.rejects(none.send('hola'), /Ajustes → WhatsApp/)
 })
 
 test('te manda tus pendientes por WhatsApp', async () => {

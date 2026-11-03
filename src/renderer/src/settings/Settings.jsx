@@ -3,20 +3,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizard, LedScreen, WakeTrainer, CalendarWizard } from './parts.jsx'
 
-const SECTIONS = [
-  ['general', 'General'],
-  ['personalizacion', 'Personalización'],
-  ['agenda', 'Agenda'],
-  ['pomodoro', 'Pomodoro'],
-  ['estudio', 'Mi estudio'],
-  ['noticias', 'Noticias'],
-  ['apps', 'Apps'],
-  ['mapas', 'Mapas y colectivos'],
-  ['ia', 'Inteligencia artificial'],
-  ['voz', 'Voz'],
-  ['actualizaciones', 'Actualizaciones'],
-  ['ayuda', 'Ayuda']
+// El menú, agrupado: lo de Pixie, el estudio, lo que se conecta con otras cosas y el sistema
+const NAV = [
+  [null, [['inicio', 'Inicio']]],
+  ['Pixie', [['general', 'Vos y Pixie'], ['voz', 'Voz y escucha'], ['ia', 'Inteligencia artificial'], ['memoria', 'Memoria y privacidad']]],
+  ['Estudio', [['pomodoro', 'Pomodoro'], ['estudio', 'Mi estudio']]],
+  ['Conexiones', [['whatsapp', 'WhatsApp'], ['agenda', 'Agenda y Gmail'], ['noticias', 'Noticias'], ['apps', 'Apps y mapas']]],
+  ['Sistema', [['actualizaciones', 'Actualizaciones y ayuda']]]
 ]
+const SECTIONS = NAV.flatMap(([, items]) => items)
+// Los nombres viejos de las secciones (desde el menú de Pixie o pedidos por voz)
+const ALIASES = { personalizacion: 'general', mapas: 'apps', ayuda: 'actualizaciones' }
+const sectionFor = (id) => ALIASES[id] ?? (SECTIONS.some(([x]) => x === id) ? id : 'inicio')
 
 const VOICES = [
   ['natural', 'Natural (argentina)', 'Suena más humana y anda sin internet. Se baja una sola vez (unos 135 MB).'],
@@ -24,9 +22,9 @@ const VOICES = [
   ['gemini', 'Gemini', 'Muy natural, pero solo 10 frases gratis por día; después vuelve a la de Windows.']
 ]
 
-export default function Settings({ section: initial = 'general' }) {
+export default function Settings({ section: initial = 'inicio' }) {
   const [s, setS] = useState(null)
-  const [section, setSection] = useState(SECTIONS.some(([id]) => id === initial) ? initial : 'general')
+  const [section, setSection] = useState(sectionFor(initial))
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
@@ -61,26 +59,41 @@ export default function Settings({ section: initial = 'general' }) {
             <span>Versión {s.version}</span>
           </div>
         </div>
-        {SECTIONS.map(([id, name]) => (
-          <button key={id} type="button" className={`nav${section === id ? ' active' : ''}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>
-            {name}
-          </button>
+        {NAV.map(([group, items]) => (
+          <div key={group ?? 'inicio'} className="nav-group">
+            {group && <p className="nav-label">{group}</p>}
+            {items.map(([id, name]) => (
+              <button key={id} type="button" className={`nav${section === id ? ' active' : ''}`} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>
+                {name}
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
 
       <main className="content">
+        {section === 'inicio' && <Home s={s} go={setSection} />}
         {section === 'general' && <General s={s} change={change} />}
-        {section === 'personalizacion' && <Personalization s={s} change={change} />}
+        {section === 'memoria' && <MemorySection s={s} setS={setS} say={say} />}
+        {section === 'whatsapp' && <WhatsAppSection s={s} setS={setS} change={change} say={say} />}
         {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
         {section === 'pomodoro' && <PomodoroSection s={s} setS={setS} change={change} say={say} />}
         {section === 'estudio' && <StudySection s={s} setS={setS} change={change} say={say} />}
         {section === 'noticias' && <NewsSection s={s} change={change} say={say} />}
-        {section === 'apps' && <AppsSection s={s} setS={setS} change={change} say={say} />}
-        {section === 'mapas' && <MapsSection s={s} change={change} />}
+        {section === 'apps' && (
+          <>
+            <AppsSection s={s} setS={setS} change={change} say={say} />
+            <MapsSection s={s} change={change} />
+          </>
+        )}
         {section === 'ia' && <AISection s={s} change={change} reload={load} say={say} />}
         {section === 'voz' && <VoiceSection s={s} setS={setS} change={change} say={say} />}
-        {section === 'actualizaciones' && <Updates s={s} setS={setS} say={say} />}
-        {section === 'ayuda' && <Help s={s} say={say} />}
+        {section === 'actualizaciones' && (
+          <>
+            <Updates s={s} setS={setS} say={say} />
+            <Help s={s} say={say} />
+          </>
+        )}
       </main>
 
       {toast && (
@@ -89,6 +102,274 @@ export default function Settings({ section: initial = 'general' }) {
         </div>
       )}
     </div>
+  )
+}
+
+// ── Inicio: cómo está todo, de un vistazo ──
+function Home({ s, go }) {
+  const ext = s.agenda?.mails?.extension ?? s.agenda?.classroom?.extension ?? {}
+  const w = s.whatsapp
+  const e = s.estudio?.resumen
+  const items = [
+    {
+      id: 'ia',
+      title: 'Inteligencia artificial',
+      ok: s.ia.tieneClave && s.ia.activa,
+      text: !s.ia.tieneClave ? 'Sin clave: entiendo solo pedidos simples. Es gratis y lleva un minuto.' : s.ia.activa ? `Conectada a ${s.ia.proveedor ?? 'la IA'}.` : 'Está apagada.'
+    },
+    {
+      id: 'voz',
+      title: '«Pixie, ¿estás?»',
+      ok: s.voz.palabra.grabada && s.voz.palabra.activa,
+      text: !s.voz.palabra.grabada ? 'Falta grabar tu voz para que me llames sin tocar nada.' : s.voz.palabra.activa ? 'Te escucho cuando me llamás.' : 'Está apagado.'
+    },
+    {
+      id: 'whatsapp',
+      title: 'WhatsApp',
+      ok: Boolean(w?.configurado),
+      text: w?.configurado ? (w.ultimo && !w.ultimo.ok ? `El último no salió: ${w.ultimo.error}` : 'Te mando los recordatorios y los timers.') : 'Falta activarlo para que te lleguen los recordatorios.'
+    },
+    {
+      id: 'agenda',
+      title: 'Extensión de Chrome',
+      ok: Boolean(ext.conectada),
+      text: ext.conectada ? 'Conectada: leo Gmail y Classroom.' : 'Falta instalarla para Gmail, Classroom y YouTube.'
+    },
+    {
+      id: 'estudio',
+      title: 'Estudio',
+      ok: true,
+      text: !e || (!e.racha && !e.hoyMin && !e.semanaMin)
+        ? 'Todavía no hay estudio anotado: arrancá un Pomodoro y lo voy anotando.'
+        : `${e.racha ? `Racha de ${e.racha} ${e.racha === 1 ? 'día' : 'días'}` : 'Sin racha por ahora'}; ${e.hoyMin ? `hoy estudiaste ${minutesLabel(e.hoyMin)}` : 'hoy todavía no estudiaste'}.`
+    },
+    {
+      id: 'actualizaciones',
+      title: `Versión ${s.version}`,
+      ok: s.actualizaciones.state !== 'ready' && s.actualizaciones.state !== 'error',
+      text: s.actualizaciones.texto
+    }
+  ]
+  const name = s.general.nombre ? `, ${s.general.nombre}` : ''
+  return (
+    <>
+      <Header title={`Hola${name}`} text="Acá ves cómo está todo. Lo que dice «Falta» se arregla tocando «Configurar»." />
+      <div className="home-grid">
+        {items.map((it) => (
+          <section key={it.id} className="home-card">
+            <div className="home-head">
+              <span className={`state-dot ${it.ok ? 'ok' : 'todo'}`} aria-hidden="true" />
+              <strong>{it.title}</strong>
+              <span className={`state-tag ${it.ok ? 'ok' : 'todo'}`}>{it.ok ? 'Listo' : 'Falta'}</span>
+            </div>
+            <p>{it.text}</p>
+            <button type="button" className="button secondary" onClick={() => go(it.id)}>
+              {it.ok ? 'Ver' : 'Configurar'}
+            </button>
+          </section>
+        ))}
+      </div>
+      <Card title="Cosas para pedirme">
+        <ul className="examples">
+          {EXAMPLES.map((x) => (
+            <li key={x}>{x}</li>
+          ))}
+        </ul>
+      </Card>
+    </>
+  )
+}
+
+// ── WhatsApp: los recordatorios al celular ──
+function WhatsAppSection({ s, setS, change, say }) {
+  const w = s.whatsapp
+  const [busy, setBusy] = useState(null)
+  if (!w) return <Header title="WhatsApp" text="Todavía estoy arrancando." />
+  const run = async (accion) => {
+    setBusy(accion)
+    try {
+      const r = await api.settings.whatsapp({ accion })
+      setS(r)
+      if (r?.mensaje) say(r.mensaje)
+    } finally {
+      setBusy(null)
+    }
+  }
+  const status = w.configurado
+    ? `Listo: te escribo al ${w.telefono}.`
+    : !w.telefono
+      ? 'Falta tu número.'
+      : !w.tieneClave
+        ? 'Falta la clave que te manda el bot.'
+        : 'Falta revisar el número.'
+  return (
+    <>
+      <Header title="WhatsApp" text="Te mando por WhatsApp los recordatorios de tu agenda y los timers, apenas se cumplen. Solo a tu número." />
+      <Card
+        title={w.configurado ? 'Activado' : 'Activalo en 3 pasos'}
+        note="Usa CallMeBot, un servicio gratis para mandarte mensajes a vos mismo. Tu número y la clave quedan solo en esta compu (la clave, cifrada)."
+      >
+        <p className={`big-status${w.configurado ? ' ok' : ''}`}>{status}</p>
+        <ol className="setup-steps">
+          <li>
+            <div className="row-text">
+              <label htmlFor="wpp-tel">Tu número</label>
+              <p className="hint">Con el código de país: en Argentina, +54 9 y el número sin el 15.</p>
+            </div>
+            <TextSetting id="wpp-tel" value={w.telefono} placeholder="+54 9 11 1234 5678" onSave={(whatsappTelefono) => change({ whatsappTelefono })} />
+          </li>
+          <li>
+            <div className="row-text">
+              <label>Activá el bot desde ese celular</label>
+              <p className="hint">
+                Se abre WhatsApp con el mensaje «{w.activacion}» para el {w.bot}. Tocá Enviar: el bot te contesta con tu clave (APIKEY).
+              </p>
+            </div>
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => run('activar')}>
+              Abrir WhatsApp
+            </button>
+          </li>
+          <li>
+            <div className="row-text">
+              <label htmlFor="wpp-clave">Pegá la clave</label>
+              <p className="hint">{w.tieneClave ? 'Ya tengo una guardada. Pegá otra si la querés cambiar.' : 'Los números que te mandó el bot, o copiá su mensaje entero y tocá «Buscar en lo copiado».'}</p>
+            </div>
+            <div className="inline-controls">
+              <TextSetting id="wpp-clave" value="" clearOnSave placeholder={w.tieneClave ? 'Guardada' : '123456'} onSave={(whatsappClave) => change({ whatsappClave })} />
+              <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => run('portapapeles')}>
+                Buscar en lo copiado
+              </button>
+            </div>
+          </li>
+        </ol>
+        <div className="buttons">
+          <button type="button" className="button" disabled={!w.configurado || Boolean(busy)} onClick={() => run('probar')}>
+            {busy === 'probar' ? 'Mandando…' : 'Mandarme un mensaje de prueba'}
+          </button>
+        </div>
+        {w.ultimo && (
+          <p className={`note ${w.ultimo.ok ? 'ok' : 'error'}`}>
+            Último mensaje: {w.ultimo.ok ? `enviado ${ago(new Date(w.ultimo.at).getTime())}.` : `no salió. ${w.ultimo.error}`}
+          </p>
+        )}
+      </Card>
+      <Card title="Cuándo te escribo">
+        <Row label="Avisarte al celular" hint="Los recordatorios de tu agenda y los timers.">
+          <Toggle label="Avisarte al celular" on={w.avisos} onChange={(v) => change({ avisosAlCelular: v })} />
+        </Row>
+        <div className="choices" role="radiogroup" aria-label="Cuándo te escribo">
+          {[
+            ['siempre', 'Siempre', 'Te llega al celular apenas se cumple, aunque estés en la compu.'],
+            ['ausente', 'Solo si no estás en la compu', 'Si estás usando la compu, te aviso solo en la pantalla.']
+          ].map(([id, name, text]) => (
+            <button key={id} type="button" role="radio" aria-checked={w.cuando === id} className={`choice${w.cuando === id ? ' selected' : ''}`} onClick={() => change({ whatsappCuando: id })}>
+              <span className="choice-title">{name}</span>
+              <span className="choice-text">{text}</span>
+            </button>
+          ))}
+        </div>
+      </Card>
+      <Card title="Si no te llega" note="CallMeBot es gratis y a veces tarda unos segundos. Si cambia su número, aparece en su página.">
+        <ul className="news-list">
+          <li>Fijate que el número sea el del celular desde el que activaste el bot.</li>
+          <li>Si el bot no te contestó con la clave, mandale el mensaje de nuevo o mirá su página por si cambió el número.</li>
+          <li>Tocá «Mandarme un mensaje de prueba»: si algo está mal, te digo qué.</li>
+        </ul>
+        <div className="buttons">
+          <button type="button" className="button secondary" onClick={() => run('pagina')}>
+            Abrir la página de CallMeBot
+          </button>
+        </div>
+      </Card>
+    </>
+  )
+}
+
+// ── Memoria y privacidad ──
+function MemorySection({ s, setS, say }) {
+  const m = s.memoria
+  const [sure, setSure] = useState(null)
+  const forget = async (que) => {
+    const r = await api.settings.forgetMemory({ que })
+    setS(r)
+    setSure(null)
+    if (r?.mensaje) say(r.mensaje)
+  }
+  const day = (f) => new Date(`${f}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return (
+    <>
+      <Header title="Memoria y privacidad" text="Me acuerdo de lo que hablamos aunque me cierre o me actualice. Todo queda solo en esta compu." />
+      <Card title="Lo que me acuerdo" note="Preguntame «¿de qué hablamos ayer?», «¿qué te conté del viaje?» o «¿qué sabés de mí?».">
+        <p className="big-status">
+          {m.charlas === 1 ? '1 charla anotada' : `${m.charlas} charlas anotadas`}
+          {m.personales > 0 && ` · ${m.personales === 1 ? '1 cosa personal' : `${m.personales} cosas personales`} que no nombro`}
+        </p>
+        {m.dias.length > 0 && (
+          <>
+            <h3 className="pomo-sub">Los últimos días</h3>
+            <ul className="memory-days">
+              {m.dias
+                .slice()
+                .reverse()
+                .map((d) => (
+                  <li key={d.fecha}>
+                    <span className="memory-date">{day(d.fecha)}</span>
+                    <span>{d.temas.length ? d.temas.join(', ') : 'charlas cortas'}</span>
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
+        {m.datos.length > 0 && (
+          <>
+            <h3 className="pomo-sub">Lo que me contaste</h3>
+            <ul className="news-list">
+              {m.datos.slice(0, 12).map((d) => (
+                <li key={`${d.creado}-${d.texto}`}>{d.texto}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Card>
+      <Card title="Lo personal">
+        <p>
+          Si me contás algo personal o sensible (tu salud, tu familia, tu pareja, la plata o tus creencias), me lo acuerdo pero no lo saco yo: no te pregunto por eso ni lo nombro en un resumen. Solo hablo de eso si vos lo traés.
+        </p>
+        <p>Las contraseñas, los números de tarjeta, el CBU, el DNI y las claves no los guardo nunca.</p>
+      </Card>
+      <Card title="Borrar" note="Lo que borrás no se puede recuperar.">
+        <div className="buttons">
+          {sure === 'charlas' ? (
+            <>
+              <button type="button" className="button danger" onClick={() => forget('charlas')}>
+                Sí, borrar las charlas
+              </button>
+              <button type="button" className="button secondary" onClick={() => setSure(null)}>
+                No
+              </button>
+            </>
+          ) : sure === 'todo' ? (
+            <>
+              <button type="button" className="button danger" onClick={() => forget('todo')}>
+                Sí, borrar todo
+              </button>
+              <button type="button" className="button secondary" onClick={() => setSure(null)}>
+                No
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="button secondary" onClick={() => setSure('charlas')} disabled={!m.charlas}>
+                Borrar nuestras charlas
+              </button>
+              <button type="button" className="button secondary" onClick={() => setSure('todo')}>
+                Borrar todo lo que sé de vos
+              </button>
+            </>
+          )}
+        </div>
+      </Card>
+    </>
   )
 }
 
@@ -520,7 +801,7 @@ function StudySection({ s, setS, change, say }) {
       <Header title="Mi estudio" text="Tu seguimiento de los Pomodoros: cuánto estudiás cada día, los ciclos, la adherencia y la racha. Preguntame «¿cuánto estudié esta semana?» cuando quieras." />
       <div className="study-tiles">
         <div className="tile">
-          <span className="tile-value">🔥 {r.racha}</span>
+          <span className="tile-value">{r.racha}</span>
           <span className="tile-label">{r.racha === 1 ? 'día de racha' : 'días seguidos'}</span>
         </div>
         <div className="tile">
@@ -566,7 +847,7 @@ function StudySection({ s, setS, change, say }) {
                   </td>
                   <td>{d.futuro ? '' : <Cycles n={d.ciclos} />}</td>
                   <td>{d.adherencia === null ? <span className="muted-dash">—</span> : `${d.adherencia}%`}</td>
-                  <td>{d.estado ? `${d.estado.emoji} ${d.estado.texto}` : d.futuro ? '' : <span className="muted-dash">—</span>}</td>
+                  <td>{d.estado ? <span className={`status-pill ${d.estado.nivel}`}>{d.estado.texto}</span> : d.futuro ? '' : <span className="muted-dash">—</span>}</td>
                   <td className="topics">{d.temas.join(', ') || (d.materias.join(', ') || '')}</td>
                 </tr>
               ))}
@@ -590,7 +871,7 @@ function StudySection({ s, setS, change, say }) {
             {e.materias.map((m) => (
               <div key={m.materia} className="subject">
                 <strong>{m.materia}</strong>
-                <span>{m.racha >= 1 ? `🔥 ${m.racha === 1 ? '1 día' : `${m.racha} días seguidos`}` : m.semanaMin ? '✅ esta semana' : '❌ no estudiaste esta semana'}</span>
+                <span className={m.racha >= 1 || m.semanaMin ? 'subject-ok' : 'subject-off'}>{m.racha >= 1 ? `Racha: ${m.racha === 1 ? '1 día' : `${m.racha} días seguidos`}` : m.semanaMin ? 'Estudiaste esta semana' : 'No estudiaste esta semana'}</span>
                 <span className="muted">{m.semanaMin ? `${minutesLabel(m.semanaMin)} esta semana` : `Última vez: ${m.ultima ? m.ultima.split('-').reverse().slice(0, 2).join('/') : '—'}`}</span>
               </div>
             ))}
@@ -636,42 +917,18 @@ function StudySection({ s, setS, change, say }) {
   )
 }
 
-// Tu casa (para los recorridos) y la clave gratis de los colectivos de la Ciudad
+// Tu casa: para decirte cuánto tardás en llegar a los lugares
 function MapsSection({ s, change }) {
   const m = s.mapas
   return (
-    <>
-      <Header title="Mapas y colectivos" text="Preguntame «¿cómo llego al Obelisco?», «¿cuánto tardo caminando a la escuela?» o «¿dónde viene el 60?»." />
-      <Card title="Tu casa" note="Queda solo en esta compu. Para calcular un recorrido se la paso a los mapas de OpenStreetMap y Google Maps.">
-        <Row label="Dirección" hint="Calle y altura, y el barrio o la ciudad." htmlFor="casa">
-          <TextSetting id="casa" value={m.casa} placeholder="Av. Rivadavia 5000, Caballito" onSave={(direccionCasa) => change({ direccionCasa })} />
-        </Row>
-      </Card>
-      <Card
-        title="Colectivos en vivo (Ciudad de Buenos Aires)"
-        note="Con esta clave te digo dónde viene un colectivo y cuánto le falta para tu casa. Es gratis y la da la Ciudad. Sin la clave, te muestro las paradas en Google Maps."
-      >
-        <p className="big-status">{m.transporte ? 'Ya tengo la clave: preguntame «¿dónde viene el 60?».' : 'Todavía no tengo la clave de los colectivos.'}</p>
-        {!m.transporte && (
-          <ol className="news-list">
-            <li>Entrá a la página de registro de la API de Transporte de la Ciudad (botón de abajo) y completá el formulario.</li>
-            <li>Te llega un mail con el <b>client_id</b> y el <b>client_secret</b>.</li>
-            <li>Pegalos acá abajo.</li>
-          </ol>
-        )}
-        <div className="buttons">
-          <button type="button" className="button secondary" onClick={() => api.settings.openTransitSignup()}>
-            Abrir la página de registro
-          </button>
-        </div>
-        <Row label="client_id" htmlFor="transporte-id">
-          <TextSetting id="transporte-id" value={m.transporteId} placeholder="Pegalo acá" onSave={(transporteId) => change({ transporteId })} />
-        </Row>
-        <Row label="client_secret" hint={m.transporteSecreto ? `Guardada: ${m.transporteSecreto}` : 'Se guarda cifrada en esta compu.'} htmlFor="transporte-secreto">
-          <TextSetting id="transporte-secreto" value="" placeholder={m.transporteSecreto ? 'Pegá otra para cambiarla' : 'Pegalo acá'} onSave={(transporteSecreto) => change({ transporteSecreto })} />
-        </Row>
-      </Card>
-    </>
+    <Card
+      title="Mapas: tu casa"
+      note="Preguntame «¿cómo llego al Obelisco?» o «¿cuánto tardo caminando a la escuela?»: te abro el recorrido en Google Maps. La dirección queda solo en esta compu; para calcular un recorrido se la paso a OpenStreetMap y Google Maps."
+    >
+      <Row label="Dirección de tu casa" hint="Calle y altura, y el barrio o la ciudad." htmlFor="casa">
+        <TextSetting id="casa" value={m.casa} placeholder="Av. Rivadavia 5000, Caballito" onSave={(direccionCasa) => change({ direccionCasa })} />
+      </Row>
+    </Card>
   )
 }
 
@@ -751,7 +1008,7 @@ function General({ s, change }) {
   const g = s.general
   return (
     <>
-      <Header title="General" text="Lo básico: cómo te llamás, dónde estás y cómo llamarme." />
+      <Header title="Vos y Pixie" text="Lo básico: cómo te llamás, dónde estás, cómo llamarme y cómo me comporto." />
       <Card title="Vos">
         <Row label="Tu nombre" hint="Así te saludo." htmlFor="nombre">
           <TextSetting id="nombre" value={g.nombre} placeholder="¿Cómo te llamás?" onSave={(nombre) => change({ nombre })} />
@@ -772,22 +1029,11 @@ function General({ s, change }) {
         <Row label="Recordatorios de salud" hint="Te pregunto si tomaste agua y te propongo pausas.">
           <Toggle label="Recordatorios de salud" on={g.recordatoriosSalud} onChange={(v) => change({ recordatoriosSalud: v })} />
         </Row>
-        <Row label="Avisos al celular" hint="Si no estás frente a la compu, los recordatorios te llegan por WhatsApp (si lo configuraste).">
-          <Toggle label="Avisos al celular" on={g.avisosAlCelular} onChange={(v) => change({ avisosAlCelular: v })} />
-        </Row>
         <Row label="Correrme si dejás el mouse encima" hint="Así no tapo un botón que tenés que tocar. Para llamarme usá el atajo; para moverme a mano, llamame y arrastrame.">
           <Toggle label="Correrme si dejás el mouse encima" on={g.esquivarMouse} onChange={(v) => change({ esquivarMouse: v })} />
         </Row>
       </Card>
-    </>
-  )
-}
-
-function Personalization({ s, change }) {
-  return (
-    <>
-      <Header title="Personalización" text="Elegí qué muestro en mi pantallita cuando no me estás usando." />
-      <Card note="Cuando te hablo, reacciono o me llamás, vuelve mi cara. El clima del resumen se actualiza cada media hora.">
+      <Card title="Mi pantallita cuando no me usás" note="Cuando te hablo, reacciono o me llamás, vuelve mi cara. El clima del resumen se actualiza cada media hora.">
         <StandbyPicker value={s.apariencia.pantallaReposo} onChange={(pantallaReposo) => change({ pantallaReposo })} />
       </Card>
     </>
@@ -1212,7 +1458,7 @@ const EXAMPLES = ['«Escribí: hola, ¿cómo andás?» y «mandalo»', '«Tocá 
 function Help({ s, say }) {
   return (
     <>
-      <Header title="Ayuda" text="Si algo no anda, mandale el informe al equipo." />
+      <Header title="Ayuda" text="Si algo no anda, copiá el informe y mandáselo al equipo." />
       <Card title="Si algo falla" note="El informe trae la versión, la IA y la voz que uso y mis últimos errores, sin claves, contraseñas ni teléfonos.">
         <Row label="Informe de diagnóstico" hint={s.ayuda.errores ? `Anoté ${s.ayuda.errores} error${s.ayuda.errores === 1 ? '' : 'es'} desde que arranqué.` : 'No anoté errores desde que arranqué.'}>
           <button
@@ -1231,13 +1477,6 @@ function Help({ s, say }) {
             Abrir carpeta
           </button>
         </Row>
-      </Card>
-      <Card title="Cosas para pedirme">
-        <ul className="examples">
-          {EXAMPLES.map((e) => (
-            <li key={e}>{e}</li>
-          ))}
-        </ul>
       </Card>
     </>
   )

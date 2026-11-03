@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
+import { noEmoji } from './speech-text.js'
 
 // Tamaños de la ventana: solo la cara, o la cara con la barra para escribir.
 const SIZES = {
@@ -95,6 +96,9 @@ export function showAndFocus() {
   win.focus()
 }
 
+// Lo que dice Pixie por su cuenta (avisos y alarmas) sale sin emojis
 export function sendEvent(event) {
-  if (win && !win.isDestroyed()) win.webContents.send('pixie:event', event)
+  if (!win || win.isDestroyed()) return
+  const clean = event && (event.type === 'notice' || event.type === 'alarm') ? { ...event, text: noEmoji(event.text), suggestions: event.suggestions?.map(noEmoji) } : event
+  win.webContents.send('pixie:event', clean)
 }

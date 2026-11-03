@@ -167,6 +167,39 @@ export function createPomodoro({ now = () => Date.now(), setTimer = setTimeout, 
       return status()
     },
     stop: () => finish(false),
+    // Para guardarla antes de cerrarse o actualizarse
+    snapshot() {
+      if (!s) return null
+      const { plan, i, finAt, pausado, inicio, estudiado, distraido, ciclos } = s
+      return { plan, i, finAt, pausado, inicio, estudiado, distraido, ciclos }
+    },
+    // Al volver: sigue donde estaba. Si Pixie estuvo cerrada un rato corto (una actualización), el tiempo
+    // siguió corriendo; si pasó mucho (más de maxGapMs desde que se guardó), la termina donde había quedado.
+    restore(snap, { savedAt = now(), maxGapMs = 15 * 60 * 1000 } = {}) {
+      if (!snap?.plan?.bloques?.length || s) return null
+      s = { distraido: 0, ciclos: 0, estudiado: 0, ...snap }
+      if (s.pausado === null && now() - savedAt > maxGapMs) {
+        // Cerrada mucho tiempo: cuenta lo estudiado hasta que se guardó y termina
+        s.pausado = Math.max(0, s.finAt - savedAt)
+        return { terminado: finish(false) }
+      }
+      if (s.pausado === null) {
+        // Los bloques que terminaron mientras estaba cerrada
+        while (s && now() >= s.finAt) {
+          const b = block()
+          if (b.tipo === 'estudio') {
+            s.estudiado += b.minutos * 60000
+            s.ciclos++
+          }
+          if (s.i + 1 >= s.plan.bloques.length) return { terminado: finish(true) }
+          s.i++
+          s.finAt += block().minutos * 60000
+        }
+        schedule()
+      }
+      on('cambio', status())
+      return { sigue: status() }
+    },
     // Estuvo distraído un rato (en Instagram, un juego…) durante un bloque de estudio
     noteDistraction(ms) {
       if (s && block().tipo === 'estudio' && s.pausado === null) s.distraido += Math.max(0, ms)

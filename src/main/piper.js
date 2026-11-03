@@ -2,6 +2,7 @@
 // "Daniela" (español de Argentina). Se baja una sola vez (unos 135 MB) cuando la
 // pedís y queda en %APPDATA%\Pixie\voz. Si algo falla, Pixie usa la voz de Windows.
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { speechText, speechChunks } from './speech-text.js'
 import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -29,7 +30,7 @@ async function extractZip(zip, dest) {
 }
 
 export function piperLine(text) {
-  return String(text ?? '').replace(/[«»*_#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 600)
+  return speechText(text)
 }
 
 export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl = nodeSpawn, extract = extractZip, log = () => {} }) {
@@ -136,9 +137,10 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
   }
 
   // Habla: el audio (PCM de 16 bits, mono) llega en pedacitos a onChunk(chunk, rate)
+  // Las frases van una por renglón: Piper las lee en orden, así un texto largo no se corta
   function speak(id, text, face, onChunk) {
-    const line = piperLine(text)
-    if (!installed() || !line) return Promise.resolve({ ok: false })
+    const lines = speechChunks(text, 400)
+    if (!installed() || !lines.length) return Promise.resolve({ ok: false })
     const rate = sampleRate()
     return new Promise((resolve) => {
       let received = 0
@@ -151,7 +153,7 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
         running.delete(id)
         resolve({ ok: received > 0 })
       }
-      const timer = setTimeout(() => child.kill(), 30000)
+      const timer = setTimeout(() => child.kill(), 30000 + lines.length * 15000)
       running.set(id, child)
       child.stdout.on('data', (c) => {
         received += c.length
@@ -164,7 +166,7 @@ export function createPiper({ dir, fetchImpl = (...a) => fetch(...a), spawnImpl 
       })
       child.on('close', done)
       child.stdin.on('error', () => {})
-      child.stdin.end(`${line}\n`)
+      child.stdin.end(`${lines.join('\n')}\n`)
     })
   }
 

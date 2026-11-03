@@ -138,7 +138,8 @@ export default function App() {
     if (result.face && result.face !== 'idle') react(result.face)
     const talkingVoice = voiceOn && voiceAvailable && result.speak !== false
     const perChar = talkingVoice ? 62 : 28
-    setSpeech({ id: Date.now(), ms: Math.min(6000, Math.max(500, result.text.length * perChar)) })
+    // Mientras habla mueve la boca (con voz, todo lo que dure la frase, aunque sea larga)
+    setSpeech({ id: Date.now(), ms: Math.min(talkingVoice ? 90000 : 6000, Math.max(500, result.text.length * perChar)) })
     if (result.speak === false) stopSpeaking()
     else if (voiceOn) speak(result.text, result.face)
   }, [react, voiceOn, voiceAvailable])
@@ -168,6 +169,21 @@ export default function App() {
     setExpanded(false)
     stopSpeaking()
   }, [])
+
+  // Con frases largas, la boca deja de moverse cuando termina de hablar (o si la cortaste)
+  useEffect(() => {
+    if (!speech || speech.ms <= 6000 || speech.stop) return
+    let heard = false
+    const started = Date.now()
+    const id = setInterval(() => {
+      if (isSpeaking()) heard = true
+      else if (heard || Date.now() - started > 8000) {
+        clearInterval(id)
+        setSpeech({ id: Date.now(), ms: 0, stop: true })
+      }
+    }, 400)
+    return () => clearInterval(id)
+  }, [speech])
 
   // La ventana cambia de tamaño según el modo.
   useEffect(() => {
@@ -281,7 +297,8 @@ export default function App() {
         }
         if (event.face && event.face !== 'idle') react(event.face)
         else sound('notice')
-        setSpeech({ id: Date.now(), ms: Math.min(6000, Math.max(600, event.text.length * 45)) })
+        const withVoice = voiceOn && event.voice !== false
+        setSpeech({ id: Date.now(), ms: Math.min(withVoice ? 90000 : 6000, Math.max(600, event.text.length * (withVoice ? 62 : 45))) })
         if (voiceOn && event.voice !== false) speak(event.text, event.face)
       }
       if (event.type === 'alarm') {

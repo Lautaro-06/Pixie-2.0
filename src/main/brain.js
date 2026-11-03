@@ -226,10 +226,10 @@ const KNOWLEDGE = /^(que es|que son|que significa|quien es|quien fue|quienes son
 
 const REMEMBER_VERBS = /\b(acordate|acordame|recorda|recordate|guarda|guardate|memoriza|no te olvides)\b/
 const NOTE_VERBS = /\b(anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar)\b/
-const REMIND_VERBS = /\b(recordame|recuerdame|recordarme|avisame|avisa|avises|despertame)\b/
+const REMIND_VERBS = /\b(recordame|recuerdame|recordarme|avisame|avisa|avises|despertame|haceme acordar)\b/
 const AGENDA_WORDS = /\b(tengo|tenemos|hay|me toca|voy a|vamos a|es el|es la|cumple|cumpleanos|examen|prueba|parcial|turno|entrega|reunion|partido|clase|viaje|cita|dentista|medico)\b/
 const STOP_NAMES = new Set(['yo', 'un', 'una', 'el', 'la', 'la hora', 'algo'])
-const EVENT_LEAD = /^(es|son|recordame|recorda|recuerdame|recordarme|acordate|acordame|avisame|avisa|avises|anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar|despertame|guarda|guardate|memoriza|no te olvides|que|de|el|la|los|las|tengo|tenemos|hay|me toca|voy a|vamos a|para|y|en la lista|en mis pendientes|a la lista|a mis pendientes)\b\s*/
+const EVENT_LEAD = /^(es|son|haceme acordar|recordame|recorda|recuerdame|recordarme|acordate|acordame|avisame|avisa|avises|anota|anotame|agrega|agregame|suma|sumame|apunta|apuntame|agenda|agendame|agendar|despertame|guarda|guardate|memoriza|no te olvides|que|de|el|la|los|las|tengo|tenemos|hay|me toca|voy a|vamos a|para|y|en la lista|en mis pendientes|a la lista|a mis pendientes)\b\s*/
 const EVENT_TAIL = /\s*\b(es|son|el|la|para|de|que|a|y|en la lista|a la lista|en mis pendientes|a mis pendientes|en pendientes)$/
 
 function cleanEventText(s) {
@@ -302,12 +302,12 @@ const RULES = [
     }
     return null
   },
-  // Mapas y colectivos: "mi casa queda en …", "¿cómo llego al Obelisco en colectivo?", "¿dónde viene el 60?"
+  // Mapas: "mi casa queda en …", "¿cómo llego al Obelisco en colectivo?", "¿dónde para el 60?"
   (t) => {
     let m = /^(?:mi casa (?:queda|esta) en|mi direccion es|vivo en la calle|guarda(?:te)? que mi casa (?:queda|esta) en|anota que mi casa (?:queda|esta) en)\s+(.+)$/.exec(t)
     if (m) return intent('mi_casa', { direccion: m[1] })
     if (/^(?:donde queda mi casa|cual es mi direccion|sabes donde vivo|donde vivo)$/.test(t)) return intent('mi_casa')
-    m = /^(?:donde (?:viene|esta|anda)|cuando (?:pasa|viene|llega)|cuanto (?:le )?falta (?:para|al)|por donde viene|a cuanto esta)\s+(?:el |la )?(?:colectivo |bondi |linea )?(\d{1,3}[a-z]?)$/.exec(t)
+    m = /^(?:donde (?:viene|esta|anda|para|pasa)|por donde pasa|cuando (?:pasa|viene|llega)|cuanto (?:le )?falta (?:para|al)|por donde viene|a cuanto esta)\s+(?:el |la )?(?:colectivo |bondi |linea )?(\d{1,3}[a-z]?)$/.exec(t)
     if (m) return intent('colectivo', { linea: m[1] })
     m = /^(?:como (?:llego|voy|hago para ir|hago para llegar|se llega)|llevame|indicaciones para (?:ir|llegar)|cuanto (?:tardo|tardaria|se tarda|me tardo)(?: en (?:llegar|ir))?(?: (?:caminando|a pie|en bici|en auto|en colectivo))?)\s+(?:a la |al |a |hasta la |hasta el |hasta )?(.+)$/.exec(t)
     if (!m) return null
@@ -469,6 +469,16 @@ const RULES = [
     return m && !STOP_NAMES.has(m[1]) ? intent('guardar_nombre', { nombre: m[1] }) : null
   },
   (t) => (/\b(como me llamo|sabes (como me llamo|mi nombre)|quien soy|cual es mi nombre)\b/.test(t) ? intent('quien_soy') : null),
+  // Las charlas: «¿de qué hablamos ayer?», «¿te acordás de lo que te conté del viaje?»
+  (t) => {
+    if (/\b(olvidate|olvida|borra|borrame)\b.*\b(lo que hablamos|nuestras charlas|las charlas|lo que te dije|lo que charlamos)\b/.test(t)) return intent('olvidar_charlas')
+    const day = /\b(de )?que (hablamos|charlamos|te conte|te dije)\b.*\b(hoy|ayer|anteayer|el (lunes|martes|miercoles|jueves|viernes|sabado|domingo))\b/.exec(t)
+    if (day) return intent('recordar_charla', { dia: day[3] })
+    const about = /\b(te acordas|te acordas de|recordas|que te (conte|dije)|que hablamos|lo que (te conte|te dije|hablamos))\b.*\b(?:de|del|de la|sobre|acerca de)\s+(?<tema>.+)$/.exec(t)
+    const tema = about?.groups.tema
+    if (tema && !/^(mi|mis)?\s*(nombre)$/.test(tema)) return intent('recordar_charla', { buscar: tema.replace(/^(el|la|los|las|mi|mis)\s+/, '') })
+    return null
+  },
   (t) => (/\b(que sabes de mi|que sabes sobre mi|que te acordas|que recordas|que te conte|que tenes guardado)\b/.test(t) ? intent('ver_datos') : null),
   (t) => {
     const m = t.match(/^(?:olvidate|olvida|olvidar)\s+(?:de\s+)?(?:que\s+)?(.+)$/)
@@ -522,6 +532,8 @@ const RULES = [
   // Agenda: consultar
   (t, ctx) => {
     if (!/\b(que tengo|tengo algo|que hay|mi agenda|la agenda|que eventos|proximos eventos|que me toca)\b/.test(t)) return null
+    // «recordame mañana a las 8 que tengo que llevar el TP» es para anotar, no para mirar la agenda
+    if (/^(?:y |che |pixie )?(recordame|recuerdame|recordarme|avisame|avisa|acordame|acordate|anotame|anota|agendame|agenda|haceme acordar|despertame)\b/.test(t)) return null
     const when = parseWhen(t, ctx.now)
     if (when) return intent('ver_agenda', { dia: when.date.toISOString() })
     return intent('ver_agenda', { dias: 7 })
@@ -671,7 +683,12 @@ const RULES = [
 
   // Estado de la compu y sistema
   (t) => (/\b(como (esta|anda|va) (la|mi) (compu|pc|computadora)|estado de (la|mi) (compu|pc|computadora)|memoria|ram|cpu|procesador|rendimiento|(anda|va|esta) lenta|se tilda)\b/.test(t) ? intent('estado_pc') : null),
-  (t) => (/\b(bloquea|bloquear|bloqueame|bloquees|bloquee|me voy|ya vuelvo|vuelvo en un rato|me tengo que ir)\b/.test(t) ? intent('bloquear_pc') : null),
+  (t) => {
+    if (/\b(bloquea|bloquear|bloqueame|bloquees|bloquee|ya vuelvo|vuelvo en un rato|me tengo que ir)\b/.test(t)) return intent('bloquear_pc')
+    // «me voy» solo si te vas de la compu («me voy a comer»), no «me voy de viaje a Mendoza»
+    const s = t.replace(/ , /g, ' ')
+    return /^(?:(?:bueno|ya|che|chau|listo) )*me voy(?: (?:un rato|ya|a (?:comer|almorzar|cenar|merendar|dormir|banarme|duchar|duchar?me|la escuela|clase|entrenar)|al (?:bano|colegio|gimnasio)))?(?: (?:chau|ya))?$/.test(s) ? intent('bloquear_pc') : null
+  },
   (t) => (/\b(cancela|cancelar|frena|para)\b.*\b(apagado|reinicio)\b/.test(t) ? intent('cancelar_apagado') : null),
   (t) => (/\b(apaga|apagar|apagues|apagame)\b.*\b(compu|pc|computadora|todo)\b/.test(t) ? intent('apagar_pc', { modo: 'apagar' }) : null),
   (t) => (/\b(reinicia|reiniciar|reinicies|reiniciame)\b.*\b(compu|pc|computadora)\b/.test(t) ? intent('apagar_pc', { modo: 'reiniciar' }) : null),

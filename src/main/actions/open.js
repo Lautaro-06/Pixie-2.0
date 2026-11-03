@@ -25,7 +25,7 @@ export const openActions = [
       const { tipo, item } = found
       // Las apps que sacaste en Ajustes → Apps no las abre
       if (tipo === 'app' && ctx.apps && !ctx.apps.can('abrir', { nombre: item.nombre, proceso: item.proceso })) {
-        return { text: `No tengo permiso para abrir ${item.nombre}. Lo podés cambiar en mis Ajustes → Apps.`, face: 'idle' }
+        return { text: `No tengo permiso para abrir ${item.nombre}. Lo podés cambiar en mis Ajustes → Apps y mapas.`, face: 'idle' }
       }
       if (tipo === 'sitio') {
         const blocked = checkUrl(item.url, ctx.getConfig().sitiosBloqueados)
@@ -66,7 +66,7 @@ export const openActions = [
         return { text: `No sé cerrar «${objetivo}».`, face: 'confused' }
       }
       if (ctx.apps && !ctx.apps.can('usar', { nombre: found.item.nombre, proceso: found.item.proceso })) {
-        return { text: `No tengo permiso para usar ${found.item.nombre}. Lo podés cambiar en mis Ajustes → Apps.`, face: 'idle' }
+        return { text: `No tengo permiso para usar ${found.item.nombre}. Lo podés cambiar en mis Ajustes → Apps y mapas.`, face: 'idle' }
       }
       try {
         await closeProcess(found.item.proceso)

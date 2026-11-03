@@ -470,6 +470,18 @@ export function createAI({
     transcribe,
     locate,
     note: (text) => notes.push(text),
+    // La charla de ahora, para que siga después de reiniciarse (por una actualización)
+    saveState: () => {
+      if (!messages.length) return null
+      const st = { messages, messagesFor, lastAt }
+      return JSON.stringify(st).length < 200000 ? st : null
+    },
+    loadState(st) {
+      if (!Array.isArray(st?.messages) || !st.messages.length) return
+      messages = st.messages
+      messagesFor = st.messagesFor ?? null
+      lastAt = Number(st.lastAt) || 0
+    },
     idle: () => background ?? Promise.resolve(), // cuando termina lo que seguía en segundo plano
     reset: () => {
       messages = []

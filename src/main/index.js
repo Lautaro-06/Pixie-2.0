@@ -7,8 +7,12 @@ import { actions, runAction, needsConfirm } from './actions/index.js'
 import { createPomodoro } from './pomodoro.js'
 import { studyIntent, subjectFrom, subjectIn, topicFromTitle, topicsFromTitles, taskTypeFrom, minutesFrom, focusKind } from './study.js'
 import { createStudyLog, endSummaryText, DEFAULT_GOAL } from './study-log.js'
+import { createJournal, journalContext } from './journal.js'
+import { crisisRisk, CRISIS_TEXT } from './sensitive.js'
+import { noEmoji } from './speech-text.js'
+import { readFileSync as readFile, writeFileSync as writeFile, rmSync as removeFile } from 'node:fs'
 import { createDodger } from './dodge.js'
-import { setPomodoroProbe, onTimersChange, timersState, toggleTimer } from './actions/timers.js'
+import { setPomodoroProbe, onTimersChange, timersState, toggleTimer, exportTimers, restoreTimers } from './actions/timers.js'
 import { studyWindow } from './scenes.js'
 import { loadConfig, getConfig, saveConfig, logAction, watchConfig, setCipher } from './config.js'
 import { createPixieWindow, getWindow, getMode, setMode, showAndFocus, sendEvent } from './window.js'
@@ -17,7 +21,7 @@ import { createMind } from './mind.js'
 import { createAI, aiErrorText, voiceErrorText, describeAI } from './ai.js'
 import { createBrowserBridge } from './browser.js'
 import { createBackup } from './backup.js'
-import { createPhone } from './phone.js'
+import { createPhone, whatsappConfig } from './phone.js'
 import { FriendlyError, isWindows, launch, run, powershell } from './windows.js'
 import { createVoices } from './voices.js'
 import { createMediaSession } from './media-session.js'
@@ -33,8 +37,7 @@ import { createNews } from './news.js'
 import { createClassroom } from './classroom.js'
 import { createMail, announceText } from './mail.js'
 import { createApps, LIST_SCRIPT } from './apps.js'
-import { createMaps, createTransit } from './maps.js'
-import { TRANSIT_SIGNUP } from './actions/maps.js'
+import { createMaps } from './maps.js'
 import { compareVersions, updateText } from './changelog.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
@@ -310,10 +313,65 @@ async function isProcessRunning(exe) {
 }
 
 // Lo que la IA sabe en cada mensaje (de los mails, solo cuántos hay sin leer, y si pediste los avisos)
-function contextForAI() {
+// query: lo que dijo ahora (para traer lo que hablaron antes sobre eso)
+function contextForAI(query = '') {
   const st = mail?.status()
   const mails = st?.avisos && st.leido ? `\nMails sin leer en Gmail: ${st.sinLeer}.` : ''
-  return `${mind.contextText()}${mails}`
+  const talks = journalContext(journal, query)
+  return `${mind.contextText(query)}${mails}${talks ? `\n${talks}` : ''}`
+}
+
+// ───────────── Lo que estaba haciendo (para seguir después de actualizarse o reiniciarse) ─────────────
+let journal = null // el diario de charlas (charlas.jsonl)
+const stateFile = () => join(app.getPath('userData'), 'estado.json')
+
+function saveState(reason = 'auto') {
+  try {
+    const state = {
+      version: app.getVersion(),
+      savedAt: Date.now(),
+      reason,
+      pomodoro: pomodoro?.snapshot() ?? null,
+      timers: exportTimers(),
+      ai: ai?.saveState() ?? null
+    }
+    writeFile(stateFile(), JSON.stringify(state))
+  } catch (err) {
+    logAction(`no pude guardar lo que estaba haciendo: ${err.message}`)
+  }
+}
+
+// Al arrancar: sigue con el Pomodoro, los timers y la charla de antes de cerrarse
+function restoreState() {
+  let state = null
+  try {
+    state = JSON.parse(readFile(stateFile(), 'utf8'))
+    removeFile(stateFile(), { force: true })
+  } catch {
+    return
+  }
+  if (!state?.savedAt || Date.now() - state.savedAt > 12 * 60 * 60 * 1000) return
+  const parts = []
+  if (state.pomodoro) {
+    const r = pomodoro.restore(state.pomodoro, { savedAt: state.savedAt })
+    if (r?.sigue) {
+      const st = r.sigue
+      const fase = st.fase === 'estudio' ? `el bloque ${st.bloque} de ${st.bloques}` : 'el descanso'
+      parts.push(`Seguimos con tu Pomodoro: ${fase}, ${st.pausado ? 'en pausa' : `faltan ${Math.max(1, Math.ceil(st.restanteMs / 60000))} minutos`}.`)
+    } else if (r?.terminado) parts.push('Tu Pomodoro quedó anotado hasta donde lo dejaste.')
+  }
+  const t = restoreTimers(state.timers, ctx)
+  if (t.siguen.length) parts.push(t.siguen.length === 1 ? `Tu timer${t.siguen[0].etiqueta ? ` de «${t.siguen[0].etiqueta}»` : ''} sigue andando.` : `Tus ${t.siguen.length} timers siguen andando.`)
+  // La charla: si fue hace poco, la IA sigue donde estaba
+  if (state.ai && Date.now() - state.savedAt < 6 * 60 * 60 * 1000) ai?.loadState(state.ai)
+  const last = state.reason === 'actualizacion' ? journal?.lastTalk() : null
+  if (last) {
+    parts.push(`Estábamos hablando de «${last.yo.slice(0, 80)}»: seguimos cuando quieras.`)
+  }
+  logAction(`volví: ${state.reason} (${parts.length ? parts.join(' ') : 'nada pendiente'})`)
+  if (!parts.length) return
+  const intro = state.reason === 'actualizacion' ? 'Ya volví de actualizarme.' : 'Ya volví.'
+  setTimeout(() => mind?.say({ kind: 'volvio', text: `${intro} ${parts.join(' ')}`, face: 'happy' }), state.reason === 'actualizacion' ? 16000 : 4000)
 }
 
 // La primera vez que arranca con una versión nueva, cuenta qué hay de nuevo y qué mejoró
@@ -498,6 +556,19 @@ function offerPomodoro(input, result) {
 
 async function ask(text) {
   const input = String(text ?? '').slice(0, 500)
+  const result = await respond(input, text)
+  // Todo lo que hablan queda en el diario (en la compu), para acordarse aunque se cierre.
+  // Las órdenes que entienden las reglas («abrí Spotify») quedan marcadas como pedidos.
+  if (result?.text) journal?.record(input, result.text, { pedido: Boolean(interpretAll(input, { customApps: getConfig().apps ?? [] })?.length) })
+  return result
+}
+
+async function respond(input, text) {
+  // Si dice que se quiere hacer daño: primero eso, con cuidado y con a quién llamar
+  if (crisisRisk(input)) {
+    logAction('charla: respondí con ayuda (dijo que se quería hacer daño)')
+    return { text: CRISIS_TEXT, face: 'sad' }
+  }
   // Le preguntó «¿qué vas a estudiar?» hace poco: esto es la respuesta (si no es otro pedido)
   if (studyQuestion && Date.now() - studyQuestion.at < 5 * 60 * 1000) {
     const r = await answerStudyQuestion(input)
@@ -532,7 +603,7 @@ async function askInner(text) {
   const direct = intents?.some((i) => DIRECT.has(i.action))
   if (ai?.enabled() && !direct && (!intents || social || words > 10)) {
     try {
-      return await ai.chat(input, contextForAI())
+      return await ai.chat(input, contextForAI(input))
     } catch (err) {
       const line = `IA (${ai.provider()}): ${err.status ? `${err.status} ` : ''}${err.message}`
       console.error(line)
@@ -645,8 +716,10 @@ if (!app.requestSingleInstanceLock()) {
     const restored = backup.restoreIfMissing()
     loadConfig()
 
-    ipcMain.handle('pixie:ask', (_e, text) => ask(text))
-    ipcMain.handle('pixie:confirm', (_e, yes) => confirm(Boolean(yes)))
+    // Las respuestas salen sin emojis (aunque la IA los ponga)
+    const clean = (r) => (r && typeof r === 'object' ? { ...r, text: noEmoji(r.text), suggestions: r.suggestions?.map(noEmoji) } : r)
+    ipcMain.handle('pixie:ask', async (_e, text) => clean(await ask(text)))
+    ipcMain.handle('pixie:confirm', async (_e, yes) => clean(await confirm(Boolean(yes))))
     // Lo que dijiste por el micrófono → texto
     ipcMain.handle('pixie:transcribe', async (_e, audio) => {
       const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio ?? [])
@@ -709,6 +782,8 @@ if (!app.requestSingleInstanceLock()) {
       mind?.interacted(result?.ganador === 'user' ? 'gracias' : 'chiste')
     })
 
+    journal = createJournal(join(app.getPath('userData'), 'charlas.jsonl'))
+    ctx.journal = journal
     mind = createMind({
       ctx,
       sendEvent,
@@ -839,9 +914,8 @@ if (!app.requestSingleInstanceLock()) {
       classroom,
       mail,
       apps,
-      // Mapas (OpenStreetMap) y colectivos de la Ciudad
+      // Mapas (OpenStreetMap; los recorridos en colectivo, en Google Maps)
       maps: createMaps({ getConfig, log: logAction }),
-      transit: createTransit({ getConfig }),
       phone,
       media,
       voice: tts,
@@ -857,12 +931,18 @@ if (!app.requestSingleInstanceLock()) {
           throw new FriendlyError(aiErrorText(err) ?? 'No me pude conectar con la IA para mirar la pantalla.')
         }
       },
-      // Si no estás frente a la compu, los avisos importantes te llegan al celular
-      phoneIfAway: (text) => {
-        const snap = mind.snapshot()
-        const away = snap && (snap.bloqueada || snap.inactivoSeg >= 300)
-        if (!away || getConfig().avisosAlCelular === false || !phone.configured()) return
-        phone.send(`Pixie: ${text}`, { auto: true }).catch((err) => logAction(`whatsapp automático: ${err.message}`))
+      // Recordatorios y timers al WhatsApp: siempre, o solo si no estás en la compu (Ajustes → WhatsApp)
+      phoneNotify: (text) => {
+        const w = whatsappConfig(getConfig())
+        if (!w || getConfig().avisosAlCelular === false) return
+        if (w.cuando === 'ausente') {
+          const snap = mind.snapshot()
+          if (!(snap && (snap.bloqueada || snap.inactivoSeg >= 300))) return
+        }
+        phone
+          .send(`Pixie: ${text}`, { auto: true })
+          .then((sent) => sent && logAction(`whatsapp: te mandé «${text.slice(0, 60)}»`))
+          .catch((err) => logAction(`whatsapp automático: ${err.message}`))
       },
       ai,
       browser,
@@ -886,6 +966,7 @@ if (!app.requestSingleInstanceLock()) {
       log: logAction,
       reportError: ctx.reportError,
       onChange: () => trayMenu?.refresh(),
+      beforeInstall: () => saveState('actualizacion'),
       onReady: (version) =>
         mind.say({
           kind: 'actualizacion',
@@ -943,6 +1024,9 @@ if (!app.requestSingleInstanceLock()) {
       apps,
       pomodoro,
       studyLog,
+      phone,
+      journal,
+      openExternal: (url) => shell.openExternal(url),
       runPomodoro: runPomodoroButton,
       extension: () => ({
         carpeta: extensionFiles?.carpeta ?? null,
@@ -1006,7 +1090,8 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:pomodoro-consejos', () => settings.pomodoroAdvice())
     handle('ajustes:temario', (req) => settings.syllabus(req && typeof req === 'object' ? req : {}))
     handle('ajustes:estudio-borrar', () => settings.clearStudy())
-    handle('ajustes:abrir-registro-transporte', () => shell.openExternal(TRANSIT_SIGNUP))
+    handle('ajustes:whatsapp', (req) => settings.whatsapp(req && typeof req === 'object' ? req : {}))
+    handle('ajustes:memoria-borrar', (req) => settings.forget(req && typeof req === 'object' ? req : {}))
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
     handle('ajustes:copiar-direccion-extensiones', () => clipboard.writeText('chrome://extensions'))
@@ -1068,6 +1153,9 @@ if (!app.requestSingleInstanceLock()) {
       quit: quitPixie
     })
     mind.start()
+    // Si se cerró o se actualizó en el medio de algo, sigue donde estaba (y lo va guardando)
+    restoreState()
+    setInterval(() => saveState('auto'), 20000).unref?.()
     updates.start()
     syncStandby()
     console.log(`Pixie ${app.getVersion()} · ${ai.status()}`)
@@ -1128,6 +1216,7 @@ if (!app.requestSingleInstanceLock()) {
   // Vive en la barra de tareas: cerrar la ventana no cierra la app.
   app.on('window-all-closed', () => {})
   app.on('will-quit', () => {
+    saveState(updates?.status().state === 'ready' ? 'actualizacion' : 'cerrar')
     globalShortcut.unregisterAll()
     mind?.stop()
     media?.stop()

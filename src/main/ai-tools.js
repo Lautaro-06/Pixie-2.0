@@ -266,7 +266,7 @@ export const AI_TOOLS = [
   },
   {
     name: 'colectivo',
-    description: 'Dice dónde viene un colectivo de la Ciudad de Buenos Aires (el más cercano a la casa del usuario) y cuánto le falta',
+    description: 'Abre en Google Maps las paradas de una línea de colectivo cerca de la casa del usuario (no sigue los colectivos en vivo)',
     input_schema: obj({ linea: str('El número de la línea, por ejemplo "60"') }, ['linea'])
   },
   {

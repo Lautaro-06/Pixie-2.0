@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createMaps, createTransit, parseVehicles, directionsUrl, distanceText, durationText, modeFrom } from '../src/main/maps.js'
+import { createMaps, directionsUrl, distanceText, durationText, modeFrom } from '../src/main/maps.js'
 import { runAction } from '../src/main/actions/index.js'
 import { opened } from './helpers/electron-stub.mjs'
 import { interpretAll } from '../src/main/brain.js'
@@ -66,23 +66,14 @@ test('«¿cómo llego…?» abre el recorrido y dice cuánto se tarda desde tu c
   await assert.rejects(runAction('como_llego', { destino: 'videos porno' }, ctx).then((x) => { if (x.blocked) throw new Error('bloqueado') }), /bloqueado/)
 })
 
-test('«¿dónde viene el 60?»: el más cercano a tu casa, o cómo sacar la clave', async () => {
-  let cfg = { ciudad: 'Buenos Aires', direccionCasa: 'av rivadavia 5000' }
-  const fetchImpl = fakeFetch()
-  const ctx = { maps: createMaps({ fetchImpl, getConfig: () => cfg }), transit: createTransit({ fetchImpl, getConfig: () => cfg }), getConfig: () => cfg, log: () => {}, openSettings: (v) => (ctx.opened = v) }
-  let r = await runAction('colectivo', { linea: '60' }, ctx)
-  assert.match(r.text, /necesito una clave gratis de la Ciudad/)
-  assert.equal(ctx.opened, 'ajustes/mapas')
+test('«¿dónde para el 60?»: las paradas en Google Maps (sin la API de colectivos)', async () => {
+  const cfg = { ciudad: 'Buenos Aires', direccionCasa: 'av rivadavia 5000' }
+  const ctx = { getConfig: () => cfg, log: () => {} }
+  const r = await runAction('colectivo', { linea: '60' }, ctx)
+  assert.match(r.text, /^Te abrí en Google Maps las paradas del 60 cerca de tu casa\./)
   assert.match(opened.at(-1), /google\.com\/maps\/search\/\?api=1&query=parada%20colectivo%2060%20cerca%20de%20av%20rivadavia%205000/)
-  cfg = { ...cfg, transporte: { id: 'mi-id', secreto: 'secreto' } }
-  r = await runAction('colectivo', { linea: '60' }, ctx)
-  assert.equal(r.text, 'El 60 más cerca está a 1,2 km de tu casa, va para Constitución: si viene para tu lado, llega en más o menos 5 minutos. Hay 2 andando.')
-  r = await runAction('colectivo', { linea: '39' }, ctx)
-  assert.match(r.text, /No veo ningún 39 andando ahora/)
-  cfg = { ...cfg, transporte: { id: 'mi-id', secreto: 'otra' } }
-  r = await runAction('colectivo', { linea: '60' }, ctx)
-  assert.match(r.text, /la clave de la API de Transporte no funciona/)
-  assert.deepEqual(parseVehicles([{ route_short_name: '60', lat: 0, lon: 0 }], '60'), [], 'sin posición no cuenta')
+  const nohome = await runAction('colectivo', { linea: '39' }, { getConfig: () => ({}), log: () => {} })
+  assert.match(nohome.text, /^Te abrí en Google Maps las paradas del 39\./)
 })
 
 test('entiende cómo se pide', () => {
@@ -90,6 +81,7 @@ test('entiende cómo se pide', () => {
   assert.deepEqual(one('¿Cómo llego al Obelisco en colectivo?'), { action: 'como_llego', params: { destino: 'obelisco', modo: 'colectivo' } })
   assert.deepEqual(one('cuánto tardo caminando a la plaza'), { action: 'como_llego', params: { destino: 'plaza', modo: 'caminando' } })
   assert.deepEqual(one('¿dónde viene el 60?'), { action: 'colectivo', params: { linea: '60' } })
+  assert.deepEqual(one('¿dónde para el 152?'), { action: 'colectivo', params: { linea: '152' } })
   assert.deepEqual(one('¿dónde queda mi casa?'), { action: 'mi_casa', params: {} })
   assert.equal(one('¿dónde queda Tucumán?').action, 'buscar', 'dónde queda un lugar sigue siendo buscarlo en el mapa')
 })

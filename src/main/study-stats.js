@@ -77,9 +77,9 @@ export function adherenceOf(sessions) {
 
 // Cómo te fue en el día, como en un habit tracker
 export function dayStatus(min, goal = DEFAULT_GOAL) {
-  if (min >= goal * 1.5) return { emoji: '🔥', texto: '¡Imparable!' }
-  if (min >= goal) return { emoji: '👍', texto: 'Bien hecho' }
-  if (min > 0) return { emoji: '💪', texto: 'Dale que podés' }
+  if (min >= goal * 1.5) return { nivel: 'alto', texto: '¡Imparable!' }
+  if (min >= goal) return { nivel: 'bien', texto: 'Bien hecho' }
+  if (min > 0) return { nivel: 'poco', texto: 'Dale que podés' }
   return null
 }
 
@@ -108,7 +108,7 @@ export function parseSyllabus(text) {
 
 const STOP = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'e', 'en', 'por', 'para', 'con', 'una', 'uno', 'un', 'que', 'sus', 'su', 'al', 'a', 'o', 'u', 'the', 'and', 'of', 'tipos', 'tipo', 'concepto', 'introduccion'])
 const words = (t) => fold(t).replace(/[^a-z0-9ñ ]+/g, ' ').split(' ').filter(Boolean)
-// ¿Ese tema aparece en lo que tuviste abierto? («Respiración celular» ↔ «Respiración celular - Wikipedia»)
+// ¿Ese tema aparece en lo que tuviste abierto? («Respiración celular» y «Respiración celular - Wikipedia»)
 export function topicSeen(topic, titles) {
   const keys = words(topic).filter((w) => !STOP.has(w) && (w.length >= 4 || /\d/.test(w)))
   const tokens = keys.length ? keys : words(topic).filter((w) => !STOP.has(w))

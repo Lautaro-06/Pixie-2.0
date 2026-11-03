@@ -3,6 +3,7 @@
 // avisa para pausar la música que esté sonando.
 import { api } from './api.js'
 import { pcmToFloat } from './audio.js'
+import { speechChunks } from '../../main/speech-text.js'
 
 const DEFAULT_RATE = 24000 // la voz natural llega como PCM de 16 bits (22 o 24 kHz)
 const PAUSE_MUSIC_FROM = 35 // frases cortas no pausan la música
@@ -59,22 +60,29 @@ function setSpeaking(on) {
 // en las voces de Windows suena distorsionado.
 const SPEED = { happy: 1.08, laugh: 1.1, surprised: 1.08, alarm: 1.1, sad: 0.97, love: 1.02 }
 
+// La voz de Windows se corta con los textos largos: se le pasa frase por frase (las pone en fila)
 function systemSpeak(text, face, id) {
   const voice = spanishVoice()
   if (!voice || id !== current) return
-  const utterance = new SpeechSynthesisUtterance(text.replace(/[«»]/g, ''))
-  utterance.voice = voice
-  utterance.lang = voice.lang
-  utterance.rate = SPEED[face] ?? 1.05
-  utterance.pitch = 1
-  utterance.onstart = () => id === current && setSpeaking(true)
-  utterance.onend = utterance.onerror = () => {
-    if (id !== current) return
-    systemUntil = 0
-    setSpeaking(false)
-  }
+  const pieces = speechChunks(text, 200)
+  pieces.forEach((piece, i) => {
+    const utterance = new SpeechSynthesisUtterance(piece)
+    utterance.voice = voice
+    utterance.lang = voice.lang
+    utterance.rate = SPEED[face] ?? 1.05
+    utterance.pitch = 1
+    if (i === 0) utterance.onstart = () => id === current && setSpeaking(true)
+    // Si una frase falla, siguen las otras; recién la última avisa que terminó
+    if (i === pieces.length - 1) {
+      utterance.onend = utterance.onerror = () => {
+        if (id !== current) return
+        systemUntil = 0
+        setSpeaking(false)
+      }
+    }
+    window.speechSynthesis.speak(utterance)
+  })
   systemUntil = Date.now() + 4000 + text.length * 110
-  window.speechSynthesis.speak(utterance)
 }
 
 function playChunk(id, chunk, rate = DEFAULT_RATE) {
@@ -117,6 +125,13 @@ export function isSpeaking() {
   return system || sources.length > 0 || (!streamDone && now < streamUntil)
 }
 
+// Espera a que termine el audio que ya llegó (y que nadie lo haya cortado)
+function whenQuiet(id, fn) {
+  if (id !== current) return
+  if (sources.length) setTimeout(() => whenQuiet(id, fn), 200)
+  else fn()
+}
+
 export function speak(text, face) {
   stopSpeaking()
   if (!text) return
@@ -125,13 +140,20 @@ export function speak(text, face) {
   // La app decide si hay voz natural (si no, contesta enseguida y se usa la de Windows)
   if (!api.voice) return systemSpeak(text, face, id)
   streamDone = false
-  streamUntil = Date.now() + 40000
+  streamUntil = Date.now() + 40000 + text.length * 90
   received = 0
   api
     .voice({ id, text, face })
     .catch(() => ({ ok: false }))
     .then((r) => {
       if (id !== current) return
+      // Se cortó a mitad (se acabó el límite gratis): cuando termina lo que llegó, sigue la de Windows
+      if (r?.resto) {
+        return whenQuiet(id, () => {
+          streamDone = true
+          systemSpeak(r.resto, face, id)
+        })
+      }
       streamDone = true
       if (!r?.ok && !received) systemSpeak(text, face, id) // sin voz natural: la de Windows
       else if (!sources.length) setSpeaking(false)

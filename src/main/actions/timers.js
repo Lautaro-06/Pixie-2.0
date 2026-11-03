@@ -69,6 +69,63 @@ export function timersSummary() {
   return timers.size === 1 ? `Tenés ${list[0]}.` : `Tenés ${timers.size} timers: ${list.join(', ')}.`
 }
 
+// Pone un timer (también los que vuelven después de una actualización)
+function startTimer({ etiqueta = null, ms, totalMs = ms, paused = null, late = false }, ctx) {
+  const id = nextId++
+  const segundos = Math.round(totalMs / 1000)
+  const timer = { id, etiqueta, endsAt: Date.now() + ms, totalMs, paused: null }
+  timer.fire = () => {
+    timers.delete(id)
+    changed()
+    const pomodoro = etiqueta === 'Pomodoro'
+    const base = pomodoro
+      ? '¡Terminó el Pomodoro! Muy bien. Tomate 5 minutos de descanso.'
+      : etiqueta
+        ? `¡Tiempo! Te aviso: ${etiqueta}.`
+        : `¡Terminó el timer de ${durationText(segundos)}!`
+    const text = late ? `${base} (se cumplió mientras me reiniciaba)` : base
+    ctx.notify('Pixie', text)
+    ;(ctx.phoneNotify ?? ctx.phoneIfAway)?.(text)
+    ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
+    ctx.log(`timer terminado: ${etiqueta ?? durationText(segundos)}`)
+  }
+  if (paused !== null) {
+    timer.paused = paused
+    timer.endsAt = Date.now() + paused
+  } else arm(timer, ms, timer.fire)
+  timers.set(id, timer)
+  changed()
+  return timer
+}
+
+// Para guardarlos antes de cerrarse o actualizarse
+export function exportTimers() {
+  return [...timers.values()].map((t) => ({ etiqueta: t.etiqueta ?? null, endsAt: t.endsAt, totalMs: t.totalMs, paused: t.paused }))
+}
+
+// Al volver: siguen los que faltaban; los que se cumplieron mientras estaba cerrada (hace menos de
+// media hora) suenan enseguida. Devuelve { siguen, vencidos }.
+export function restoreTimers(list, ctx, now = Date.now()) {
+  const out = { siguen: [], vencidos: [] }
+  for (const t of Array.isArray(list) ? list : []) {
+    if (!t || !t.totalMs) continue
+    if (t.paused != null) {
+      startTimer({ etiqueta: t.etiqueta, ms: t.paused, totalMs: t.totalMs, paused: t.paused }, ctx)
+      out.siguen.push({ etiqueta: t.etiqueta, restanteMs: t.paused, pausado: true })
+      continue
+    }
+    const left = t.endsAt - now
+    if (left > 0) {
+      startTimer({ etiqueta: t.etiqueta, ms: left, totalMs: t.totalMs }, ctx)
+      out.siguen.push({ etiqueta: t.etiqueta, restanteMs: left })
+    } else if (-left < 30 * 60 * 1000) {
+      startTimer({ etiqueta: t.etiqueta, ms: 2000, totalMs: t.totalMs, late: true }, ctx)
+      out.vencidos.push({ etiqueta: t.etiqueta })
+    }
+  }
+  return out
+}
+
 export const timerActions = [
   {
     name: 'crear_timer',
@@ -80,25 +137,7 @@ export const timerActions = [
       if (segundos > MAX_SECONDS) {
         return { text: 'Por ahora pongo timers de hasta 24 horas.', face: 'confused' }
       }
-      const id = nextId++
-      const timer = { id, etiqueta, endsAt: Date.now() + segundos * 1000, totalMs: segundos * 1000, paused: null }
-      timer.fire = () => {
-        timers.delete(id)
-        changed()
-        const pomodoro = etiqueta === 'Pomodoro'
-        const text = pomodoro
-          ? '¡Terminó el Pomodoro! Muy bien. Tomate 5 minutos de descanso.'
-          : etiqueta
-            ? `¡Tiempo! Te aviso: ${etiqueta}.`
-            : `¡Terminó el timer de ${durationText(segundos)}!`
-        ctx.notify('Pixie', text)
-        ctx.phoneIfAway?.(text)
-        ctx.emit({ type: 'alarm', text, suggestions: pomodoro ? ['timer de 5 minutos', 'arrancá un pomodoro'] : undefined })
-        ctx.log(`timer terminado: ${etiqueta ?? durationText(segundos)}`)
-      }
-      arm(timer, segundos * 1000, timer.fire)
-      timers.set(id, timer)
-      changed()
+      startTimer({ etiqueta, ms: segundos * 1000 }, ctx)
       const about = etiqueta && etiqueta !== 'Pomodoro' ? ` para «${etiqueta}»` : ''
       const kind = etiqueta === 'Pomodoro' ? 'Pomodoro de 25 minutos. ¡A concentrarse!' : `timer de ${durationText(segundos)}${about}.`
       return { text: `Listo, ${kind}`, face: 'happy' }

@@ -31,7 +31,7 @@ let fakeSettings = {
   bienvenidaHecha: false,
   general: { nombre: '', ciudad: 'Buenos Aires', atajo: 'Ctrl+Shift+Espacio', arrancarConWindows: true, recordatoriosSalud: true, avisosAlCelular: true, esquivarMouse: true },
   apariencia: { pantallaReposo: 'cara' },
-  mapas: { casa: '', transporteId: '', transporteSecreto: '', transporte: false },
+  mapas: { casa: '' },
   pomodoro: pomodoroView(fakePomodoro),
   estudio: fakeStudy(),
   apps: {
@@ -50,6 +50,20 @@ let fakeSettings = {
     mails: { estado: 'sin-leer', conectada: false, avisos: false, leido: null, sinLeer: 0, cuentas: [], error: null, silenciados: ['Netflix'], extension: { carpeta: null, version: '0.11.0', conectada: false, vieja: false } }
   },
   noticias: { fuentes: ['infobae', 'tn'], avisos: 'aveces' },
+  whatsapp: { configurado: false, telefono: '', tieneClave: false, cuando: 'siempre', ultimo: null, bot: '+34 684 77 00 05', activacion: 'I allow callmebot to send me messages', avisos: true },
+  memoria: {
+    charlas: 42,
+    personales: 1,
+    datos: [
+      { texto: 'juega al fútbol los sábados', creado: '2026-10-30T18:00:00.000Z' },
+      { texto: 'su materia favorita es Biología', creado: '2026-10-28T18:00:00.000Z' }
+    ],
+    dias: [1, 2, 3].map((back) => {
+      const d = new Date()
+      d.setDate(d.getDate() - back)
+      return { fecha: d.toISOString().slice(0, 10), charlas: 5 - back, temas: [['fotosintesis', 'prueba', 'biologia'], ['futbol', 'sabado'], []][back - 1] }
+    })
+  },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
   voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.', palabra: { grabada: false, activa: false, sensibilidad: 'normal' } },
   actualizaciones: { state: 'dev', current: 'navegador', texto: 'Las actualizaciones andan en la app instalada.' },
@@ -62,6 +76,13 @@ const previewSettings = {
   set: async (patch) => {
     const g = { ...fakeSettings.general }
     for (const k of ['nombre', 'ciudad', 'arrancarConWindows', 'recordatoriosSalud', 'avisosAlCelular', 'esquivarMouse']) if (k in patch) g[k] = patch[k]
+    // WhatsApp: el número, la clave y cuándo
+    let wpp = fakeSettings.whatsapp
+    if ('avisosAlCelular' in patch) wpp = { ...wpp, avisos: patch.avisosAlCelular }
+    if (typeof patch.whatsappTelefono === 'string') wpp = { ...wpp, telefono: patch.whatsappTelefono.replace(/[^\d+]/g, '') }
+    if (patch.whatsappClave?.trim()) wpp = { ...wpp, tieneClave: true }
+    if (patch.whatsappCuando) wpp = { ...wpp, cuando: patch.whatsappCuando }
+    wpp = { ...wpp, configurado: Boolean(wpp.telefono && wpp.tieneClave) }
     if (patch.atajo) g.atajo = patch.atajo.replace('Control', 'Ctrl').replace('Space', 'Espacio')
     // Apps: los permisos en la vista previa
     let apps = fakeSettings.apps
@@ -74,6 +95,7 @@ const previewSettings = {
     fakeSettings = {
       ...fakeSettings,
       apps,
+      whatsapp: wpp,
       pomodoro: pomodoroView(fakePomodoro),
       estudio: fakeStudy(),
       general: g,
@@ -134,7 +156,6 @@ const previewSettings = {
     }
     return { ...fakeSettings, mensaje: 'Leí tus Pendientes: tenés 3 tareas.' }
   },
-  openTransitSignup: async () => window.open('https://api-transporte.buenosaires.gob.ar/registro', '_blank'),
   pomodoro: async (accion) => ({ ...fakeSettings, mensaje: `En la app de escritorio haría «${accion}».` }),
   syllabus: async ({ accion, materia, texto, indice, visto } = {}) => {
     if (accion === 'guardar') {
@@ -181,6 +202,19 @@ const previewSettings = {
       ]
     }
   ),
+  whatsapp: async ({ accion } = {}) => {
+    if (accion === 'activar') window.open('https://wa.me/34684770005', '_blank')
+    if (accion === 'probar') {
+      await wait(700)
+      fakeSettings = { ...fakeSettings, whatsapp: { ...fakeSettings.whatsapp, ultimo: { ok: true, at: new Date().toISOString() } } }
+      return { ...fakeSettings, mensaje: '¡Te lo mandé! Fijate en tu WhatsApp.' }
+    }
+    return { ...fakeSettings, mensaje: accion === 'portapapeles' ? 'No encontré la clave en lo que copiaste.' : null }
+  },
+  forgetMemory: async ({ que } = {}) => {
+    fakeSettings = { ...fakeSettings, memoria: que === 'todo' ? { charlas: 0, personales: 0, datos: [], dias: [] } : { ...fakeSettings.memoria, charlas: 0, dias: [] } }
+    return { ...fakeSettings, mensaje: que === 'todo' ? 'Listo, me olvidé de todo.' : 'Listo, me olvidé de nuestras charlas.' }
+  },
   onView: () => () => {}
 }
 

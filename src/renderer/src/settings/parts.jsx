@@ -38,7 +38,8 @@ export function Toggle({ on, onChange, label }) {
 }
 
 // Un texto que se guarda al salir del campo o con Enter
-export function TextSetting({ id, value, placeholder, onSave, label }) {
+// clearOnSave: para claves, que no queden a la vista después de guardarlas
+export function TextSetting({ id, value, placeholder, onSave, label, clearOnSave = false }) {
   const [text, setText] = useState(value ?? '')
   const editing = useRef(false)
   useEffect(() => {
@@ -47,6 +48,7 @@ export function TextSetting({ id, value, placeholder, onSave, label }) {
   const save = () => {
     editing.current = false
     if (text.trim() !== (value ?? '')) onSave(text.trim())
+    if (clearOnSave) setText('')
   }
   return (
     <input

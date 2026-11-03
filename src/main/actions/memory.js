@@ -1,6 +1,7 @@
 import { describeWhen, startOfDay, addDays } from '../dates.js'
 import { similarity, isTimeBound, ageDays, ageText } from '../memory.js'
 import { summarizeUsage, durationText, CATEGORY_NAMES } from '../usage.js'
+import { whenText } from '../journal.js'
 
 // "mi perro se llama Toby" → "tu perro se llama Toby"
 const SWAPS = [
@@ -29,7 +30,60 @@ function eventText(e, now) {
   return `${e.texto} ${describeWhen(e.cuando, e.conHora, now)}`
 }
 
+// «Hace 3 días» como lo diría alguien: hoy, ayer, el martes, el 3 de octubre
+const DAY_WORDS = { hoy: 0, ayer: 1, anteayer: 2 }
+const WEEKDAY_INDEX = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 }
+export function dayFromWords(dia, now = new Date()) {
+  const d = String(dia ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/^el /, '')
+  const back = (n) => {
+    const x = new Date(now)
+    x.setDate(x.getDate() - n)
+    return x
+  }
+  if (d in DAY_WORDS) return back(DAY_WORDS[d])
+  if (d in WEEKDAY_INDEX) return back(((now.getDay() - WEEKDAY_INDEX[d] + 7) % 7) || 7)
+  return null
+}
+
 export const memoryActions = [
+  {
+    name: 'recordar_charla',
+    description: 'Se acuerda de lo que hablaron: un día («ayer», «el martes») o sobre un tema («lo del viaje»)',
+    run: ({ buscar, dia }, ctx) => {
+      const j = ctx.journal
+      if (!j?.count()) return { text: 'Todavía no tengo charlas anotadas. Desde ahora me acuerdo de todo lo que hablemos.', face: 'idle' }
+      const now = new Date()
+      if (buscar) {
+        // Lo pediste vos: puede nombrar aunque sea personal
+        const found = j.search(buscar, { limit: 2, includeSensitive: true })
+        const fact = ctx.memory?.findFact?.(buscar)
+        if (!found.length && !fact) return { text: `No me acuerdo de que me hayas contado algo sobre ${buscar}. ¿Me lo contás?`, face: 'confused' }
+        if (!found.length) return { text: `Me contaste que ${toYou(fact.texto)} (${ageText(fact.creado, now)}).`, face: 'happy' }
+        const e = found[0]
+        return { text: `Sí: ${whenText(e.at, now)} me dijiste «${e.yo}».${found[1] ? ` Y ${whenText(found[1].at, now)}, «${found[1].yo}».` : ''}`, face: 'happy' }
+      }
+      const day = dayFromWords(dia ?? 'ayer', now)
+      const list = day ? j.day(day) : []
+      const when = day ? whenText(day, now) : dia
+      if (!list.length) return { text: `${upperFirst(when)} no hablamos.`, face: 'idle' }
+      const open = list.filter((e) => !e.sensible)
+      const topics = [...new Set(open.flatMap((e) => e.temas ?? []))].slice(0, 5)
+      const personal = list.length - open.length
+      const about = topics.length ? `de ${listText(topics)}` : 'de cosas cortitas (pedidos y eso)'
+      const extra = personal ? ` Y de algo más personal que no nombro si no me lo preguntás.` : ''
+      return { text: `${upperFirst(when)} hablamos ${about}.${extra}`, face: 'happy' }
+    }
+  },
+  {
+    name: 'olvidar_charlas',
+    description: 'Borra el diario de charlas (pide confirmación)',
+    confirm: true,
+    confirmText: () => '¿Borro todo lo que hablamos? Me olvido de nuestras charlas (no de tus pendientes ni tu agenda).',
+    run: (_p, ctx) => {
+      ctx.journal?.forgetAll()
+      return { text: 'Listo, me olvidé de nuestras charlas.', face: 'sad' }
+    }
+  },
   // Nombre
   {
     name: 'guardar_nombre',
@@ -70,10 +124,13 @@ export const memoryActions = [
       const parts = []
       if (m.getName()) parts.push(`Sé que te llamás ${m.getName()}.`)
       const now = new Date()
-      const facts = m.listFacts()
+      // Lo personal o sensible no lo dice en voz alta: solo cuántas cosas son
+      const facts = m.publicFacts ? m.publicFacts() : m.listFacts()
+      const hidden = m.listFacts().length - facts.length
       // Lo que tenía fecha y ya pasó, con hace cuánto (para que no suene a que viene)
       const fact = (f) => (isTimeBound(f.texto) && ageDays(f.creado, now) > 1 ? `${toYou(f.texto)} (me lo dijiste ${ageText(f.creado, now)})` : toYou(f.texto))
       if (facts.length) parts.push(`Me contaste que ${listText(facts.map(fact))}.`)
+      if (hidden > 0) parts.push(`Y ${hidden === 1 ? 'una cosa más personal' : `${hidden} cosas más personales`} que no nombro: si querés, preguntame por algo puntual.`)
       const todos = m.listTodos().length
       const events = m.data.agenda.filter((e) => new Date(e.cuando) >= startOfDay(now)).length
       if (todos || events) parts.push(`Tenés ${todos} pendiente${todos === 1 ? '' : 's'} y ${events} cosa${events === 1 ? '' : 's'} en la agenda.`)

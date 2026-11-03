@@ -3,6 +3,7 @@
 // cuando se acaban, la interfaz usa la voz de Windows. La voz natural de todos los
 // días es la de la compu (piper.js).
 import { pickProvider } from './ai.js'
+import { speechChunks } from './speech-text.js'
 
 const URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 const DEFAULT_MODEL = 'gemini-3.1-flash-tts-preview'
@@ -50,6 +51,7 @@ async function* sseEvents(body) {
 export function createTTS({ getConfig, fetchImpl = (...a) => fetch(...a), log = () => {} }) {
   const cache = new Map() // frase → pedazos de audio
   const running = new Map() // id → AbortController
+  const stopped = new Set() // los que se cortaron a mitad (no se piden más pedazos)
   let pausedUntil = 0
 
   function settings() {
@@ -59,8 +61,23 @@ export function createTTS({ getConfig, fetchImpl = (...a) => fetch(...a), log = 
     return { apiKey: p.apiKey, model: cfg.modeloVoz || DEFAULT_MODEL, voice: cfg.vozIA || DEFAULT_VOICE }
   }
 
-  // onChunk recibe PCM de 16 bits, 24 kHz, mono. Devuelve { ok } (ok: false → usar la voz de Windows)
+  // Un texto largo se pide de a pedazos (frases), uno atrás del otro, para que no se corte
   async function stream(id, text, face, onChunk) {
+    const pieces = speechChunks(text, MAX_CHARS - 50)
+    if (pieces.length <= 1) return streamOne(id, text, face, onChunk)
+    stopped.delete(id)
+    for (const [i, piece] of pieces.entries()) {
+      if (stopped.has(id)) break
+      const r = await streamOne(id, piece, face, onChunk)
+      // Si se corta a mitad (se acabó el límite gratis), lo que falta lo lee la voz de Windows
+      if (!r.ok) return i ? { ok: true, resto: pieces.slice(i).join(' ') } : { ok: false }
+    }
+    stopped.delete(id)
+    return { ok: true }
+  }
+
+  // onChunk recibe PCM de 16 bits, 24 kHz, mono. Devuelve { ok } (ok: false → usar la voz de Windows)
+  async function streamOne(id, text, face, onChunk) {
     const s = settings()
     const clean = cleanForVoice(text)
     if (!s || !clean) return { ok: false }
@@ -123,6 +140,9 @@ export function createTTS({ getConfig, fetchImpl = (...a) => fetch(...a), log = 
   return {
     available: () => Boolean(settings()),
     stream,
-    stop: (id) => running.get(id)?.abort()
+    stop: (id) => {
+      stopped.add(id)
+      running.get(id)?.abort()
+    }
   }
 }

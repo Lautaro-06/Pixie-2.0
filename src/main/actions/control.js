@@ -20,7 +20,7 @@ async function target(ctx) {
   // Las apps que sacaste en Ajustes → Apps no las toca
   if (ctx.apps && !ctx.apps.can('usar', win)) {
     const name = ctx.apps.appForWindow(win)?.nombre ?? win.proceso ?? 'esa app'
-    throw new FriendlyError(`No tengo permiso para usar ${name}. Lo podés cambiar en mis Ajustes → Apps.`)
+    throw new FriendlyError(`No tengo permiso para usar ${name}. Lo podés cambiar en mis Ajustes → Apps y mapas.`)
   }
   return win
 }

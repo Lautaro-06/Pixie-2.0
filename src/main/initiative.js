@@ -1,6 +1,7 @@
 // Iniciativa: Pixie habla primero cuando tiene sentido. Cada 5 segundos mira
 // cómo está todo y decide si avisar algo. No molesta en pantalla completa ni
 // en modo "no molestar" (salvo recordatorios y batería muy baja).
+import { sensitiveTopic } from './sensitive.js'
 import { dayKey, startOfDay, addDays } from './dates.js'
 import { ageText } from './memory.js'
 import { feeling } from './feelings.js'
@@ -132,7 +133,8 @@ export function createInitiative(times = TIMES, rng = Math.random) {
           const mails = snap.mailsDesde?.(t - fuera) ?? 0
           if (mails) extra.push(mails === 1 ? 'Mientras no estabas te llegó un mail.' : `Mientras no estabas te llegaron ${mails} mails.`)
           const end = new Date(addDays(startOfDay(now), 1).getTime() - 1)
-          const next = (memory.eventsBetween?.(now, end) ?? []).find((e) => e.conHora && new Date(e.cuando) > now)
+          // (lo sensible no lo nombra ella: «turno con el psicólogo» no lo dice al volver)
+          const next = (memory.eventsBetween?.(now, end) ?? []).find((e) => e.conHora && new Date(e.cuando) > now && !(e.sensible ?? sensitiveTopic(e.texto)))
           if (next) extra.push(`A las ${hhmm(new Date(next.cuando))} tenés ${next.texto}.`)
           say({ kind: 'volvio', text: [`¡Volviste${nombre ? `, ${nombre}` : ''}!`, ...extra].join(' '), face: 'happy', suggestions: mails ? ['¿tengo mails?'] : undefined })
         }

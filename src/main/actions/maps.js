@@ -1,12 +1,10 @@
 // «¿Cómo llego al Obelisco?», «¿cuánto tardo caminando a la escuela?», «mi casa queda en Rivadavia 5000»,
-// «¿dónde viene el 60?». Ver maps.js.
+// «¿dónde para el 60?» (te muestra las paradas en Google Maps). Ver maps.js.
 import { launch, BlockedError } from '../windows.js'
 import { checkQuery } from '../safety.js'
 import { directionsUrl, distanceText, durationText, haversine, MODE_NAMES } from '../maps.js'
 
-export const TRANSIT_SIGNUP = 'https://api-transporte.buenosaires.gob.ar/registro'
 const HOME = /^(mi |a mi |a )?casa$/i
-const CITY_BUS_KMH = 15 // lo que anda un colectivo en la ciudad, más o menos
 
 const MODE_TEXT = { caminando: 'Caminando', bici: 'En bici', auto: 'En auto' }
 
@@ -51,7 +49,7 @@ export const mapActions = [
   },
   {
     name: 'mi_casa',
-    description: 'Guarda dónde queda tu casa (para calcular cuánto tardás y dónde viene el colectivo)',
+    description: 'Guarda dónde queda tu casa (para calcular cuánto tardás en llegar a los lugares)',
     run: ({ direccion }, ctx) => {
       const d = String(direccion ?? '').trim().slice(0, 120)
       if (!d) {
@@ -66,37 +64,16 @@ export const mapActions = [
   },
   {
     name: 'colectivo',
-    description: 'Dice dónde viene un colectivo de la Ciudad de Buenos Aires (el más cercano a tu casa) y cuánto le falta',
+    description: 'Muestra en Google Maps las paradas de un colectivo cerca de tu casa',
     run: async ({ linea }, ctx) => {
       const l = String(linea ?? '').trim().replace(/^(el|la|linea)\s+/i, '')
-      if (!l) return { text: '¿Qué colectivo? Decime, por ejemplo, «¿dónde viene el 60?».', face: 'confused' }
+      if (!l) return { text: '¿Qué colectivo? Decime, por ejemplo, «¿dónde para el 60?».', face: 'confused' }
       const casa = ctx.getConfig().direccionCasa
-      if (!ctx.transit?.configured()) {
-        ctx.openSettings?.('ajustes/mapas')
-        const q = `parada colectivo ${l}${casa ? ` cerca de ${casa}` : ''}`
-        await launch({ tipo: 'uri', valor: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` })
-        return {
-          text: `Para decirte dónde viene el ${l} en vivo necesito una clave gratis de la Ciudad: te abrí mis ajustes (Mapas) con los pasos. Mientras, te mostré las paradas del ${l} en Google Maps.`,
-          face: 'idle'
-        }
-      }
-      if (!casa) return { text: 'Primero decime dónde queda tu casa: «mi casa queda en …». Así busco el colectivo más cerca.', face: 'confused' }
-      try {
-        const home = await ctx.maps.geocode(casa)
-        if (!home) return { text: `No encontré «${casa}» en el mapa. Probá decirme la dirección con la ciudad.`, face: 'confused' }
-        const buses = await ctx.transit.vehicles(l)
-        if (!buses.length) return { text: `No veo ningún ${l} andando ahora. Puede que esa línea no sea de la Ciudad o que no esté pasando.`, face: 'confused' }
-        const near = buses.map((b) => ({ ...b, metros: haversine(home, b) })).sort((a, b) => a.metros - b.metros)
-        const b = near[0]
-        const eta = (b.metros / 1000 / CITY_BUS_KMH) * 3600
-        const where = b.destino ? `, va para ${b.destino}` : ''
-        const others = buses.length > 1 ? ` Hay ${buses.length} andando.` : ''
-        return {
-          text: `El ${l} más cerca está a ${distanceText(b.metros)} de tu casa${where}: si viene para tu lado, llega en más o menos ${durationText(eta)}.${others}`,
-          face: 'happy'
-        }
-      } catch (err) {
-        return { text: `No pude ver dónde viene el ${l}: ${err.message}.`, face: 'confused' }
+      const q = `parada colectivo ${l}${casa ? ` cerca de ${casa}` : ''}`
+      await launch({ tipo: 'uri', valor: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` })
+      return {
+        text: `Te abrí en Google Maps las paradas del ${l}${casa ? ' cerca de tu casa' : ''}. Para ir a algún lado, decime «¿cómo llego a …?» y te muestro el recorrido con los horarios.`,
+        face: 'happy'
       }
     }
   }
