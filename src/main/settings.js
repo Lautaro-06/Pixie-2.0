@@ -170,7 +170,8 @@ export function createSettings({
     if (typeof patch.whatsappTelefono === 'string' || typeof patch.whatsappClave === 'string' || typeof patch.whatsappCuando === 'string') {
       const cur = getConfig().whatsapp ?? {}
       const next = { ...cur }
-      if (typeof patch.whatsappTelefono === 'string') next.telefono = cleanPhone(patch.whatsappTelefono) || undefined
+      // Vacío lo borra (también el cifrado)
+      if (typeof patch.whatsappTelefono === 'string') next.telefono = cleanPhone(patch.whatsappTelefono) || null
       if (typeof patch.whatsappClave === 'string' && patch.whatsappClave.trim()) next.apikey = (findWhatsappKey(patch.whatsappClave) ?? patch.whatsappClave).trim()
       if (WHEN.includes(patch.whatsappCuando)) next.cuando = patch.whatsappCuando
       saveConfig({ whatsapp: next })
@@ -363,6 +364,11 @@ export function createSettings({
 
   // WhatsApp: abrir el chat del bot con el mensaje de activación, buscar la clave copiada o mandar una prueba
   async function whatsapp({ accion } = {}) {
+    // Borra tu número y la clave de esta compu
+    if (accion === 'borrar') {
+      saveConfig({ whatsapp: { telefono: null, apikey: null } })
+      return { ...snapshot(), mensaje: 'Listo, borré tu número y la clave de WhatsApp de esta compu.' }
+    }
     if (accion === 'activar') {
       openExternal(activationLink())
       return { ...snapshot(), mensaje: 'Te abrí WhatsApp con el mensaje ya escrito: tocá Enviar. El bot te contesta con tu clave (APIKEY).' }

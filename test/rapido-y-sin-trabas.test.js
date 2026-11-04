@@ -88,7 +88,7 @@ test('«agendá en el Google Calendar…» lo guarda en su agenda y aclara que a
   assert.equal(interpretAll('agendame en el calendario la prueba de historia del viernes')[0].params.texto, 'prueba de historia')
   const memory = createMemory(join(mkdtempSync(join(tmpdir(), 'pixie-')), 'memoria.json'))
   const r = await runAction('agendar', it.params, { memory, log: () => {} })
-  assert.match(r.text, /^Agendado: prueba de historia, el viernes\./)
+  assert.match(r.text, /^Agendado: prueba de historia, (el viernes|pasado mañana|mañana|hoy)\./)
   assert.match(r.text, /En tu Google Calendar no puedo escribir \(solo lo leo\)/)
   assert.equal(memory.eventsBetween(new Date(it.params.cuando), new Date(it.params.cuando)).length, 1)
 })

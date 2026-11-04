@@ -50,7 +50,7 @@ let fakeSettings = {
     mails: { estado: 'sin-leer', conectada: false, avisos: false, leido: null, sinLeer: 0, cuentas: [], error: null, silenciados: ['Netflix'], extension: { carpeta: null, version: '0.11.0', conectada: false, vieja: false } }
   },
   noticias: { fuentes: ['infobae', 'tn'], avisos: 'aveces' },
-  whatsapp: { configurado: false, telefono: '', tieneClave: false, cuando: 'siempre', ultimo: null, bot: '+34 684 77 00 05', activacion: 'I allow callmebot to send me messages', avisos: true },
+  whatsapp: { configurado: false, tieneNumero: false, termina: '', tieneClave: false, cuando: 'siempre', ultimo: null, bot: '+34 684 77 00 05', activacion: 'I allow callmebot to send me messages', avisos: true },
   memoria: {
     charlas: 42,
     personales: 1,
@@ -79,10 +79,13 @@ const previewSettings = {
     // WhatsApp: el número, la clave y cuándo
     let wpp = fakeSettings.whatsapp
     if ('avisosAlCelular' in patch) wpp = { ...wpp, avisos: patch.avisosAlCelular }
-    if (typeof patch.whatsappTelefono === 'string') wpp = { ...wpp, telefono: patch.whatsappTelefono.replace(/[^\d+]/g, '') }
+    if (typeof patch.whatsappTelefono === 'string') {
+      const digits = patch.whatsappTelefono.replace(/\D/g, '')
+      wpp = { ...wpp, tieneNumero: digits.length > 0, termina: digits.length >= 8 ? digits.slice(-4) : '' }
+    }
     if (patch.whatsappClave?.trim()) wpp = { ...wpp, tieneClave: true }
     if (patch.whatsappCuando) wpp = { ...wpp, cuando: patch.whatsappCuando }
-    wpp = { ...wpp, configurado: Boolean(wpp.telefono && wpp.tieneClave) }
+    wpp = { ...wpp, configurado: Boolean(wpp.termina && wpp.tieneClave) }
     if (patch.atajo) g.atajo = patch.atajo.replace('Control', 'Ctrl').replace('Space', 'Espacio')
     // Apps: los permisos en la vista previa
     let apps = fakeSettings.apps
@@ -203,6 +206,10 @@ const previewSettings = {
     }
   ),
   whatsapp: async ({ accion } = {}) => {
+    if (accion === 'borrar') {
+      fakeSettings = { ...fakeSettings, whatsapp: { ...fakeSettings.whatsapp, configurado: false, tieneNumero: false, termina: '', tieneClave: false } }
+      return { ...fakeSettings, mensaje: 'Listo, borré tu número y la clave de WhatsApp de esta compu.' }
+    }
     if (accion === 'activar') window.open('https://wa.me/34684770005', '_blank')
     if (accion === 'probar') {
       await wait(700)

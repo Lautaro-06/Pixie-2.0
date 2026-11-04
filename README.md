@@ -259,7 +259,7 @@ Pixie te puede escribir por WhatsApp, **solo a tu número**, usando [CallMeBot](
 2. **Abrir WhatsApp:** se abre el chat del bot de CallMeBot (**+34 684 77 00 05**) con el mensaje `I allow callmebot to send me messages` ya escrito. Tocás Enviar desde ese celular y el bot te contesta con tu clave (**APIKEY**).
 3. **La clave:** la pegás, o copiás el mensaje entero del bot y tocás **Buscar en lo copiado**.
 
-Después, **Mandarme un mensaje de prueba**: si algo está mal (el número, la clave, el bot sin activar), te dice qué. El número y la clave quedan solo en tu compu (la clave, cifrada).
+Después, **Mandarme un mensaje de prueba**: si algo está mal (el número, la clave, el bot sin activar), te dice qué. El número y la clave quedan cifrados con tu cuenta de Windows y solo en esta compu: no viajan con Pixie ni con el respaldo, y en Ajustes el número nunca se muestra entero (solo cómo termina). Si `config.json` llega de otra compu o de otra cuenta, Pixie lo borra. **Borrar mi número de esta compu** lo saca.
 
 Con eso, los recordatorios de tu agenda y los timers te llegan al celular **apenas se cumplen**. En **Cuándo te escribo** elegís **Siempre** o **Solo si no estás en la compu** (bloqueada o 5 minutos sin tocarla). Los mensajes salen en fila, de a uno, y si CallMeBot no responde, reintenta. Para que no te escriba más, apagá **Avisarte al celular**. También le podés pedir «mandame por WhatsApp que compre pan» o «probá el WhatsApp».
 

@@ -2,7 +2,7 @@
 // cuenta de Windows (en "cifrado") y Pixie las usa descifradas solo en memoria.
 // Si alguien pega una clave a mano en config.json, se cifra sola la próxima vez que se lee.
 
-export const SECRET_PATHS = [['claveIA'], ['whatsapp', 'apikey'], ['transporte', 'secreto']]
+export const SECRET_PATHS = [['claveIA'], ['whatsapp', 'apikey'], ['whatsapp', 'telefono'], ['transporte', 'secreto']]
 const keyOf = (path) => path.join('.')
 
 export function getIn(obj, path) {
@@ -79,4 +79,20 @@ export function maskSecret(value) {
   if (!v) return ''
   if (v.length <= 10) return '••••'
   return `${v.slice(0, 5)}…${v.slice(-4)}`
+}
+
+// El WhatsApp es de una persona en una compu: el número y la clave quedan marcados con esta compu y esta
+// cuenta de Windows (dueno). Si config.json llegó de otro lado (una copia, otra cuenta, una compu
+// compartida que ya lo tenía) o es de antes de la 0.16.2 (sin marca), se borra: nadie ve el número de otro.
+export function guardWhatsapp(data, owner) {
+  const enc = data?.cifrado ?? {}
+  const has = data?.whatsapp || enc['whatsapp.apikey'] || enc['whatsapp.telefono']
+  if (!has || (data.whatsapp?.dueno && data.whatsapp.dueno === owner)) return { data, removed: false }
+  const { whatsapp: _gone, ...rest } = data
+  if (data.cifrado) {
+    const { 'whatsapp.apikey': _k, 'whatsapp.telefono': _t, ...others } = data.cifrado
+    if (Object.keys(others).length) rest.cifrado = others
+    else delete rest.cifrado
+  }
+  return { data: rest, removed: true }
 }

@@ -195,9 +195,11 @@ function WhatsAppSection({ s, setS, change, say }) {
       setBusy(null)
     }
   }
+  // El número nunca se muestra entero: solo cómo termina (para que lo reconozcas vos)
+  const yours = w.termina ? `tu número que termina en ${w.termina}` : 'tu número'
   const status = w.configurado
-    ? `Listo: te escribo al ${w.telefono}.`
-    : !w.telefono
+    ? `Listo: te escribo a ${yours}.`
+    : !w.tieneNumero
       ? 'Falta tu número.'
       : !w.tieneClave
         ? 'Falta la clave que te manda el bot.'
@@ -207,7 +209,7 @@ function WhatsAppSection({ s, setS, change, say }) {
       <Header title="WhatsApp" text="Te mando por WhatsApp los recordatorios de tu agenda y los timers, apenas se cumplen. Solo a tu número." />
       <Card
         title={w.configurado ? 'Activado' : 'Activalo en 3 pasos'}
-        note="Usa CallMeBot, un servicio gratis para mandarte mensajes a vos mismo. Tu número y la clave quedan solo en esta compu (la clave, cifrada)."
+        note="Usa CallMeBot, un servicio gratis para mandarte mensajes a vos mismo. Tu número y la clave quedan solo en esta compu y en tu cuenta de Windows, cifrados: no viajan con Pixie ni con el respaldo, y acá nunca se muestra el número entero."
       >
         <p className={`big-status${w.configurado ? ' ok' : ''}`}>{status}</p>
         <ol className="setup-steps">
@@ -216,7 +218,13 @@ function WhatsAppSection({ s, setS, change, say }) {
               <label htmlFor="wpp-tel">Tu número</label>
               <p className="hint">Con el código de país: en Argentina, +54 9 y el número sin el 15.</p>
             </div>
-            <TextSetting id="wpp-tel" value={w.telefono} placeholder="+54 9 11 1234 5678" onSave={(whatsappTelefono) => change({ whatsappTelefono })} />
+            <TextSetting
+              id="wpp-tel"
+              value=""
+              clearOnSave
+              placeholder={w.tieneNumero ? `Guardado${w.termina ? ` (termina en ${w.termina})` : ''}` : '+54 9 11 1234 5678'}
+              onSave={(whatsappTelefono) => whatsappTelefono && change({ whatsappTelefono })}
+            />
           </li>
           <li>
             <div className="row-text">
@@ -246,6 +254,11 @@ function WhatsAppSection({ s, setS, change, say }) {
           <button type="button" className="button" disabled={!w.configurado || Boolean(busy)} onClick={() => run('probar')}>
             {busy === 'probar' ? 'Mandando…' : 'Mandarme un mensaje de prueba'}
           </button>
+          {(w.tieneNumero || w.tieneClave) && (
+            <button type="button" className="button danger" disabled={Boolean(busy)} onClick={() => run('borrar')}>
+              Borrar mi número de esta compu
+            </button>
+          )}
         </div>
         {w.ultimo && (
           <p className={`note ${w.ultimo.ok ? 'ok' : 'error'}`}>

@@ -107,13 +107,16 @@ export function createPhone({ getConfig, fetchImpl = (...a) => fetch(...a), log 
   return {
     configured: () => Boolean(whatsappConfig(getConfig())),
     send,
-    // Para Ajustes: el número, si tiene clave, cuándo avisa y cómo salió el último
+    // Para Ajustes: si hay número (nunca el número entero: solo cómo termina), si tiene clave, cuándo
+    // avisa y cómo salió el último
     status() {
       const raw = getConfig().whatsapp ?? {}
       const w = whatsappConfig(getConfig())
+      const digits = cleanPhone(raw.telefono).replace(/\D/g, '')
       return {
         configurado: Boolean(w),
-        telefono: cleanPhone(raw.telefono),
+        tieneNumero: digits.length > 0,
+        termina: digits.length >= 8 ? digits.slice(-4) : '',
         tieneClave: Boolean(String(raw.apikey ?? '').trim()),
         cuando: WHEN.includes(raw.cuando) ? raw.cuando : 'siempre',
         ultimo: last,

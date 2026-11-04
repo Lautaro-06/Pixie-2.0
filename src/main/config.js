@@ -2,7 +2,9 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, writeFileSync, mkdirSync, appendFile, copyFileSync, watchFile } from 'node:fs'
-import { sealSecrets, openSecrets, forgetSecrets } from './secrets.js'
+import { createHash } from 'node:crypto'
+import { hostname, userInfo } from 'node:os'
+import { sealSecrets, openSecrets, forgetSecrets, guardWhatsapp } from './secrets.js'
 
 const DEFAULTS = {
   ciudad: 'Buenos Aires',
@@ -18,8 +20,34 @@ export function setCipher(next) {
   cipher = next
 }
 
+// Esta compu y esta cuenta de Windows (para saber de quién es el WhatsApp guardado)
+let ownerId = null
+export function machineOwner() {
+  if (!ownerId) {
+    let user = ''
+    try {
+      user = userInfo().username
+    } catch {
+      user = process.env.USERNAME ?? process.env.USER ?? ''
+    }
+    ownerId = createHash('sha256').update(`pixie|${hostname()}|${user}|${app.getPath('userData')}`).digest('hex').slice(0, 24)
+  }
+  return ownerId
+}
+
 // Si config.json tiene claves a la vista, las cifra y lo reescribe. Devuelve los datos tal como quedaron.
-function sealOnDisk(data) {
+// Antes, si trae un WhatsApp que no es de esta compu y esta cuenta, lo borra.
+function sealOnDisk(raw) {
+  const guarded = guardWhatsapp(raw, machineOwner())
+  let data = guarded.data
+  if (guarded.removed) {
+    try {
+      writeFileSync(configPath(), JSON.stringify(data, null, 2))
+      logAction('whatsapp: borré un número que no era de esta compu y esta cuenta (o de antes de la 0.16.2). Se pone de nuevo en Ajustes → WhatsApp.')
+    } catch (err) {
+      console.error('No se pudo borrar el WhatsApp viejo de config.json', err)
+    }
+  }
   const { data: sealed, changed } = sealSecrets(data, cipher)
   if (changed) {
     try {
@@ -116,6 +144,8 @@ export function saveConfig(patch) {
     config = { ...config, ...patch } // el archivo está a medio editar: no se toca
     return config
   }
+  // El WhatsApp que guardás queda marcado como de esta compu y esta cuenta
+  if (patch.whatsapp && typeof patch.whatsapp === 'object') patch = { ...patch, whatsapp: { ...patch.whatsapp, dueno: machineOwner() } }
   // Las claves nuevas se cifran; { claveIA: null } la borra (también la cifrada)
   const merged = forgetSecrets({ ...(disk.ok ? disk.data : config), ...patch }, patch)
   const { data: toWrite } = sealSecrets(merged, cipher)

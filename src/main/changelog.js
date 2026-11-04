@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.16.2',
+    nuevo: [],
+    mejoras: [
+      {
+        corto: 'tu número de WhatsApp queda cifrado y solo en tu compu, y nunca se muestra entero',
+        detalle:
+          'Tu número de WhatsApp queda cifrado con tu cuenta de Windows y solo en esta compu: no viaja con Pixie ni con el respaldo, y en Ajustes nunca se muestra entero (solo cómo termina). Si en esta compu había un número de antes, lo borré: si es el tuyo, ponelo de nuevo en Ajustes → WhatsApp (es un minuto). También hay un botón para borrarlo.'
+      }
+    ]
+  },
+  {
     version: '0.16.1',
     nuevo: [],
     mejoras: [
