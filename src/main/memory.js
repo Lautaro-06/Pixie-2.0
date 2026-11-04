@@ -15,7 +15,17 @@ const EMPTY = () => ({
   animo: { valor: 65, ultimoContacto: null },
   salud: {}, // { 'AAAA-MM-DD': { agua, pausas } } y ultimaAgua
   hechos: {}, // cosas que Pixie ya hizo hoy: { resumen: 'AAAA-MM-DD', ... }
-  iniciativa: {} // cómo le fue a cada tipo de aviso: { agua: { ignorados, esperando, at } }
+  iniciativa: {}, // cómo le fue a cada tipo de aviso: { agua: { ignorados, esperando, at } }
+  trabajo: {
+    habilitado: false,
+    trabaja: null,
+    perfilesActivos: [],
+    descripcionLibre: '',
+    proyectos: [],
+    perfilesDescartados: [],
+    buscandoTrabajo: false,
+    deteccion: {}
+  }
 })
 
 const STOPWORDS = new Set([
@@ -170,6 +180,19 @@ export function createMemory(file) {
   return {
     get data() {
       return data
+    },
+
+    getWork() {
+      return structuredClone(data.trabajo ?? EMPTY().trabajo)
+    },
+    setWork(trabajo) {
+      data.trabajo = structuredClone(trabajo ?? EMPTY().trabajo)
+      save()
+      return structuredClone(data.trabajo)
+    },
+    forgetWork() {
+      data.trabajo = EMPTY().trabajo
+      save()
     },
 
     // Nombre
