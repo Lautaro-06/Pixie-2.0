@@ -28,7 +28,7 @@ test('mantiene apagado el modo de trabajo hasta activarlo', () => {
   const work = createWork({ memory })
   assert.equal(work.getState().habilitado, false)
   assert.deepEqual(work.context().perfiles, [])
-  assert.deepEqual(work.listProfiles().map((item) => item.id), ['libre'])
+  assert.deepEqual(work.listProfiles().map((item) => item.id), ['programador', 'cientifico', 'disenador', 'libre'])
   assert.deepEqual(work.context().fuentesNoticias, [])
 })
 
@@ -80,7 +80,7 @@ test('olvidar el modo de trabajo borra su estado', () => {
   const { memory } = fresh()
   const work = createWork({ memory })
   work.setFreeDescription('Diseño')
-  memory.forgetWork()
+  work.clear()
   assert.equal(createWork({ memory }).getState().descripcionLibre, '')
 })
 

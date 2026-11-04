@@ -1,4 +1,4 @@
-import freeProfile from './profiles/libre.js'
+import { WORK_PROFILES } from './profiles/index.js'
 
 const DEFAULT_STATE = {
   habilitado: false,
@@ -38,7 +38,7 @@ function validateProfile(profile) {
   return profile
 }
 
-export function createWork({ memory, profiles = [freeProfile] } = {}) {
+export function createWork({ memory, profiles = WORK_PROFILES } = {}) {
   const registry = new Map()
   for (const rawProfile of profiles) {
     const profile = validateProfile(rawProfile)
@@ -110,6 +110,17 @@ export function createWork({ memory, profiles = [freeProfile] } = {}) {
     },
     setFreeDescription(description) {
       state.descripcionLibre = String(description ?? '').trim().slice(0, 1000)
+      persist()
+      return compose()
+    },
+    updatePreferences(patch = {}) {
+      if (typeof patch.trabaja === 'boolean' || patch.trabaja === null) state.trabaja = patch.trabaja
+      if (typeof patch.buscandoTrabajo === 'boolean') state.buscandoTrabajo = patch.buscandoTrabajo
+      persist()
+      return compose()
+    },
+    clear() {
+      state = normalizeState()
       persist()
       return compose()
     }
