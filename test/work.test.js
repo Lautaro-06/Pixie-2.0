@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createBackup } from '../src/main/backup.js'
 import { needsConfirm, resolveAction, runAction } from '../src/main/actions/index.js'
+import { createBackup } from '../src/main/backup.js'
 import { createMemory } from '../src/main/memory.js'
 import { createWork } from '../src/main/work/index.js'
 
