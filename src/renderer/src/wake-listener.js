@@ -26,11 +26,17 @@ export async function startWakeListener({ templates, learned = [], sensibilidad,
   let paused = false
   let tap = null // escuchar el pedido con este mismo audio
   let ended = false
+  // Para el informe: qué tan fuerte llega el sonido y cuántas frases oyó
+  const stats = { pico: 0, frases: 0, mejor: null }
   const detector = createWakeDetector({
     templates,
     learned,
     sensibilidad,
-    onCandidate,
+    onCandidate: (info) => {
+      stats.frases++
+      if (!stats.mejor || info.distance.total < stats.mejor.total) stats.mejor = { total: info.distance.total, nombre: info.distance.nombre, limite: info.limit.total }
+      onCandidate?.(info)
+    },
     onWake: (info) => {
       if (!paused) onWake(info)
     }
@@ -44,6 +50,7 @@ export async function startWakeListener({ templates, learned = [], sensibilidad,
     lastChunkAt = performance.now()
     let peak = 0
     for (let i = 0; i < data.length; i += 4) peak = Math.max(peak, Math.abs(data[i]))
+    if (!paused) stats.pico = Math.max(stats.pico, peak)
     if (peak > 1e-6) silentSince = null
     else silentSince ??= lastChunkAt
     if (tap) tap(data, ctx.sampleRate)
@@ -57,6 +64,14 @@ export async function startWakeListener({ templates, learned = [], sensibilidad,
       tap = fn
     },
     live: () => !ended && stream.getAudioTracks().some((t) => t.readyState === 'live'),
+    // Lo que oyó desde la última vez que se preguntó (y vuelve a contar)
+    takeStats() {
+      const out = { ...stats, ruido: detector.noise() }
+      stats.pico = 0
+      stats.frases = 0
+      stats.mejor = null
+      return out
+    },
     // ¿Anda? sinAudioMs: hace cuánto no llega nada; silencioMs: hace cuánto llega silencio total (un
     // micrófono de verdad siempre tiene un poquito de ruido)
     health() {

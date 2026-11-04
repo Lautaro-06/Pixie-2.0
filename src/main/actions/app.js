@@ -102,7 +102,9 @@ export const appActions = [
         return { text: 'Actualicé mi extensión de Chrome y hay que recargarla una vez: en chrome://extensions tocá recargar en «Pixie para Chrome». Después pedímelo de nuevo.', face: 'confused' }
       }
       const before = c.status()
-      const reading = Promise.resolve(c.refresh({ force: !before.leido || Date.now() - before.leido > 30 * 60 * 1000 }))
+      // Si de fondo no pudo leerlo, ahora que lo pediste lo abre a la vista un momento
+      const visible = before.estado === 'error' || (!before.leido && before.estado !== 'sin-extension')
+      const reading = Promise.resolve(c.refresh({ force: !before.leido || Date.now() - before.leido > 30 * 60 * 1000, visible }))
       if (before.leido) {
         reading.catch(() => {})
         return classroomReply(c, before, ctx)
@@ -110,7 +112,7 @@ export const appActions = [
       const st = await Promise.race([reading, new Promise((r) => setTimeout(() => r(null), CLASSROOM_WAIT_MS))])
       if (st) return classroomReply(c, st, ctx)
       reading.then((done) => ctx.say?.({ kind: 'classroom', ...classroomReply(c, done, ctx) })).catch(() => {})
-      return { text: 'Estoy leyendo tu Classroom en Chrome (tarda unos segundos). Te cuento apenas termine.', face: 'idle' }
+      return { text: visible ? 'Abro Classroom un momento en Chrome para leerlo y te cuento.' : 'Estoy leyendo tu Classroom en Chrome (tarda unos segundos). Te cuento apenas termine.', face: 'idle' }
     }
   },
   {

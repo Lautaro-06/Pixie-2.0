@@ -141,7 +141,7 @@ async function handle(cmd, args) {
     return run(tab.id, youtubeAction, [args.accion, args.valor ?? null])
   }
   // Tus Pendientes de Classroom (para la agenda de Pixie)
-  if (cmd === 'classroom') return readClassroom()
+  if (cmd === 'classroom') return readClassroom({ visible: Boolean(args.visible) })
   // Pixie trae una versión nueva de la extensión: se recarga sola desde la carpeta
   if (cmd === 'recargar') {
     setTimeout(() => chrome.runtime.reload(), 300)
@@ -171,8 +171,12 @@ async function handle(cmd, args) {
 // Abre tus Pendientes de Classroom en una pestaña de fondo, los lee y la cierra. Usa la sesión
 // que ya tenés en Chrome. Prueba tus cuentas de Google (la primera puede ser la personal, sin clases):
 // se queda con la primera que tenga tareas, o con una que se haya podido leer.
-async function readClassroom() {
-  const tab = await chrome.tabs.create({ url: 'about:blank', active: false })
+// visible: la abre a la vista un momento (Classroom a veces no arma la lista en una pestaña de fondo);
+// solo cuando se lo pedís, y después vuelve a la pestaña donde estabas.
+async function readClassroom({ visible = false } = {}) {
+  const [before] = visible ? await chrome.tabs.query({ active: true, lastFocusedWindow: true }) : []
+  const tab = await chrome.tabs.create({ url: 'about:blank', active: visible })
+  const seen = [] // qué encontró en cada cuenta (para el informe si no anda)
   try {
     let best = null
     let login = false
@@ -182,10 +186,14 @@ async function readClassroom() {
       const where = await run(tab.id, classroomWhere).catch(() => null)
       // Te mandó a iniciar sesión, o esa cuenta no existe (te devolvió a otra): no hay más cuentas
       if (where && where.host !== 'classroom.google.com') {
+        seen.push(`u${u}: ${where.host}`)
         if (u === 0) login = true
         break
       }
-      if (where?.u != null && where.u !== u) break
+      if (where?.u != null && where.u !== u) {
+        seen.push(`u${u}: no existe`)
+        break
+      }
       await sleep(1500) // la lista aparece un rato después de cargar
       await poll(tab.id, expandClassroomSections, [], 3, 400)
       const r = await poll(tab.id, readClassroomTodo, [], 15, 600)
@@ -193,16 +201,34 @@ async function readClassroom() {
         if (u === 0) login = true
         break
       }
-      if (!r) continue // esta no se pudo leer: prueba la siguiente cuenta
+      if (!r) {
+        const peek = await run(tab.id, classroomPeek).catch(() => null)
+        seen.push(peek ? `u${u}: ${peek}` : `u${u}: sin respuesta`)
+        continue // esta no se pudo leer: prueba la siguiente cuenta
+      }
       const found = { ...r, cuenta: u }
       if (r.items.length) return found
+      seen.push(`u${u}: ${r.sinClases ? 'sin clases' : 'sin tareas'}`)
       best ??= found
     }
     if (best) return best
-    throw new Error(login ? 'Entrá a Classroom en Chrome con tu cuenta y probá de nuevo.' : 'No encontré la lista de tareas en Classroom. ¿Se abre bien classroom.google.com en Chrome?')
+    const why = login ? 'Entrá a Classroom en Chrome con tu cuenta y probá de nuevo.' : 'No encontré la lista de tareas en Classroom. ¿Se abre bien classroom.google.com en Chrome?'
+    throw new Error(`${why} [${seen.join('; ')}${visible ? '; a la vista' : ''}]`)
   } finally {
-    chrome.tabs.remove(tab.id).catch(() => {})
+    await chrome.tabs.remove(tab.id).catch(() => {})
+    if (before?.id) chrome.tabs.update(before.id, { active: true }).catch(() => {})
   }
+}
+
+// Qué se ve en la página cuando no encuentra la lista (sin los textos de tus tareas): la dirección,
+// el título y cuántos links y renglones tiene, para saber qué cambió en Classroom
+function classroomPeek() {
+  const links = document.querySelectorAll('a[href]').length
+  const course = [...document.querySelectorAll('a[href]')].filter((a) => /\/c\//.test(a.getAttribute('href') || '')).length
+  const items = document.querySelectorAll('li, [role="listitem"]').length
+  const words = (document.body?.innerText || '').split(/\s+/).filter(Boolean).length
+  const hidden = document.visibilityState
+  return `${location.pathname.replace(/\/c\/[^/]+/g, '/c/…')} «${(document.title || '').slice(0, 40)}» ${links} links (${course} de clases), ${items} renglones, ${words} palabras, ${hidden}`
 }
 
 // En qué página quedó (para saber si te mandó a iniciar sesión o a otra cuenta)

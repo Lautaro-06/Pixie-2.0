@@ -1087,9 +1087,10 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:copiar-informe', () => ctx.copyDiagnostics())
     handle('ajustes:abrir-carpeta', () => shell.openPath(app.getPath('userData')))
     handle('ajustes:probar-voz', () => sendEvent({ type: 'prueba-voz', text: '¡Hola! Así sueno. ¿Te gusta mi voz?' }))
-    handle('ajustes:palabra-guardar', (plantillas) => {
-      const r = settings.saveWake(plantillas)
-      if (r.ok) logAction('palabra mágica: grabaste tu voz')
+    handle('ajustes:palabra-guardar', (plantillas, extra) => {
+      const micro = typeof extra?.micro === 'string' ? extra.micro.slice(0, 120) : null
+      const r = settings.saveWake(plantillas, micro)
+      if (r.ok) logAction(`palabra mágica: grabaste tu voz${micro ? ` con ${micro}` : ''}`)
       return r
     })
     handle('ajustes:palabra-borrar', () => settings.forgetWake())

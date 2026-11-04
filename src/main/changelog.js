@@ -6,6 +6,26 @@
 
 export const CHANGELOG = [
   {
+    version: '0.16.3',
+    nuevo: [],
+    mejoras: [
+      {
+        corto: '«Pixie, ¿estás?» te escucha aunque tu micrófono llegue bajito',
+        detalle:
+          '«Pixie, ¿estás?» te escucha aunque tu micrófono llegue bajito (por ejemplo, el de unos auriculares): antes descartaba la frase sin compararla. Y si grabaste tu voz con otro micrófono, te aviso para que la grabes de nuevo con el que usás ahora.'
+      },
+      {
+        corto: 'si la IA tarda, le pregunto también al otro modelo',
+        detalle: 'Si la IA tarda más de 5 segundos (pasa cuando Google tiene mucha demanda), le pregunto también al otro modelo y me quedo con la primera respuesta.'
+      },
+      {
+        corto: 'si Classroom no se deja leer de fondo, lo abro un momento',
+        detalle: 'Si Classroom no se deja leer de fondo, cuando me lo pedís lo abro un momento en Chrome, lo leo y vuelvo a donde estabas. Mi extensión se actualiza sola, y si no la puedo leer, el informe dice qué vi en la página.'
+      },
+      { corto: 'entiendo «pasame el informe» y «qué tiene tu última versión»', detalle: 'Entiendo «pasame el informe» y «¿qué tiene tu última versión?» al instante, sin pasar por la IA.' }
+    ]
+  },
+  {
     version: '0.16.2',
     nuevo: [],
     mejoras: [

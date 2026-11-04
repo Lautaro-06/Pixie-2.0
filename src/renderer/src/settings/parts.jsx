@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { renderFace, WIDTH, HEIGHT } from '../face/draw.js'
 import { renderStandby } from '../face/standby.js'
-import { listen } from '../audio.js'
+import { listen, microphoneLabel } from '../audio.js'
 import { learnSample, compare } from '../wake.js'
 import { startWakeListener, HandsFreeError } from '../wake-listener.js'
 
@@ -393,7 +393,12 @@ export function WakeTrainer({ palabra, change, setS, compact = false }) {
       setTakes([])
       return setMessage({ kind: 'error', text: 'Una de las tres salió muy distinta (¿un ruido?). Grabemos las tres de nuevo, como me llamarías siempre.' })
     }
-    const res = await api.settings.saveWake(next.map((t) => t.map((f) => Array.from(f))))
+    // Con qué micrófono grabaste: si después escucha con otro, te avisa que conviene grabarla de nuevo
+    const micro = await microphoneLabel()
+    const res = await api.settings.saveWake(
+      next.map((t) => t.map((f) => Array.from(f))),
+      { micro }
+    )
     setTakes([])
     setMessage({ kind: res.ok ? 'ok' : 'error', text: res.mensaje })
     if (res.ok) {

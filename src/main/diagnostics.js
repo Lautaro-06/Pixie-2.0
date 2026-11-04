@@ -19,7 +19,7 @@ export function redact(text) {
 // Lo último del historial que sirve para entender un problema: «Pixie, ¿estás?» (si te escuchó, a qué
 // distancia, si se cerró el micrófono), lo que tardó en contestar, la IA, Classroom y la extensión.
 // No lleva lo que le pediste guardar ni los WhatsApp.
-const USEFUL = /palabra m[aá]gica|tard[eé]|\bIA\b|IA \(|classroom|extensi[oó]n de chrome|\bvoz:|micr[oó]fono/i
+const USEFUL = /palabra m[aá]gica|tard[eé]|\bIA\b|IA \(|classroom|mails?:|extensi[oó]n de chrome|\bvoz:|micr[oó]fono/i
 export function usefulLogLines(text, max = 40) {
   return String(text ?? '')
     .split('\n')

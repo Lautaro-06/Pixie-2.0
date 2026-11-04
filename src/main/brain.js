@@ -253,11 +253,12 @@ const RULES = [
   (t) => (/\b(que version (tenes|sos|es|estas usando|usas)|en que version estas|tu version|version de pixie)\b/.test(t) ? intent('version') : null),
   // "¿qué hay de nuevo?", "¿qué cambió en la actualización?", "novedades"
   (t) =>
-    /^(que hay de nuevo|que tenes de nuevo|que (trae|tiene) de nuevo( la (version|actualizacion))?|novedades|(contame |decime )?(las )?novedades( de la (version|actualizacion))?|que (cambio|cambiaste|mejoraste|hay nuevo)( en la (ultima )?(version|actualizacion))?|que (trajo|trae) la (ultima )?(version|actualizacion)|que (cosas )?nuevas (sabes hacer|haces|tenes))$/.test(t)
+    /^(que hay de nuevo|que tenes de nuevo|que (trae|tiene) de nuevo( la (version|actualizacion))?|novedades|(contame |decime )?(las )?novedades( de la (version|actualizacion))?|que (cambio|cambiaste|mejoraste|hay nuevo)( en la (ultima )?(version|actualizacion))?|que (trajo|trae|tiene) (la|tu) (ultima )?(version|actualizacion)( nueva)?|que (cosas )?nuevas (sabes hacer|haces|tenes))$/.test(t) ||
+    /\b(que (trae|tiene|hay en|cambio en|trajo) (la|tu|esta) (ultima |nueva )?(version|actualizacion)( nueva)?)\b/.test(t)
       ? intent('novedades')
       : null,
   (t) =>
-    /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|dame|mandame|copiame) el diagnostico)\b/.test(t)
+    /^(el |un )?(informe de )?diagnostico$|\b(informe de diagnostico|reporte de errores|informe de errores|copia(me)? el informe|(pasame|pasa|dame|mandame|manda|copiame|genera|generame|arma|armame|hace|haceme) (el |un )?(informe|diagnostico|reporte))\b/.test(t)
       ? intent('diagnostico')
       : null,
   // Cerrarla del todo ("pixie" se borra al normalizar: "cerrá Pixie" llega como "cerra")

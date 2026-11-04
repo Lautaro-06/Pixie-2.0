@@ -117,6 +117,18 @@ async function microphoneId() {
   }
 }
 
+// El nombre del micrófono que se va a usar (para saber con cuál grabaste tu voz)
+export async function microphoneLabel() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const id = pickMicrophone(devices)
+    const mic = devices.find((d) => d.kind === 'audioinput' && (id ? d.deviceId === id : d.deviceId === 'default')) ?? devices.find((d) => d.kind === 'audioinput')
+    return mic?.label || null
+  } catch {
+    return null
+  }
+}
+
 // El mismo micrófono y el mismo filtrado para grabar tu voz y para escucharte después
 export async function openMicrophone() {
   const deviceId = await microphoneId()

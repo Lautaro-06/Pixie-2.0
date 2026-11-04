@@ -39,6 +39,19 @@ function savePref(key, on) {
   }
 }
 
+// ¿Es el mismo micrófono? Windows le agrega «Predeterminado -» o «Comunicaciones -» adelante y el código
+// del aparato atrás. null: no se sabe
+function sameMic(a, b) {
+  const norm = (x) =>
+    String(x ?? '')
+      .toLowerCase()
+      .replace(/^(default|predeterminado|communications|comunicaciones)\s*-\s*/, '')
+      .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/, '')
+      .trim()
+  if (!norm(a) || !norm(b)) return null
+  return norm(a) === norm(b)
+}
+
 export default function App() {
   const [expanded, setExpanded] = useState(false)
   const [reply, setReply] = useState(null) // { text, confirm, suggestions }
@@ -89,6 +102,9 @@ export default function App() {
   const wakeRef = useRef(null) // el que escucha la palabra mágica
   const wakePaused = useRef(false) // mientras la probás en Ajustes
   const lastMic = useRef(null) // con qué micrófono escucha (para el historial)
+  const wakeMic = useRef(null) // con qué micrófono grabaste tu voz
+  const micWarned = useRef(null) // ya avisó que grabaste con otro micrófono
+  const farLogAt = useRef(0)
   const silentRestarts = useRef(0) // veces seguidas que lo reabrió porque estaba mudo
   const away = useRef(false)
   const voiceSession = useRef(null) // charla que empezó con «Pixie, ¿estás?»: { turns }
@@ -361,6 +377,7 @@ export default function App() {
   const wakeTemplates = wakeCfg?.activa ? wakeCfg.plantillas : null
   const wakeLearned = wakeCfg?.aprendidas
   const wakeSensitivity = wakeCfg?.sensibilidad ?? 'normal'
+  wakeMic.current = wakeCfg?.micro ?? null
   useEffect(() => {
     if (isPreview || !wakeTemplates) return
     let stopped = false
@@ -382,8 +399,13 @@ export default function App() {
       templates: wakeTemplates,
       learned: wakeLearned ?? [],
       sensibilidad: wakeSensitivity,
-      onCandidate: ({ distance, limit, almost }) => {
+      onCandidate: ({ distance, limit, almost, match }) => {
         if (almost) api.wakeLog?.(`casi te escuché (distancia ${distance.total.toFixed(3)} de ${limit.total.toFixed(3)}); si lo repetís, me despierto`)
+        // Algo parecido pero no tanto: queda anotado (como mucho cada 20 s) para entender por qué no te reconoce
+        else if (!match && distance.total < limit.total * 2.2 && Date.now() - farLogAt.current > 20000) {
+          farLogAt.current = Date.now()
+          api.wakeLog?.(`oí algo parecido pero no te reconocí (distancia ${distance.total.toFixed(3)}, nombre ${distance.nombre.toFixed(3)}; necesito menos de ${limit.total.toFixed(3)} y ${limit.nombre.toFixed(3)})`)
+        }
       },
       onWake: (info) => onWakeRef.current(info),
       onLost: () => !stopped && setTimeout(() => setWakeRestart((n) => n + 1), 3000)
@@ -398,8 +420,28 @@ export default function App() {
           lastMic.current = first.micro
           api.wakeLog?.(`escucho «Pixie, ¿estás?» con ${first.micro}`)
         }
+        // Si grabaste tu voz con otro micrófono, la huella no se parece: avisa una vez por micrófono
+        const recorded = wakeMic.current
+        if (recorded && sameMic(recorded, first.micro) === false && micWarned.current !== first.micro) {
+          micWarned.current = first.micro
+          api.wakeLog?.(`grabaste tu voz con ${recorded} y ahora escucho con ${first.micro}: si no te reconozco, hay que grabarla de nuevo`)
+          setNotice({ text: 'Grabaste «Pixie, ¿estás?» con otro micrófono. Si no te escucho, grabá tu voz de nuevo con este en Ajustes → Voz y escucha (son tres veces).' })
+        } else if (!recorded && !micWarned.current) {
+          micWarned.current = 'sin-dato'
+          api.wakeLog?.('no sé con qué micrófono grabaste tu voz (se grabó antes de la 0.16.3)')
+        }
         const started = performance.now()
+        let statsAt = started
         watchdog = setInterval(() => {
+          // Cada 15 minutos, lo que oyó (para el informe): cuántas frases, la más parecida y el volumen
+          if (performance.now() - statsAt > 15 * 60 * 1000) {
+            statsAt = performance.now()
+            const st = l.takeStats?.()
+            if (st?.frases) {
+              const best = st.mejor && Number.isFinite(st.mejor.total) ? `${st.mejor.total.toFixed(3)} (te reconozco con menos de ${st.mejor.limite.toFixed(3)})` : 'ninguna (duraban muy distinto)'
+              api.wakeLog?.(`en 15 min oí ${st.frases} ${st.frases === 1 ? 'frase' : 'frases'}; la más parecida a tu voz: ${best}; volumen máximo ${st.pico.toFixed(3)}`)
+            } else if (st && st.pico > 0 && st.pico < 0.02) api.wakeLog?.(`en 15 min no oí ninguna frase: el micrófono llega muy bajito (máximo ${st.pico.toFixed(3)})`)
+          }
           if (listeningRef.current) return // te está escuchando con este mismo audio
           const h = l.health()
           // Llega sonido de verdad: el micrófono anda

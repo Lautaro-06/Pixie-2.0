@@ -115,3 +115,37 @@ test('el informe trae lo último de «Pixie, ¿estás?», lo que tardó, la IA y
   const report = createDiagnostics().report(['Versión: 0.16.1'], lines)
   assert.match(report, /Lo último del historial \(5 renglones\):/)
 })
+
+test('si Gemini tarda, le pregunta también al otro modelo y se queda con la primera respuesta', async () => {
+  const calls = []
+  let aborted = false
+  const fetchImpl = (_url, init) => {
+    const body = JSON.parse(init.body)
+    calls.push(body.model)
+    const ok = (text) => ({ ok: true, json: async () => ({ choices: [{ message: { content: text }, finish_reason: 'stop' }] }) })
+    if (body.model === 'gemini-flash-lite-latest') {
+      // El primero está trabado: tarda mucho (y se corta cuando contesta el otro)
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => resolve(ok('tarde')), 2000)
+        init.signal.addEventListener('abort', () => {
+          aborted = true
+          clearTimeout(t)
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        })
+      })
+    }
+    return Promise.resolve(ok('rápido'))
+  }
+  const d = createCompatibleDriver({ preset: PROVIDERS.gemini, apiKey: 'x', model: PROVIDERS.gemini.model, system: 's', fetchImpl, hedgeMs: 50, wait: async () => {} })
+  const started = Date.now()
+  const r = await d.step([d.user('hola')], { tools: false })
+  assert.equal(r.text, 'rápido')
+  assert.ok(Date.now() - started < 1000, 'no esperó al lento')
+  assert.deepEqual(calls, ['gemini-flash-lite-latest', 'gemini-flash-latest'])
+  await new Promise((r) => setTimeout(r, 10))
+  assert.equal(aborted, true, 'el pedido lento se corta')
+  // Si contesta a tiempo, no le pregunta al otro
+  const quick = gemini([{ text: 'Hola' }])
+  assert.equal((await ask(quick.d)).text, 'Hola')
+  assert.equal(quick.calls.length, 1)
+})

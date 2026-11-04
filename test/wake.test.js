@@ -130,3 +130,39 @@ test('aprende de las veces que la llamaste de verdad (las últimas 6)', () => {
   store.save(plain)
   assert.equal(store.learnedCount(), 0, 'si grabás tu voz de nuevo, empieza de cero')
 })
+
+test('con un micrófono que llega bajito (auriculares, lejos) igual te reconoce', () => {
+  const quiet = (samples, rms) => {
+    let sum = 0
+    for (const s of samples) sum += s * s
+    const k = rms / Math.sqrt(sum / samples.length)
+    return samples.map((s) => s * k)
+  }
+  const wakes = []
+  const candidates = []
+  const det = createWakeDetector({ templates, sensibilidad: 'alta', onWake: (info) => wakes.push(info), onCandidate: (c) => candidates.push(c) })
+  const calm = (seconds) => Float32Array.from({ length: Math.round(seconds * RATE) }, () => (Math.random() * 2 - 1) * 0.0006)
+  // Antes, con la voz tan bajita, ni siquiera la comparaba (no quedaba ni un «casi» en el historial)
+  // Si la primera vez queda «casi», al repetirla se despierta (como cuando no te contesta y la volvés a llamar)
+  const call = quiet(trimSilence(wav('si2')), 0.005)
+  const audio = join_(calm(10), call, calm(1.5), call, calm(1))
+  for (let i = 0; i < audio.length; i += 4096) det.push(audio.subarray(i, i + 4096))
+  assert.equal(candidates.length, 2, 'la compara las dos veces')
+  assert.ok(candidates[0].match || candidates[0].almost, `queda cerca (${candidates[0].distance.total.toFixed(3)} de ${candidates[0].limit.total.toFixed(3)})`)
+  assert.equal(wakes.length, 1)
+})
+
+test('se acuerda con qué micrófono grabaste tu voz', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pixie-voz-'))
+  const file = join(dir, 'palabra-magica.json')
+  let cfg = {}
+  const store = createWakeStore({ file, getConfig: () => cfg, saveConfig: (p) => (cfg = { ...cfg, ...p }) })
+  const plain = templates.map((t) => t.map((f) => Array.from(f)))
+  store.save(plain, { micro: 'Predeterminado - Micrófono (Logi USB Headset) (046d:0a65)' })
+  assert.equal(store.forWindow().micro, 'Predeterminado - Micrófono (Logi USB Headset) (046d:0a65)')
+  store.learn(plain[0])
+  const again = createWakeStore({ file, getConfig: () => cfg, saveConfig: () => {} })
+  assert.equal(again.forWindow().micro, 'Predeterminado - Micrófono (Logi USB Headset) (046d:0a65)', 'queda guardado (también después de aprender)')
+  store.save(plain)
+  assert.equal(store.forWindow().micro, null, 'sin dato: no se sabe')
+})

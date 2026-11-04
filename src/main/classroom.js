@@ -118,12 +118,14 @@ export function createClassroom({ browser, file, getConfig = () => ({}), log = (
     }
   }
 
-  // Lee los Pendientes con la extensión. force: aunque lo haya leído hace poco (igual espera 5 minutos)
-  async function refresh({ force = false } = {}) {
+  // Lee los Pendientes con la extensión. force: aunque lo haya leído hace poco (igual espera 5 minutos).
+  // visible: se lo pediste y de fondo no anduvo: la extensión abre Classroom a la vista un momento
+  // (en ese caso puede volver a probar a los 30 segundos)
+  async function refresh({ force = false, visible = false } = {}) {
     if (reading) return reading
     const t = now().getTime()
     if (!force && saved.leido && t - saved.leido < EVERY_MS - MIN) return status()
-    if (t - lastTry < MIN_GAP_MS) return status()
+    if (t - lastTry < (visible ? 30 * 1000 : MIN_GAP_MS)) return status()
     if (!browser?.connected() && force) await browser?.ensure?.()
     if (!browser?.connected()) {
       state = 'sin-extension'
@@ -133,7 +135,7 @@ export function createClassroom({ browser, file, getConfig = () => ({}), log = (
     state = 'leyendo'
     reading = (async () => {
       try {
-        const raw = await browser.request('classroom', {}, 2 * 60 * 1000)
+        const raw = await browser.request('classroom', visible ? { visible: true } : {}, 2 * 60 * 1000)
         const tareas = parseTodo(raw, now())
         saved = { tareas, leido: now().getTime() }
         writeFileSync(file, JSON.stringify({ version: 1, ...saved, crudo: raw?.items?.slice(0, 60) ?? [] }, null, 2))
@@ -142,8 +144,10 @@ export function createClassroom({ browser, file, getConfig = () => ({}), log = (
         log(`classroom: leí ${tareas.length} ${tareas.length === 1 ? 'tarea pendiente' : 'tareas pendientes'}`)
       } catch (err) {
         state = /desconocido/i.test(err.message) ? 'extension-vieja' : 'error'
-        error = err.message
-        log(`classroom: ${err.message}`)
+        // Lo que vio en cada cuenta viene entre corchetes: va al historial (para el informe), no al mensaje
+        const detail = /\s*\[([^\]]*)\]\s*$/.exec(err.message)
+        error = detail ? err.message.slice(0, detail.index) : err.message
+        log(`classroom: ${error}${detail ? ` (${detail[1]})` : ''}${visible ? ' [a la vista]' : ''}`)
       } finally {
         reading = null
         startAlerts()

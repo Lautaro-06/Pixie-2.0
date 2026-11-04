@@ -26,11 +26,13 @@ export function createWakeStore({ file, getConfig, saveConfig, onChange = () => 
   let stamp = null // cuándo se grabó: la ventanita la usa para saber si cambió la voz
   let learned = [] // las veces que la llamaste de verdad (las últimas 6)
   let learnedCount = 0
+  let micro = null // con qué micrófono grabaste (si después escucha con otro, conviene grabar de nuevo)
   try {
     const data = JSON.parse(readFileSync(file, 'utf8'))
     if (validTemplates(data.plantillas)) {
       templates = data.plantillas
       stamp = String(data.creada ?? 'grabada')
+      micro = typeof data.micro === 'string' ? data.micro : null
       learned = (data.aprendidas ?? []).filter(validTemplate).slice(-MAX_LEARNED)
     }
   } catch {
@@ -50,24 +52,25 @@ export function createWakeStore({ file, getConfig, saveConfig, onChange = () => 
     // Lo que necesita la ventanita para escuchar
     forWindow: () => {
       const s = status()
-      return { ...s, plantillas: s.activa ? templates : null, aprendidas: s.activa ? learned : [], huella: `${stamp}#${learnedCount}` }
+      return { ...s, plantillas: s.activa ? templates : null, aprendidas: s.activa ? learned : [], huella: `${stamp}#${learnedCount}`, micro }
     },
     // Te despertó y entendió lo que le pediste: esa forma de decirlo se suma a tus grabaciones
     learn(frames) {
       if (!templates || !validTemplate(frames)) return false
       learned = [...learned, ...round([frames])].slice(-MAX_LEARNED)
       learnedCount++
-      writeFileSync(file, JSON.stringify({ version: 1, creada: stamp, plantillas: templates, aprendidas: learned }))
+      writeFileSync(file, JSON.stringify({ version: 1, creada: stamp, micro, plantillas: templates, aprendidas: learned }))
       onChange()
       return true
     },
     learnedCount: () => learned.length,
-    save(list) {
+    save(list, { micro: mic = null } = {}) {
       if (!validTemplates(list)) throw new Error('Las grabaciones no llegaron bien.')
       templates = round(list)
       learned = []
       stamp = new Date().toISOString()
-      writeFileSync(file, JSON.stringify({ version: 1, creada: stamp, plantillas: templates }))
+      micro = typeof mic === 'string' && mic.trim() ? mic.trim().slice(0, 120) : null
+      writeFileSync(file, JSON.stringify({ version: 1, creada: stamp, micro, plantillas: templates }))
       saveConfig({ palabraMagica: true })
       onChange()
       return status()
@@ -76,6 +79,7 @@ export function createWakeStore({ file, getConfig, saveConfig, onChange = () => 
       templates = null
       learned = []
       stamp = null
+      micro = null
       rmSync(file, { force: true })
       onChange()
       return status()

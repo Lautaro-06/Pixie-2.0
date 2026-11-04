@@ -17,6 +17,7 @@ const VOICE_MODEL = 'gemini-flash-latest'
 const VOICE_TIMEOUT_MS = 15000 // pasar unas palabras a texto tarda segundos
 const VOICE_HEDGE_MS = 3000 // si el modelo de voz no contestó en 3 s, le pregunta también al de siempre (gana el primero)
 const VOICE_PAUSE_MS = 15 * 60 * 1000 // si el modelo de voz falla o tarda seguido, un rato usa directo el de siempre
+const CHAT_HEDGE_MS = 5000 // si la IA no contestó en 5 s, le pregunta también al otro modelo
 const SLOW_MS = 3000 // más que esto queda anotado en el historial, para saber dónde se va el tiempo
 
 // Herramientas que hacen algo y cuya respuesta ya es la respuesta final ("Pongo música", "Abrí Spotify").
@@ -188,7 +189,8 @@ export function createAI({
   function driverFor(p) {
     if (p.name === 'claude') return createClaudeDriver({ getClient: () => getClient(p.apiKey), model: p.model, effort: getConfig().esfuerzoIA || 'low' })
     const thinking = p.name === 'gemini' ? thinkingFor(p.model) : null
-    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl, thinking })
+    // Si el modelo tarda (pasa cuando Google está con mucha demanda), le pregunta también al otro: gana el primero
+    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl, thinking, hedgeMs: CHAT_HEDGE_MS })
   }
 
   // Ejecuta una herramienta pedida por la IA. Devuelve { content, game?, confirm?, isError? }

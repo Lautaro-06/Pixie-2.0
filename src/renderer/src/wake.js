@@ -185,8 +185,9 @@ export function trimSilence(samples, { floor = 0.01 } = {}) {
 }
 
 // Revisa una grabación para "aprender" la frase. Devuelve { ok, frames, problema }
+// (el mínimo es bajito: hay micrófonos de auriculares que llegan muy despacio)
 export function learnSample(samples) {
-  const voice = trimSilence(samples)
+  const voice = trimSilence(samples, { floor: 0.004 })
   const seconds = voice.length / RATE
   if (seconds < 0.3) return { ok: false, problema: 'No te escuché. Acercate al micrófono y decilo un poco más fuerte.' }
   if (seconds > 3.2) return { ok: false, problema: 'Fue muy largo. Decí solo «Pixie, ¿estás?» y quedate callado después.' }
@@ -242,8 +243,9 @@ export function createSegmenter({ onSegment, minMs = 300, maxMs = 3200, silenceM
     let sum = 0
     for (const s of block) sum += s * s
     const rms = Math.sqrt(sum / block.length)
-    // Para empezar hace falta sobresalir bien del ruido; ya hablando, alcanza con menos (sílabas suaves)
-    const speech = current ? rms > Math.max(0.004, noise * 1.8) : rms > Math.max(0.006, noise * 3)
+    // Para empezar hace falta sobresalir bien del ruido; ya hablando, alcanza con menos (sílabas suaves).
+    // El mínimo es bajo: hay micrófonos (auriculares USB, uno lejos) que llegan muy despacio
+    const speech = current ? rms > Math.max(0.0015, noise * 1.8) : rms > Math.max(0.0025, noise * 3)
     // El ruido de fondo se mide solo cuando no hay voz
     if (!speech) noise = noise * 0.995 + rms * 0.005
     if (!current) {
@@ -323,7 +325,9 @@ export function createWakeDetector({ templates, learned = [], sensibilidad = 'no
   let lastNear = 0
   const segmenter = createSegmenter({
     onSegment: (samples) => {
-      const voice = trimSilence(samples)
+      // El segmentador ya decidió que es voz (comparándola con el ruido): acá solo se recorta el borde,
+      // sin un mínimo fijo de volumen (si no, con un micrófono bajito se descartaba todo sin comparar)
+      const voice = trimSilence(samples, { floor: 0.001 })
       if (voice.length < 0.3 * RATE) return
       const frames = features(voice)
       const distance = distanceTo(all, frames)
@@ -338,5 +342,5 @@ export function createWakeDetector({ templates, learned = [], sensibilidad = 'no
       } else if (almost) lastNear = t
     }
   })
-  return { push: segmenter.push, reset: segmenter.reset, limit }
+  return { push: segmenter.push, reset: segmenter.reset, noise: segmenter.noise, limit }
 }

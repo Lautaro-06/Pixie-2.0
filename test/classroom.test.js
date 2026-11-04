@@ -139,16 +139,18 @@ test('Classroom: el error no se repite, la extensión vieja se avisa y lo de con
 test('Classroom la primera vez: si tarda, contesta enseguida y avisa cuando termina', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   let finish
+  let asked = null
   const said = []
   const classroom = {
     status: () => ({ estado: 'sin-leer', leido: null }),
-    refresh: () => new Promise((r) => (finish = r)),
+    refresh: (opts) => ((asked = opts), new Promise((r) => (finish = r))),
     tasks: () => [{ titulo: 'TP 3', materia: 'Química', cuando: null }]
   }
   const pending = runAction('classroom', {}, { log: () => {}, classroom, say: (n) => said.push(n) })
   t.mock.timers.tick(8000)
   const r = await pending
-  assert.match(r.text, /Estoy leyendo tu Classroom/)
+  assert.match(r.text, /Abro Classroom un momento en Chrome/)
+  assert.equal(asked.visible, true, 'lo pediste vos y nunca lo pudo leer: lo abre a la vista')
   finish({ estado: 'ok', leido: Date.now() })
   await new Promise((r) => setImmediate(r))
   assert.equal(said.length, 1)
@@ -169,8 +171,10 @@ test('la extensión viaja con Pixie y se copia cuando cambia de versión', () =>
   installExtensionFiles({ from, to })
   assert.equal(readFileSync(join(to, 'background.js'), 'utf8'), '// v1', 'misma versión: no la toca')
   writeFileSync(join(from, 'manifest.json'), JSON.stringify({ version: '0.10.0' }))
+  writeFileSync(join(to, 'viejo.js'), '// ya no viene')
   assert.equal(installExtensionFiles({ from, to }).actualizada, true)
   assert.equal(readFileSync(join(to, 'background.js'), 'utf8'), '// v2')
+  assert.equal(existsSync(join(to, 'viejo.js')), false, 'lo que ya no viene se borra')
   assert.equal(installExtensionFiles({ from: join(base, 'no-existe'), to }).ok, false)
   assert.ok(existsSync(to))
   assert.equal(olderThan('0.6.0', '0.9.1'), true)

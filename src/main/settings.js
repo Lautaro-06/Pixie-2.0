@@ -241,9 +241,9 @@ export function createSettings({
   }
 
   // «Pixie, ¿estás?»: guarda o borra la huella de tu voz
-  function saveWake(plantillas) {
+  function saveWake(plantillas, micro = null) {
     try {
-      wake.save(plantillas)
+      wake.save(plantillas, { micro })
       return { ok: true, mensaje: '¡Listo! Ahora llamame diciendo «Pixie, ¿estás?».', ...snapshot() }
     } catch (err) {
       return { ok: false, mensaje: err.message, ...snapshot() }

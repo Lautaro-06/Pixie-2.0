@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld('pixie', {
     openFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta'),
     testVoice: () => ipcRenderer.invoke('ajustes:probar-voz'),
     finishWelcome: () => ipcRenderer.invoke('ajustes:bienvenida-lista'),
-    saveWake: (plantillas) => ipcRenderer.invoke('ajustes:palabra-guardar', plantillas),
+    saveWake: (plantillas, extra) => ipcRenderer.invoke('ajustes:palabra-guardar', plantillas, extra),
     forgetWake: () => ipcRenderer.invoke('ajustes:palabra-borrar'),
     testingWake: (on) => ipcRenderer.invoke('ajustes:palabra-probando', Boolean(on)),
     wakeTemplates: () => ipcRenderer.invoke('ajustes:palabra-plantillas'),
