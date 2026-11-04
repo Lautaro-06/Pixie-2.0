@@ -7,6 +7,7 @@ import { Card, Row, Toggle, TextSetting, ShortcutPicker, StandbyPicker, KeyWizar
 const NAV = [
   [null, [['inicio', 'Inicio']]],
   ['Pixie', [['general', 'Vos y Pixie'], ['voz', 'Voz y escucha'], ['ia', 'Inteligencia artificial'], ['memoria', 'Memoria y privacidad']]],
+  ['Trabajo', [['trabajo', 'Modo Trabajo']]],
   ['Estudio', [['pomodoro', 'Pomodoro'], ['estudio', 'Mi estudio']]],
   ['Conexiones', [['whatsapp', 'WhatsApp'], ['agenda', 'Agenda y Gmail'], ['noticias', 'Noticias'], ['apps', 'Apps y mapas']]],
   ['Sistema', [['actualizaciones', 'Actualizaciones y ayuda']]]
@@ -75,6 +76,7 @@ export default function Settings({ section: initial = 'inicio' }) {
         {section === 'inicio' && <Home s={s} go={setSection} />}
         {section === 'general' && <General s={s} change={change} />}
         {section === 'memoria' && <MemorySection s={s} setS={setS} say={say} />}
+        {section === 'trabajo' && <WorkSection s={s} setS={setS} change={change} say={say} />}
         {section === 'whatsapp' && <WhatsAppSection s={s} setS={setS} change={change} say={say} />}
         {section === 'agenda' && <AgendaSection s={s} setS={setS} change={change} say={say} />}
         {section === 'pomodoro' && <PomodoroSection s={s} setS={setS} change={change} say={say} />}
@@ -175,6 +177,90 @@ function Home({ s, go }) {
             <li key={x}>{x}</li>
           ))}
         </ul>
+      </Card>
+    </>
+  )
+}
+
+function WorkSection({ s, setS, change, say }) {
+  const work = s.trabajo
+  const [projectName, setProjectName] = useState('')
+  const [projectFolder, setProjectFolder] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
+  const update = (patch) => change({ trabajo: patch })
+  const updateProfiles = (id, checked) => {
+    const active = new Set(work.perfilesActivos)
+    if (checked) active.add(id)
+    else active.delete(id)
+    const perfilesActivos = [...active]
+    update({ perfilesActivos, habilitado: perfilesActivos.length ? true : work.habilitado })
+  }
+  const addProject = () => {
+    const nombre = projectName.trim()
+    const carpeta = projectFolder.trim()
+    if (!nombre || !carpeta) return say('Poné el nombre y la ruta de la carpeta del proyecto.')
+    update({ proyectos: [...work.proyectos, { nombre, carpeta }] })
+    setProjectName('')
+    setProjectFolder('')
+  }
+  const clear = async () => {
+    const result = await api.settings.clearWork()
+    setS(result)
+    setConfirmClear(false)
+    if (result?.mensaje) say(result.mensaje)
+  }
+  return (
+    <>
+      <Header title="Modo Trabajo" text="Elegí cómo querés que Pixie te acompañe en tu trabajo. Podés cambiarlo o apagarlo cuando quieras." />
+      <Card title="Perfiles">
+        <Row label="Modo Trabajo" hint="Combina las instrucciones y herramientas de los perfiles activos.">
+          <Toggle label="Modo Trabajo" on={work.habilitado} onChange={(habilitado) => update({ habilitado })} />
+        </Row>
+        <div className="work-profiles">
+          {work.perfiles.map((profile) => (
+            <label className="work-profile" key={profile.id}>
+              <input type="checkbox" checked={profile.activo} onChange={(event) => updateProfiles(profile.id, event.target.checked)} />
+              <span>
+                <strong>{profile.nombre}</strong>
+                <span>{profile.descripcion}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {work.perfilesActivos.includes('libre') && (
+          <div className="work-description">
+            <label htmlFor="work-description">¿En qué consiste tu trabajo?</label>
+            <TextSetting id="work-description" value={work.descripcionLibre} placeholder="Contame a qué te dedicás" onSave={(descripcionLibre) => update({ descripcionLibre })} />
+          </div>
+        )}
+        <Row label="Estoy buscando trabajo" hint="Se guarda como preferencia; todavía no activa recomendaciones de empleo.">
+          <Toggle label="Estoy buscando trabajo" on={work.buscandoTrabajo} onChange={(buscandoTrabajo) => update({ buscandoTrabajo })} />
+        </Row>
+      </Card>
+      <Card title="Proyectos conocidos" note="Se guarda el nombre y la ruta. Pixie solo leerá documentación cuando conectes un proyecto en el perfil Programador.">
+        {work.proyectos.length ? (
+          <ul className="work-projects">
+            {work.proyectos.map((project) => (
+              <li key={project.carpeta}>
+                <span><strong>{project.nombre}</strong><small>{project.carpeta}</small></span>
+                <button type="button" className="button secondary" onClick={() => update({ proyectos: work.proyectos.filter((item) => item.carpeta !== project.carpeta) })}>Quitar</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="hint">Todavía no agregaste proyectos.</p>}
+        <div className="work-project-form">
+          <TextSetting id="work-project-name" value={projectName} placeholder="Nombre del proyecto" onSave={setProjectName} />
+          <TextSetting id="work-project-folder" value={projectFolder} placeholder="Ruta de la carpeta" onSave={setProjectFolder} />
+          <button type="button" className="button secondary" onClick={addProject}>Agregar proyecto</button>
+        </div>
+      </Card>
+      <Card title="Datos del Modo Trabajo" note="Borra los perfiles elegidos, la descripción, los proyectos y las preferencias de detección. No se puede deshacer.">
+        {confirmClear ? (
+          <div className="buttons">
+            <button type="button" className="button danger" onClick={clear}>Sí, borrar los datos</button>
+            <button type="button" className="button secondary" onClick={() => setConfirmClear(false)}>Cancelar</button>
+          </div>
+        ) : <button type="button" className="button secondary" onClick={() => setConfirmClear(true)}>Borrar datos del Modo Trabajo</button>}
       </Card>
     </>
   )

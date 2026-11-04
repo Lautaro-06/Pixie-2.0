@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { createBackup } from '../src/main/backup.js'
+import { needsConfirm, resolveAction, runAction } from '../src/main/actions/index.js'
 import { createMemory } from '../src/main/memory.js'
 import { createWork } from '../src/main/work/index.js'
 
@@ -82,6 +84,72 @@ test('olvidar el modo de trabajo borra su estado', () => {
   work.setFreeDescription('Diseño')
   work.clear()
   assert.equal(createWork({ memory }).getState().descripcionLibre, '')
+})
+
+test('valida y deduplica proyectos por ruta sin leer la carpeta', () => {
+  const work = createWork()
+  const result = work.setProjects([
+    { nombre: 'Pixie', carpeta: 'C:\\Proyectos\\Pixie' },
+    { nombre: 'Otra etiqueta', carpeta: 'c:\\proyectos\\pixie' }
+  ])
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.proyectos, [{ nombre: 'Pixie', carpeta: 'C:\\Proyectos\\Pixie' }])
+  assert.equal(work.setProjects([{ nombre: 'Incompleto', carpeta: '' }]).ok, false)
+})
+
+test('Git trabaja solo en proyectos conocidos y confirma operaciones riesgosas', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'pixie-git-'))
+  execFileSync('git', ['init'], { cwd: folder, stdio: 'ignore' })
+  execFileSync('git', ['config', 'user.name', 'Pixie Test'], { cwd: folder })
+  execFileSync('git', ['config', 'user.email', 'pixie@example.invalid'], { cwd: folder })
+  writeFileSync(join(folder, 'README.md'), 'Proyecto de prueba\n')
+  execFileSync('git', ['add', '--', 'README.md'], { cwd: folder })
+  execFileSync('git', ['commit', '-m', 'inicio'], { cwd: folder, stdio: 'ignore' })
+
+  const work = createWork()
+  const ctx = { work, log: () => {}, reportError: () => {} }
+  assert.equal(resolveAction('work_git', ctx), null)
+  work.setActiveProfiles(['programador'])
+  work.setProjects([{ nombre: 'Temporal', carpeta: folder }])
+  work.setEnabled(true)
+  const action = resolveAction('work_git', ctx)
+  assert.ok(action)
+
+  writeFileSync(join(folder, 'README.md'), 'Proyecto de prueba\ncambio visible\n')
+  const status = await runAction('work_git', { operation: 'status' }, ctx)
+  assert.match(status.text, /README\.md/)
+  const diff = await runAction('work_git', { operation: 'diff' }, ctx)
+  assert.match(diff.text, /cambio visible/)
+  await runAction('work_git', { operation: 'add', path: 'README.md' }, ctx)
+
+  const commit = { operation: 'commit', message: 'agrega nota' }
+  assert.equal(needsConfirm(action, commit, ctx), true)
+  const committed = await runAction('work_git', { ...commit, confirmado: true }, ctx)
+  assert.match(committed.text, /agrega nota/)
+
+  writeFileSync(join(folder, 'README.md'), 'Proyecto de prueba\notro cambio\n')
+  await runAction('work_git', { operation: 'add', path: 'README.md' }, ctx)
+  const pending = []
+  ctx.setPending = (item) => pending.push(item)
+  ctx.ai = { enabled: () => true, suggestCommitMessage: async (contents) => (contents.includes('otro cambio') ? 'actualiza la documentación' : '') }
+  const proposal = await runAction('work_git', { operation: 'commit' }, ctx)
+  assert.equal(proposal.confirm, true)
+  assert.match(proposal.text, /actualiza la documentación/)
+  assert.equal(pending.length, 1)
+  assert.equal(needsConfirm(action, pending[0].params, ctx), true)
+  const proposedCommit = await runAction('work_git', { ...pending[0].params, confirmado: true }, ctx)
+  assert.match(proposedCommit.text, /actualiza la documentación/)
+
+  const create = { operation: 'create_branch', name: 'feature/demo' }
+  assert.equal(needsConfirm(action, create, ctx), true)
+  const branch = await runAction('work_git', { ...create, confirmado: true }, ctx)
+  assert.match(branch.text, /feature\/demo/)
+  for (const operation of ['switch_branch', 'pull', 'push']) assert.equal(needsConfirm(action, { operation, name: 'main' }, ctx), true)
+
+  const unsafePath = await runAction('work_git', { operation: 'add', path: '..\\outside.txt' }, ctx)
+  assert.match(unsafePath.text, /Solo puedo agregar archivos dentro/)
+  const arbitrary = await runAction('work_git', { operation: 'reset --hard' }, ctx)
+  assert.match(arbitrary.text, /no está permitida/)
 })
 
 test('respalda los datos de trabajo sin incluir claves', () => {

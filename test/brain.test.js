@@ -85,6 +85,18 @@ const CASES = [
   ['¿cómo está la compu?', 'estado_pc', {}],
   ['la compu anda lenta', 'estado_pc', {}],
 
+  // Git del perfil Programador
+  ['git status', 'work_git', { operation: 'status' }],
+  ['mostrame el diff', 'work_git', { operation: 'diff' }],
+  ['git log', 'work_git', { operation: 'log' }],
+  ['listá las ramas', 'work_git', { operation: 'branches' }],
+  ['creá una rama feature/demo', 'work_git', { operation: 'create_branch', name: 'feature/demo' }],
+  ['cambiá a la rama main', 'work_git', { operation: 'switch_branch', name: 'main' }],
+  ['git add src/main.js', 'work_git', { operation: 'add', path: 'src/main.js' }],
+  ['git commit arregla el inicio', 'work_git', { operation: 'commit', message: 'arregla el inicio' }],
+  ['git pull', 'work_git', { operation: 'pull' }],
+  ['git push', 'work_git', { operation: 'push' }],
+
   // Cuentas
   ['¿cuánto es 25 por 4?', 'calcular', { expresion: '25*4' }],
   ['12 + 30', 'calcular', { expresion: '12+30' }],

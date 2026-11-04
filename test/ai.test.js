@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAI, parseEmotion } from '../src/main/ai.js'
 import { createMemory } from '../src/main/memory.js'
+import { createWork } from '../src/main/work/index.js'
 
 // Cliente de mentira: devuelve las respuestas del guion y guarda los pedidos
 function fakeClient(script) {
@@ -68,6 +69,19 @@ test('responde con la cara que eligió y manda el contexto', async () => {
   assert.equal(req.system[0].cache_control.type, 'ephemeral')
   assert.ok(req.tools.some((t) => t.name === 'abrir'))
   assert.match(req.messages[0].content, /<contexto>\nAhora: martes 18:00\.\n<\/contexto>\n\ncontame algo/)
+})
+
+test('solo ofrece herramientas e instrucciones de perfiles activos', async () => {
+  const { ai, ctx, calls } = setup([text('[normal] Listo.'), text('[normal] Entendido.')])
+  ctx.work = createWork()
+  await ai.chat('hola', 'ctx')
+  assert.equal(calls[0].tools.some((tool) => tool.name === 'work_git'), false)
+
+  ctx.work.setActiveProfiles(['programador'])
+  ctx.work.setEnabled(true)
+  await ai.chat('seguimos', 'ctx')
+  assert.equal(calls[1].tools.some((tool) => tool.name === 'work_git'), true)
+  assert.match(calls[1].system[0].text, /par técnico/)
 })
 
 test('usa las herramientas y sigue la charla con el resultado', async () => {
@@ -144,6 +158,14 @@ test('resume sin herramientas y sin tocar la charla', async () => {
   const s = await ai.summarize('mail', 'Asunto: Reunión\n\nMañana no hay clases.')
   assert.equal(s, 'Es de la profe: mañana no hay clases.')
   assert.equal(calls[0].tools, undefined)
+})
+
+test('propone un mensaje de commit usando solo el diff y sin herramientas', async () => {
+  const { ai, calls } = setup([text('documenta la instalación')])
+  const message = await ai.suggestCommitMessage('diff --git a/README.md b/README.md\n+Instalación')
+  assert.equal(message, 'documenta la instalación')
+  assert.equal(calls[0].tools, undefined)
+  assert.match(calls[0].messages[0].content, /diff --git a\/README\.md/)
 })
 
 test('lee la etiqueta de emoción', () => {

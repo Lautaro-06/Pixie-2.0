@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { TextSetting, ShortcutPicker, KeyWizard, LedScreen, WakeTrainer } from './parts.jsx'
 
-const STEPS = ['hola', 'ia', 'llamar', 'listo']
+const STEPS = ['hola', 'ia', 'llamar', 'trabajo', 'listo']
 
 export default function Welcome() {
   const [step, setStep] = useState(0)
@@ -28,6 +28,15 @@ export default function Welcome() {
   const name = STEPS[step]
   const next = () => setStep((n) => Math.min(n + 1, STEPS.length - 1))
   const back = () => setStep((n) => Math.max(n - 1, 0))
+  const work = s.trabajo
+  const setWork = (patch) => change({ trabajo: patch })
+  const toggleProfile = (id, checked) => {
+    const active = new Set(work.perfilesActivos)
+    if (checked) active.add(id)
+    else active.delete(id)
+    const perfilesActivos = [...active]
+    setWork({ perfilesActivos, habilitado: perfilesActivos.length > 0 })
+  }
 
   return (
     <div className="welcome">
@@ -99,6 +108,37 @@ export default function Welcome() {
             <button type="button" className="button" onClick={next}>
               Siguiente
             </button>
+          </div>
+        </section>
+      )}
+
+      {name === 'trabajo' && (
+        <section className="welcome-step">
+          <h1>¿Estás trabajando actualmente?</h1>
+          <p className="lead">Podés elegir uno o varios perfiles. El Modo Trabajo también se configura después en Ajustes.</p>
+          <div className="actions">
+            <button type="button" className={`button${work.trabaja === true ? '' : ' secondary'}`} onClick={() => setWork({ trabaja: true })}>Sí</button>
+            <button type="button" className={`button${work.trabaja === false ? '' : ' secondary'}`} onClick={() => setWork({ trabaja: false, habilitado: false, perfilesActivos: [] })}>No</button>
+          </div>
+          {work.trabaja && (
+            <div className="work-profiles welcome-work-profiles">
+              {work.perfiles.map((profile) => (
+                <label className="work-profile" key={profile.id}>
+                  <input type="checkbox" checked={profile.activo} onChange={(event) => toggleProfile(profile.id, event.target.checked)} />
+                  <span><strong>{profile.nombre}</strong><span>{profile.descripcion}</span></span>
+                </label>
+              ))}
+            </div>
+          )}
+          {work.trabaja && work.perfilesActivos.includes('libre') && (
+            <div className="form">
+              <label htmlFor="welcome-work-description">Contame brevemente a qué te dedicás</label>
+              <TextSetting id="welcome-work-description" value={work.descripcionLibre} placeholder="Tu rubro o profesión" onSave={(descripcionLibre) => setWork({ descripcionLibre })} />
+            </div>
+          )}
+          <div className="actions">
+            <button type="button" className="button secondary" onClick={back}>Atrás</button>
+            <button type="button" className="button" onClick={next}>Siguiente</button>
           </div>
         </section>
       )}

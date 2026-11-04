@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { release } from 'node:os'
 import { autoUpdater } from 'electron-updater'
 import { interpretAll, suggest, isYes, isNo, restoreAccents } from './brain.js'
-import { actions, runAction, needsConfirm } from './actions/index.js'
+import { actions, runAction, needsConfirm, resolveAction } from './actions/index.js'
 import { createPomodoro } from './pomodoro.js'
 import { studyIntent, subjectFrom, subjectIn, topicFromTitle, topicsFromTitles, taskTypeFrom, minutesFrom, focusKind } from './study.js'
 import { createStudyLog, endSummaryText, DEFAULT_GOAL } from './study-log.js'
@@ -42,6 +42,7 @@ import { createMaps } from './maps.js'
 import { compareVersions, updateText } from './changelog.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
+import { createWork } from './work/index.js'
 import { textToWrite } from './control.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
@@ -54,6 +55,7 @@ let settings = null
 let weatherNow = null // temperatura e ícono para el resumen en reposo
 let weatherTimer = null
 let mind = null
+let work = null
 let ai = null
 let browser = null
 let backup = null
@@ -638,7 +640,7 @@ async function askInner(text) {
     if (it.action === 'escribir') it.params.texto = textToWrite(input, intents.length > 1) ?? it.params.texto
     // Los temas del temario, como los escribiste (con comas y tildes)
     if (it.action === 'temario' && it.params.temas) it.params.temas = /\bson\b[:\s]*(.+)$/i.exec(input)?.[1] ?? it.params.temas
-    const action = actions[it.action]
+    const action = resolveAction(it.action, ctx)
     if (needsConfirm(action, it.params, ctx)) {
       pending = it
       results.push({ text: action.confirmText(it.params, ctx), face: 'idle', confirm: true })
@@ -806,6 +808,8 @@ if (!app.requestSingleInstanceLock()) {
         if (win && !win.isVisible()) win.showInactive()
       }
     })
+    work = createWork({ memory: mind.memory })
+    ctx.work = work
     browser = createBrowserBridge({
       log: logAction,
       // Si una función necesita Chrome y está cerrado, lo abre (si la extensión ya se conectó alguna vez)
@@ -1045,6 +1049,7 @@ if (!app.requestSingleInstanceLock()) {
       apps,
       pomodoro,
       studyLog,
+      work,
       phone,
       journal,
       openExternal: (url) => shell.openExternal(url),
@@ -1113,6 +1118,7 @@ if (!app.requestSingleInstanceLock()) {
     handle('ajustes:estudio-borrar', () => settings.clearStudy())
     handle('ajustes:whatsapp', (req) => settings.whatsapp(req && typeof req === 'object' ? req : {}))
     handle('ajustes:memoria-borrar', (req) => settings.forget(req && typeof req === 'object' ? req : {}))
+    handle('ajustes:trabajo-borrar', () => settings.clearWork())
     handle('ajustes:abrir-carpeta-extension', () => extensionFiles?.carpeta && shell.openPath(extensionFiles.carpeta))
     // Chrome no deja abrir chrome://extensions desde otro programa: se copia para pegarlo en la barra
     handle('ajustes:copiar-direccion-extensiones', () => clipboard.writeText('chrome://extensions'))

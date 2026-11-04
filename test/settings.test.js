@@ -1,13 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createSettings, findKey, keyErrorText } from '../src/main/settings.js'
+import { createWork } from '../src/main/work/index.js'
 import { AIHttpError, AIConnectionError } from '../src/main/ai-compatible.js'
 import { renderStandby } from '../src/renderer/src/face/standby.js'
 import { renderFace, WIDTH, HEIGHT } from '../src/renderer/src/face/draw.js'
 import { interpretAll } from '../src/main/brain.js'
 import { runAction } from '../src/main/actions/index.js'
 
-function setup({ config = {}, ping } = {}) {
+function setup({ config = {}, ping, work } = {}) {
   let cfg = { ciudad: 'Buenos Aires', ...config }
   const calls = []
   let login = false
@@ -22,6 +23,7 @@ function setup({ config = {}, ping } = {}) {
       return cfg
     },
     memory: { getName: () => name, setName: (n) => (name = n) },
+    work,
     voices: { status: () => 'Uso la voz de Windows.', use: (m) => calls.push({ voz: m }), install: () => calls.push({ instalar: true }) },
     updates: { status: () => ({ state: 'idle', current: '0.7.0' }), describe: () => 'Tengo la versión 0.7.0.' },
     ai: { ping: ping ?? (async (key) => ({ provider: 'gemini', model: 'gemini-flash-lite-latest', key })) },
@@ -35,6 +37,32 @@ function setup({ config = {}, ping } = {}) {
   })
   return { s, calls, cfg: () => cfg, setClip: (t) => (clip = t), login: () => login, name: () => name }
 }
+
+test('Ajustes configura los perfiles, proyectos y preferencias laborales', async () => {
+  const work = createWork()
+  const { s } = setup({ work })
+  let snap = await s.apply({
+    trabajo: {
+      trabaja: true,
+      habilitado: true,
+      perfilesActivos: ['libre'],
+      descripcionLibre: 'Diseño de interfaces',
+      buscandoTrabajo: true,
+      proyectos: [{ nombre: 'Pixie', carpeta: 'C:\\Proyectos\\Pixie' }]
+    }
+  })
+  assert.equal(snap.trabajo.habilitado, true)
+  assert.equal(snap.trabajo.trabaja, true)
+  assert.equal(snap.trabajo.perfiles.find((profile) => profile.id === 'libre').activo, true)
+  assert.equal(snap.trabajo.descripcionLibre, 'Diseño de interfaces')
+  assert.equal(snap.trabajo.buscandoTrabajo, true)
+  assert.deepEqual(snap.trabajo.proyectos, [{ nombre: 'Pixie', carpeta: 'C:\\Proyectos\\Pixie' }])
+
+  snap = s.clearWork()
+  assert.equal(snap.trabajo.habilitado, false)
+  assert.deepEqual(snap.trabajo.perfilesActivos, [])
+  assert.deepEqual(snap.trabajo.proyectos, [])
+})
 
 test('muestra los ajustes sin revelar la clave', () => {
   const { s } = setup({ config: { claveIA: 'AQ.Ab8RNxxxxxxxxxxxxxxxxk3Zq', pantallaReposo: 'reloj' } })

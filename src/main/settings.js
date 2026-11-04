@@ -57,6 +57,7 @@ export function createSettings({
   apps = null,
   pomodoro = null, // la sesión (pomodoro.js)
   studyLog = null, // el seguimiento de estudio y el temario (study-log.js)
+  work = null, // perfiles laborales (work/index.js)
   phone = null, // WhatsApp (phone.js)
   journal = null, // el diario de charlas (journal.js)
   openExternal = () => {},
@@ -82,6 +83,21 @@ export function createSettings({
   function studySnapshot() {
     const goal = goalOf(getConfig())
     return studyLog ? studyLog.view(goal) : null
+  }
+
+  function workSnapshot() {
+    const state = work?.getState?.() ?? {
+      habilitado: false,
+      trabaja: null,
+      perfilesActivos: [],
+      descripcionLibre: '',
+      proyectos: [],
+      perfilesDescartados: [],
+      buscandoTrabajo: false,
+      deteccion: {}
+    }
+    const active = new Set(state.perfilesActivos)
+    return { ...state, perfiles: (work?.listProfiles?.() ?? []).map((profile) => ({ ...profile, activo: active.has(profile.id) })) }
   }
 
   function snapshot() {
@@ -122,6 +138,7 @@ export function createSettings({
       pomodoro: pomodoroSnapshot(),
       whatsapp: phone ? { ...phone.status(), avisos: cfg.avisosAlCelular !== false } : null,
       memoria: memorySnapshot(),
+      trabajo: workSnapshot(),
       estudio: studySnapshot(),
       mapas: { casa: cfg.direccionCasa ?? '' },
       noticias: {
@@ -186,6 +203,23 @@ export function createSettings({
     if (typeof patch.pomodoroMateria === 'string') saveConfig({ pomodoroMateria: patch.pomodoroMateria.trim().slice(0, 40) || undefined })
     if ('pomodoroOfrecer' in patch) saveConfig({ pomodoroOfrecer: Boolean(patch.pomodoroOfrecer) })
     if ('pomodoroDistracciones' in patch) saveConfig({ pomodoroDistracciones: Boolean(patch.pomodoroDistracciones) })
+    if (patch.trabajo && typeof patch.trabajo === 'object') {
+      const change = patch.trabajo
+      if (typeof change.descripcionLibre === 'string') work?.setFreeDescription(change.descripcionLibre)
+      if (Array.isArray(change.perfilesActivos)) {
+        const result = work?.setActiveProfiles(change.perfilesActivos)
+        if (result && !result.ok) mensajes.push(result.error)
+      }
+      if (Array.isArray(change.proyectos)) {
+        const result = work?.setProjects(change.proyectos)
+        if (result && !result.ok) mensajes.push(result.error)
+      }
+      const preferences = {}
+      if (typeof change.trabaja === 'boolean' || change.trabaja === null) preferences.trabaja = change.trabaja
+      if (typeof change.buscandoTrabajo === 'boolean') preferences.buscandoTrabajo = change.buscandoTrabajo
+      if (Object.keys(preferences).length) work?.updatePreferences(preferences)
+      if (typeof change.habilitado === 'boolean') work?.setEnabled(change.habilitado)
+    }
     // Ajustes → Apps: qué apps puede abrir y usar
     if (patch.appPermiso && typeof patch.appPermiso.id === 'string') apps?.set(patch.appPermiso.id, patch.appPermiso)
     if (typeof patch.appsTodas === 'boolean') apps?.setAll(patch.appsTodas)
@@ -407,6 +441,7 @@ export function createSettings({
     if (que === 'todo') {
       journal?.forgetAll()
       memory?.forgetAll?.()
+      work?.clear?.()
     }
     return { ...snapshot(), mensaje: que === 'todo' ? 'Listo, me olvidé de todo.' : que === 'charlas' ? 'Listo, me olvidé de nuestras charlas.' : null }
   }
@@ -442,6 +477,10 @@ export function createSettings({
     pomodoroControl,
     pomodoroAdvice,
     syllabus,
+    clearWork() {
+      work?.clear?.()
+      return { ...snapshot(), mensaje: 'Borré los datos del Modo Trabajo.' }
+    },
     clearStudy,
     whatsapp,
     forget

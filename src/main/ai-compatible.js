@@ -58,14 +58,18 @@ function cleanSchema(schema) {
   return rest
 }
 
-export const COMPATIBLE_TOOLS = AI_TOOLS.map((t) => ({
+export function compatibleToolsFor(tools = AI_TOOLS) {
+  return tools.map((t) => ({
   type: 'function',
   function: {
     name: t.name,
     description: t.description,
     ...(Object.keys(t.input_schema.properties ?? {}).length ? { parameters: cleanSchema(t.input_schema) } : {})
   }
-}))
+  }))
+}
+
+export const COMPATIBLE_TOOLS = compatibleToolsFor()
 
 // Algunos modelos piensan en voz alta (<think>) o usan markdown: el globito no lo necesita
 export function cleanText(text) {
@@ -99,7 +103,7 @@ export const transientError = (err) =>
   (err instanceof AIHttpError && (err.status === 429 || OVERLOADED.has(err.status))) || (err instanceof AIConnectionError && err.timeout)
 
 // thinking: cuánto piensa el modelo (ver thinkingFor); null = lo que traiga el modelo
-export function createCompatibleDriver({ preset, apiKey, model, system, fetchImpl = fetch, thinking = null, wait = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
+export function createCompatibleDriver({ preset, apiKey, model, system, toolDefinitions = AI_TOOLS, fetchImpl = fetch, thinking = null, wait = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   async function post(body) {
     let first
     try {
@@ -168,7 +172,7 @@ export function createCompatibleDriver({ preset, apiKey, model, system, fetchImp
     async step(history, { tools = true, persona = true, extra = {} } = {}) {
       const body = { ...extra, model, messages: persona ? [{ role: 'system', content: system }, ...history] : history }
       if (thinking && !('reasoning_effort' in body)) body.reasoning_effort = thinking
-      if (tools) body.tools = COMPATIBLE_TOOLS
+      if (tools) body.tools = compatibleToolsFor(toolDefinitions)
       const res = await post(body)
       const choice = res.choices?.[0] ?? {}
       const msg = choice.message ?? {}

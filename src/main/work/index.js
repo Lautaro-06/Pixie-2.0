@@ -82,6 +82,7 @@ export function createWork({ memory, profiles = WORK_PROFILES } = {}) {
       perfiles: active.map(({ id, nombre, descripcion }) => ({ id, nombre, descripcion })),
       instruccionesIA: instructions.join('\n\n'),
       acciones: Object.fromEntries(Object.entries(actions).map(([name, action]) => [name, Object.fromEntries(Object.entries(action).filter(([key]) => key !== 'perfil'))])),
+      herramientas: Object.values(actions).map((action) => action.aiTool).filter(Boolean),
       fuentes: active.flatMap((profile) => profile.fuentes),
       fuentesNoticias: active.flatMap((profile) => profile.fuentesNoticias),
       colisiones: collisions
@@ -112,6 +113,20 @@ export function createWork({ memory, profiles = WORK_PROFILES } = {}) {
       state.descripcionLibre = String(description ?? '').trim().slice(0, 1000)
       persist()
       return compose()
+    },
+    setProjects(projects) {
+      if (!Array.isArray(projects)) return { ok: false, error: 'La lista de proyectos no es válida.' }
+      const byPath = new Map()
+      for (const project of projects) {
+        const nombre = String(project?.nombre ?? '').trim().slice(0, 80)
+        const carpeta = String(project?.carpeta ?? '').trim().slice(0, 1024)
+        if (!nombre || !carpeta) return { ok: false, error: 'Cada proyecto necesita un nombre y una carpeta.' }
+        const key = carpeta.toLocaleLowerCase()
+        if (!byPath.has(key)) byPath.set(key, { nombre, carpeta })
+      }
+      state.proyectos = [...byPath.values()]
+      persist()
+      return { ok: true, proyectos: clone(state.proyectos) }
     },
     updatePreferences(patch = {}) {
       if (typeof patch.trabaja === 'boolean' || patch.trabaja === null) state.trabaja = patch.trabaja

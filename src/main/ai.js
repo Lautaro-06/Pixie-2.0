@@ -4,7 +4,7 @@
 // Sin clave (o sin internet) sigue funcionando con las reglas de brain.js.
 import Anthropic from '@anthropic-ai/sdk'
 import { AI_TOOLS } from './ai-tools.js'
-import { actions, runAction, needsConfirm } from './actions/index.js'
+import { actions, runAction, needsConfirm, resolveAction } from './actions/index.js'
 import { pageForAI } from './actions/browser.js'
 import { PROVIDERS, AIHttpError, AIConnectionError, createCompatibleDriver, whisperTranscribe, thinkingFor } from './ai-compatible.js'
 import { FriendlyError } from './windows.js'
@@ -25,7 +25,7 @@ const FINAL_TOOLS = new Set([
   'abrir', 'cerrar_app', 'buscar', 'volumen', 'musica', 'crear_timer', 'cancelar_timers', 'agendar', 'agregar_pendiente',
   'completar_pendiente', 'captura', 'bloquear_pc', 'apagar_pc', 'no_molestar', 'jugar',
   'reproducir', 'youtube', 'registrar_agua', 'registrar_pausa', 'respaldar', 'brillo', 'bluetooth', 'whatsapp', 'voz',
-  'abrir_noticia', 'escribir', 'teclas', 'atajo', 'desplazar', 'ventana', 'cambiar_atajo', 'actualizar'
+  'abrir_noticia', 'escribir', 'teclas', 'atajo', 'desplazar', 'ventana', 'cambiar_atajo', 'actualizar', 'work_git'
 ])
 // "abrí Word y escribí…", "después", "también": puede necesitar más pasos, así que la IA sigue
 export function singleStep(text) {
@@ -107,7 +107,7 @@ export function pickProvider(cfg, env = process.env) {
   }
 }
 
-function createClaudeDriver({ getClient, model, effort }) {
+function createClaudeDriver({ getClient, model, effort, system = SYSTEM, toolDefinitions = AI_TOOLS }) {
   return {
     user: (text) => ({ role: 'user', content: text }),
 
@@ -115,11 +115,11 @@ function createClaudeDriver({ getClient, model, effort }) {
       const params = {
         model,
         max_tokens: 16000,
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
         messages: history,
         output_config: { effort }
       }
-      if (tools) params.tools = AI_TOOLS
+      if (tools) params.tools = toolDefinitions
       if (FALLBACK_MODELS.has(model)) {
         params.betas = ['server-side-fallback-2026-07-01']
         params.fallbacks = 'default'
@@ -186,9 +186,12 @@ export function createAI({
   }
 
   function driverFor(p) {
-    if (p.name === 'claude') return createClaudeDriver({ getClient: () => getClient(p.apiKey), model: p.model, effort: getConfig().esfuerzoIA || 'low' })
+    const work = ctx.work?.context?.()
+    const system = [SYSTEM, work?.instruccionesIA].filter(Boolean).join('\n\n')
+    const toolDefinitions = [...AI_TOOLS, ...(work?.herramientas ?? [])]
+    if (p.name === 'claude') return createClaudeDriver({ getClient: () => getClient(p.apiKey), model: p.model, effort: getConfig().esfuerzoIA || 'low', system, toolDefinitions })
     const thinking = p.name === 'gemini' ? thinkingFor(p.model) : null
-    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system: SYSTEM, fetchImpl, thinking })
+    return createCompatibleDriver({ preset: p.preset, apiKey: p.apiKey, model: p.model, system, toolDefinitions, fetchImpl, thinking })
   }
 
   // Ejecuta una herramienta pedida por la IA. Devuelve { content, game?, confirm?, isError? }
@@ -202,7 +205,7 @@ export function createAI({
         return { content: err.message, isError: true }
       }
     }
-    const action = actions[name]
+    const action = resolveAction(name, ctx)
     if (!action) return { content: `No existe la herramienta ${name}.`, isError: true }
     if (needsConfirm(action, params, ctx)) {
       ctx.setPending({ action: name, params })
@@ -332,6 +335,17 @@ export function createAI({
     )
     if (r.stop === 'refusal') return null
     return parseEmotion(r.text).text
+  }
+
+  async function suggestCommitMessage(diff) {
+    const p = provider()
+    if (!p) throw new Error('No hay IA configurada')
+    const d = driverFor(p)
+    const request = `Proponé un mensaje de commit corto y preciso, en español, basado solo en este diff. Respondé con una línea, sin comillas ni explicación.\n\n${String(diff ?? '').slice(0, 8000)}`
+    const result = await d.step([d.user(request)], { tools: false })
+    const message = parseEmotion(result.text).text.split(/\r?\n/, 1)[0].trim().replace(/^['"`]+|['"`]+$/g, '').slice(0, 200)
+    if (!message) throw new Error('No pude proponer un mensaje de commit')
+    return message
   }
 
   // Un consejo de una sola vuelta (sin herramientas ni tocar la conversación): para el plan del Pomodoro
@@ -465,6 +479,7 @@ export function createAI({
     ping,
     chat,
     summarize,
+    suggestCommitMessage,
     advise,
     look,
     transcribe,

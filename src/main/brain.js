@@ -245,6 +245,24 @@ function cleanEventText(s) {
 }
 
 const RULES = [
+  // Git del perfil Programador: solo operaciones incluidas en la lista cerrada de work/git.js
+  (t) => {
+    if (/^(git )?(status|estado de git|estado del repositorio)$/.test(t)) return intent('work_git', { operation: 'status' })
+    if (/^(git )?diff$|^(muestra|mostrame|decime|ver) (el )?diff$/.test(t)) return intent('work_git', { operation: 'diff' })
+    if (/^(git )?log$/.test(t)) return intent('work_git', { operation: 'log' })
+    if (/^(git )?(branches|ramas|lista las ramas|lista de ramas)$/.test(t)) return intent('work_git', { operation: 'branches' })
+    let m = /^(crea|crear|creame) (una )?rama (.+)$/.exec(t)
+    if (m) return intent('work_git', { operation: 'create_branch', name: m[3] })
+    m = /^(cambia|cambiar|cambiate|pasate) (a )?(la )?rama (.+)$/.exec(t)
+    if (m) return intent('work_git', { operation: 'switch_branch', name: m[4] })
+    m = /^(git )?add (.+)$/.exec(t)
+    if (m) return intent('work_git', { operation: 'add', path: m[2] })
+    m = /^(git )?commit(?: con mensaje)?(?: (.+))?$/.exec(t)
+    if (m) return intent('work_git', { operation: 'commit', ...(m[2] ? { message: m[2] } : {}) })
+    if (/^(git )?pull$/.test(t)) return intent('work_git', { operation: 'pull' })
+    if (/^(git )?push$/.test(t)) return intent('work_git', { operation: 'push' })
+    return null
+  },
   // Pixie misma: actualizarse, su versión y el informe de diagnóstico
   (t) =>
     /^(actualiza(te|r|la)?|actualizar (a )?(pixie|la app)|instala(r)? la (actualizacion|version nueva)|(busca(r)?|fijate si hay) (una |alguna )?(actualizacion(es)?|version nueva)|hay (una |alguna )?(actualizacion(es)?|version nueva))$/.test(t)

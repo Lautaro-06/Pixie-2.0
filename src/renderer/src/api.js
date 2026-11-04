@@ -64,6 +64,22 @@ let fakeSettings = {
       return { fecha: d.toISOString().slice(0, 10), charlas: 5 - back, temas: [['fotosintesis', 'prueba', 'biologia'], ['futbol', 'sabado'], []][back - 1] }
     })
   },
+  trabajo: {
+    habilitado: false,
+    trabaja: null,
+    perfilesActivos: [],
+    descripcionLibre: '',
+    proyectos: [],
+    perfilesDescartados: [],
+    buscandoTrabajo: false,
+    deteccion: {},
+    perfiles: [
+      ['programador', 'Programador', 'Desarrollo de software y mantenimiento de proyectos.'],
+      ['cientifico', 'Científico', 'Investigación, lectura de papers y organización de preguntas científicas.'],
+      ['disenador', 'Diseñador', 'Diseño gráfico, de productos digitales y experiencia de usuario.'],
+      ['libre', 'Otro / personalizado', 'Un perfil conversacional para trabajos que no tienen un perfil propio.']
+    ].map(([id, nombre, descripcion]) => ({ id, nombre, descripcion, activo: false }))
+  },
   ia: { activa: true, estado: 'No encuentro la clave de IA.', proveedor: null, modelo: null, clave: '', tieneClave: false },
   voz: { modo: 'natural', estado: 'Uso la voz de Windows hasta que se baje la natural.', palabra: { grabada: false, activa: false, sensibilidad: 'normal' } },
   actualizaciones: { state: 'dev', current: 'navegador', texto: 'Las actualizaciones andan en la app instalada.' },
@@ -99,6 +115,14 @@ const previewSettings = {
       pomodoro: pomodoroView(fakePomodoro),
       estudio: fakeStudy(),
       general: g,
+      trabajo: patch.trabajo ? {
+        ...fakeSettings.trabajo,
+        ...patch.trabajo,
+        perfiles: fakeSettings.trabajo.perfiles.map((profile) => ({
+          ...profile,
+          activo: (patch.trabajo.perfilesActivos ?? fakeSettings.trabajo.perfilesActivos).includes(profile.id)
+        }))
+      } : fakeSettings.trabajo,
       apariencia: patch.pantallaReposo ? { pantallaReposo: patch.pantallaReposo } : fakeSettings.apariencia,
       voz: {
         ...fakeSettings.voz,
@@ -214,6 +238,10 @@ const previewSettings = {
   forgetMemory: async ({ que } = {}) => {
     fakeSettings = { ...fakeSettings, memoria: que === 'todo' ? { charlas: 0, personales: 0, datos: [], dias: [] } : { ...fakeSettings.memoria, charlas: 0, dias: [] } }
     return { ...fakeSettings, mensaje: que === 'todo' ? 'Listo, me olvidé de todo.' : 'Listo, me olvidé de nuestras charlas.' }
+  },
+  clearWork: async () => {
+    fakeSettings = { ...fakeSettings, trabajo: { ...fakeSettings.trabajo, habilitado: false, trabaja: null, perfilesActivos: [], descripcionLibre: '', proyectos: [], buscandoTrabajo: false } }
+    return { ...fakeSettings, mensaje: 'Borré los datos del Modo Trabajo.' }
   },
   onView: () => () => {}
 }

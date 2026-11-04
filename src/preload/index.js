@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('pixie', {
     clearStudy: () => ipcRenderer.invoke('ajustes:estudio-borrar'),
     whatsapp: (req) => ipcRenderer.invoke('ajustes:whatsapp', req),
     forgetMemory: (req) => ipcRenderer.invoke('ajustes:memoria-borrar', req),
+    clearWork: () => ipcRenderer.invoke('ajustes:trabajo-borrar'),
     openExtensionFolder: () => ipcRenderer.invoke('ajustes:abrir-carpeta-extension'),
     copyExtensionsAddress: () => ipcRenderer.invoke('ajustes:copiar-direccion-extensiones'),
     onView: (callback) => {

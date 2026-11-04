@@ -43,6 +43,10 @@ const ALL = [
 
 export const actions = Object.fromEntries(ALL.map((a) => [a.name, a]))
 
+export function resolveAction(name, ctx) {
+  return actions[name] ?? ctx?.work?.context?.().acciones?.[name] ?? null
+}
+
 // ¿Hay que preguntar antes? Si el usuario ya dijo que sí, no se vuelve a preguntar.
 export function needsConfirm(action, params, ctx) {
   if (!action?.confirm || params?.confirmado) return false
@@ -53,7 +57,7 @@ export function needsConfirm(action, params, ctx) {
 const MEDIA_ACTIONS = new Set(['musica', 'youtube', 'volumen', 'que_suena', 'reproducir', 'youtube_click'])
 
 export async function runAction(name, params, ctx) {
-  const action = actions[name]
+  const action = resolveAction(name, ctx)
   if (!action) return { text: 'Eso todavía no lo sé hacer.', face: 'confused' }
   if (MEDIA_ACTIONS.has(name) || (name === 'buscar' && params?.sitio === 'youtube')) ctx.mediaTouchedAt = Date.now()
   try {

@@ -138,6 +138,64 @@ body.ventana-ajustes #root {
   align-items: center;
 }
 
+.ventana-ajustes .work-profiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 8px 0 16px;
+}
+.ventana-ajustes .work-profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ventana-ajustes .work-profile input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.ventana-ajustes .work-profile span span,
+.ventana-ajustes .work-projects small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ventana-ajustes .work-description,
+.ventana-ajustes .work-project-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+.ventana-ajustes .work-description label {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+.ventana-ajustes .work-projects {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ventana-ajustes .work-projects li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--card-line);
+}
+.ventana-ajustes .work-projects li:first-child {
+  border-top: 0;
+}
+.ventana-ajustes .work-projects small {
+  overflow-wrap: anywhere;
+}
+
 .ventana-ajustes .field {
   width: 240px;
   background: var(--field);
