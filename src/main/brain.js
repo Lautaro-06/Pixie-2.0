@@ -245,6 +245,15 @@ function cleanEventText(s) {
 }
 
 const RULES = [
+  (t) => {
+    const m = /^(?:crea|crear|armame|arma|inicia|iniciar) (?:un )?proyecto (?:llamado )?([a-z0-9._ -]+?) (?:en|dentro de) (.+)$/.exec(t)
+    const parent = m?.[2]?.trim().replace(/^([a-z])\s+([\\/])/, '$1:$2')
+    return m ? intent('work_create_project', { name: m[1].trim(), parent }) : null
+  },
+  (t) => {
+    const m = /^(?:busca|buscame|revisa|revisame|consulta) (?:en )?(?:la )?(?:documentacion|docs)(?: de (.+?))? (?:sobre |acerca de |: )?(.+)$/.exec(t)
+    return m ? intent('work_docs', { ...(m[1] ? { project: m[1] } : {}), query: m[2].trim() }) : null
+  },
   // Git del perfil Programador: solo operaciones incluidas en la lista cerrada de work/git.js
   (t) => {
     if (/^(git )?(status|estado de git|estado del repositorio)$/.test(t)) return intent('work_git', { operation: 'status' })

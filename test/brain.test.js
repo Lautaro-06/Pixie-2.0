@@ -86,6 +86,8 @@ const CASES = [
   ['la compu anda lenta', 'estado_pc', {}],
 
   // Git del perfil Programador
+  ['creá un proyecto llamado demo en C:\\Proyectos', 'work_create_project', { name: 'demo', parent: 'c:\\proyectos' }],
+  ['buscá en la documentación sobre instalación', 'work_docs', { query: 'instalacion' }],
   ['git status', 'work_git', { operation: 'status' }],
   ['mostrame el diff', 'work_git', { operation: 'diff' }],
   ['git log', 'work_git', { operation: 'log' }],

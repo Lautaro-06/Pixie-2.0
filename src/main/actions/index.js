@@ -62,7 +62,7 @@ export async function runAction(name, params, ctx) {
   if (MEDIA_ACTIONS.has(name) || (name === 'buscar' && params?.sitio === 'youtube')) ctx.mediaTouchedAt = Date.now()
   try {
     const result = await action.run(params ?? {}, ctx)
-    ctx.log(`${name} ${JSON.stringify(params ?? {})} → ${result.text}`)
+    ctx.log(action.logLine ? action.logLine(params ?? {}, result) : `${name} ${JSON.stringify(params ?? {})} → ${result.text}`)
     return result
   } catch (err) {
     if (err instanceof BlockedError) {

@@ -81,7 +81,27 @@ test('solo ofrece herramientas e instrucciones de perfiles activos', async () =>
   ctx.work.setEnabled(true)
   await ai.chat('seguimos', 'ctx')
   assert.equal(calls[1].tools.some((tool) => tool.name === 'work_git'), true)
+  assert.equal(calls[1].tools.some((tool) => tool.name === 'work_docs'), true)
+  assert.equal(calls[1].tools.some((tool) => tool.name === 'work_create_project'), true)
   assert.match(calls[1].system[0].text, /par técnico/)
+})
+
+test('la IA responde usando fragmentos del proyecto seleccionado', async () => {
+  const { ai, ctx, calls } = setup([
+    toolUse('docs', 'work_docs', { query: 'instalación npm', project: 'Demo' }),
+    text('[normal] La guía indica cómo instalarlo.')
+  ])
+  const folder = mkdtempSync(join(tmpdir(), 'pixie-ai-docs-'))
+  const { writeFileSync } = await import('node:fs')
+  writeFileSync(join(folder, 'README.md'), '# Guia\n\nPara la instalación ejecutá npm install.')
+  ctx.work = createWork({ memory: ctx.memory })
+  ctx.work.setActiveProfiles(['programador'])
+  ctx.work.setProjects([{ nombre: 'Demo', carpeta: folder }])
+  ctx.work.setEnabled(true)
+
+  const result = await ai.chat('¿cómo lo instalo?', 'ctx')
+  assert.equal(result.text, 'La guía indica cómo instalarlo.')
+  assert.match(calls[1].messages.at(-1).content[0].content, /npm install/)
 })
 
 test('usa las herramientas y sigue la charla con el resultado', async () => {

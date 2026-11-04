@@ -1,14 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createBackup } from '../src/main/backup.js'
 import { needsConfirm, resolveAction, runAction } from '../src/main/actions/index.js'
-import { createBackup } from '../src/main/backup.js'
 import { createMemory } from '../src/main/memory.js'
 import { createWork } from '../src/main/work/index.js'
+import { documentationAction, readProjectDocumentation, searchDocumentation } from '../src/main/work/documentation.js'
+import { createProjectAction } from '../src/main/work/create-project.js'
 
 const fresh = () => {
   const file = join(mkdtempSync(join(tmpdir(), 'pixie-work-')), 'memoria.json')
@@ -96,6 +97,63 @@ test('valida y deduplica proyectos por ruta sin leer la carpeta', () => {
   assert.equal(result.ok, true)
   assert.deepEqual(result.proyectos, [{ nombre: 'Pixie', carpeta: 'C:\\Proyectos\\Pixie' }])
   assert.equal(work.setProjects([{ nombre: 'Incompleto', carpeta: '' }]).ok, false)
+})
+
+test('lee README y docs, pero omite código fuente y archivos no documentales', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'pixie-docs-'))
+  mkdirSync(join(folder, 'docs'))
+  mkdirSync(join(folder, 'src'))
+  writeFileSync(join(folder, 'README.md'), '# Inicio\n\nLa instalación usa npm test.')
+  writeFileSync(join(folder, 'docs', 'setup.md'), '# Instalación\n\nnpm test ejecuta todas las pruebas.')
+  writeFileSync(join(folder, 'docs', 'ignored.js'), 'const secret = "not documentation"')
+  writeFileSync(join(folder, 'src', 'private.js'), 'const internal = "not documentation"')
+  writeFileSync(join(folder, 'notes.js'), 'Este archivo raíz no es documentación.')
+
+  const documents = await readProjectDocumentation(folder)
+  assert.deepEqual(new Set(documents.map((doc) => doc.path)), new Set(['README.md', 'docs/setup.md']))
+  const matches = searchDocumentation(documents, 'cómo ejecutar pruebas')
+  assert.ok(matches.length)
+  assert.match(matches[0].excerpt, /npm test/)
+  assert.equal(documents.some((doc) => doc.text.includes('not documentation')), false)
+})
+
+test('crea un proyecto nuevo con plantillas fijas, Git y registro en memoria', async () => {
+  const parent = mkdtempSync(join(tmpdir(), 'pixie-projects-'))
+  const work = createWork()
+  work.setActiveProfiles(['programador'])
+  work.setEnabled(true)
+  const ctx = { work, log: () => {}, reportError: () => {} }
+  const params = { name: 'Demo', parent, description: 'Proyecto de prueba', folders: ['src', 'docs'] }
+  assert.equal(needsConfirm(createProjectAction, params, ctx), true)
+  const result = await runAction(createProjectAction.name, { ...params, confirmado: true }, ctx)
+  const folder = join(parent, 'Demo')
+  assert.match(result.text, /inicié Git/)
+  assert.equal(existsSync(join(folder, 'README.md')), true)
+  assert.equal(existsSync(join(folder, '.gitignore')), true)
+  assert.equal(existsSync(join(folder, 'src')), true)
+  assert.equal(existsSync(join(folder, 'docs')), true)
+  assert.equal(work.getState().proyectos[0].nombre, 'Demo')
+  assert.equal(existsSync(work.getState().proyectos[0].carpeta), true)
+  assert.match(work.getState().proyectos[0].carpeta, /[\\/]Demo$/)
+
+  const original = readFileSync(join(folder, 'README.md'), 'utf8')
+  const duplicate = await runAction(createProjectAction.name, { ...params, confirmado: true }, ctx)
+  assert.match(duplicate.text, /Ya existe una carpeta/)
+  assert.equal(readFileSync(join(folder, 'README.md'), 'utf8'), original)
+})
+
+test('consulta documentación sin IA y no registra la búsqueda ni los fragmentos', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'pixie-doc-action-'))
+  writeFileSync(join(folder, 'README.md'), '# Compilación\n\nEjecutá npm test para probar el proyecto.')
+  const work = createWork()
+  work.setActiveProfiles(['programador'])
+  work.setProjects([{ nombre: 'Demo', carpeta: folder }])
+  work.setEnabled(true)
+  const logs = []
+  const ctx = { work, log: (line) => logs.push(line), reportError: () => {} }
+  const result = await runAction(documentationAction.name, { project: 'Demo', query: 'como probar' }, ctx)
+  assert.match(result.text, /npm test/)
+  assert.deepEqual(logs, ['Modo Trabajo: consultó documentación'])
 })
 
 test('Git trabaja solo en proyectos conocidos y confirma operaciones riesgosas', async () => {
