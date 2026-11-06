@@ -101,11 +101,22 @@ Clic derecho en la cara de Pixie → **Ajustes…** (o pedile «abrí tus ajuste
   - **Voz y escucha:** «Pixie, ¿estás?» (grabar tu voz, probarla, qué tan fácil se despierta) y cómo suena: natural (argentina, sin internet), la de Windows o Gemini.
   - **Inteligencia artificial:** poner la clave (con la guía paso a paso), probarla, cambiarla o borrarla.
   - **Memoria y privacidad:** cuántas charlas tiene anotadas, de qué hablaron los últimos días, lo que le contaste y los botones para borrar las charlas o todo (ver [Se acuerda de todo](#se-acuerda-de-todo-lo-que-hablaron)).
+- **Trabajo:** activar el Modo Trabajo, elegir perfiles, describir el perfil personalizado, guardar proyectos conocidos y borrar estos datos. La bienvenida también pregunta si estás trabajando.
 - **Estudio:** **Pomodoro** y **Mi estudio** (ver arriba).
 - **Conexiones:** **WhatsApp** (ver [WhatsApp al celular](#whatsapp-al-celular)), **Agenda y Gmail**, **Noticias** y **Apps y mapas** (qué apps puede abrir y usar, y tu casa para los recorridos).
 - **Sistema:** **Actualizaciones y ayuda** (qué hay de nuevo, el informe de diagnóstico y la carpeta de Pixie).
 
 Pixie no usa emojis: ni en lo que dice, ni en sus avisos, ni en Ajustes (si la IA o un titular traen alguno, lo saca).
+
+### Modo Trabajo
+
+El Modo Trabajo es independiente del Pomodoro y del seguimiento de estudio. En **Ajustes → Trabajo** podés activarlo, combinar perfiles y guardar proyectos. Pixie conserva esas preferencias en `memoria.json` y también se incluyen en el respaldo, sin claves.
+
+El perfil **Programador** trabaja únicamente con proyectos que agregaste en Ajustes o que Pixie creó con tu confirmación. Puede consultar el estado, los cambios y el historial de Git; listar, crear y cambiar ramas; agregar archivos; y hacer `commit`, `pull` o `push`. Las operaciones que pueden cambiar el repositorio preguntan antes. No ejecuta comandos arbitrarios ni ofrece borrar ramas, `push --force`, `reset --hard` o `clean -fd`.
+
+También podés pedirle que cree una estructura inicial de proyecto con `README.md`, `.gitignore` y carpetas elegidas. Para consultar documentación, Pixie busca en el `README` y en `docs`; sin IA muestra coincidencias y, con IA, comparte solo unos fragmentos relevantes, nunca el proyecto entero.
+
+Ejemplos: «git status», «mostrame el diff», «lista las ramas», «git add README.md», «git commit agrega la guía», «buscá en la documentación sobre instalación». La memoria de documentación y la búsqueda por palabras clave funcionan sin IA.
 
 ### Si el atajo no anda
 

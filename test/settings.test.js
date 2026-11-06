@@ -64,6 +64,27 @@ test('Ajustes configura los perfiles, proyectos y preferencias laborales', async
   assert.deepEqual(snap.trabajo.proyectos, [])
 })
 
+test('Ajustes no activa el modo si el conjunto de perfiles tiene acciones duplicadas', async () => {
+  const profile = (id) => ({
+    id,
+    nombre: id,
+    descripcion: `Perfil ${id}.`,
+    instruccionesIA: `Instrucciones ${id}.`,
+    acciones: [{ name: 'accion_compartida' }],
+    señales: [],
+    fuentes: [],
+    fuentesNoticias: []
+  })
+  const work = createWork({ profiles: [profile('uno'), profile('dos')] })
+  const { s } = setup({ work })
+
+  const snap = await s.apply({ trabajo: { perfilesActivos: ['uno', 'dos'], habilitado: true } })
+
+  assert.equal(snap.trabajo.habilitado, false)
+  assert.deepEqual(snap.trabajo.perfilesActivos, [])
+  assert.deepEqual(snap.mensajes, ['Hay acciones repetidas entre perfiles.'])
+})
+
 test('muestra los ajustes sin revelar la clave', () => {
   const { s } = setup({ config: { claveIA: 'AQ.Ab8RNxxxxxxxxxxxxxxxxk3Zq', pantallaReposo: 'reloj' } })
   const snap = s.snapshot()

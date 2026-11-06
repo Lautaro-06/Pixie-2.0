@@ -206,9 +206,13 @@ export function createSettings({
     if (patch.trabajo && typeof patch.trabajo === 'object') {
       const change = patch.trabajo
       if (typeof change.descripcionLibre === 'string') work?.setFreeDescription(change.descripcionLibre)
+      let profilesAccepted = true
       if (Array.isArray(change.perfilesActivos)) {
         const result = work?.setActiveProfiles(change.perfilesActivos)
-        if (result && !result.ok) mensajes.push(result.error)
+        if (result && !result.ok) {
+          profilesAccepted = false
+          mensajes.push(result.error)
+        }
       }
       if (Array.isArray(change.proyectos)) {
         const result = work?.setProjects(change.proyectos)
@@ -218,7 +222,7 @@ export function createSettings({
       if (typeof change.trabaja === 'boolean' || change.trabaja === null) preferences.trabaja = change.trabaja
       if (typeof change.buscandoTrabajo === 'boolean') preferences.buscandoTrabajo = change.buscandoTrabajo
       if (Object.keys(preferences).length) work?.updatePreferences(preferences)
-      if (typeof change.habilitado === 'boolean') work?.setEnabled(change.habilitado)
+      if (profilesAccepted && typeof change.habilitado === 'boolean') work?.setEnabled(change.habilitado)
     }
     // Ajustes → Apps: qué apps puede abrir y usar
     if (patch.appPermiso && typeof patch.appPermiso.id === 'string') apps?.set(patch.appPermiso.id, patch.appPermiso)

@@ -41,6 +41,12 @@ function safeRelativePath(value) {
   return input
 }
 
+export function editedCommitMessage(input) {
+  const match = /^(?:no[,.]?\s*)?(?:edit[aá]|cambi[aá]|usa|us[aá])\s+(?:el\s+)?mensaje(?:\s+del\s+commit)?\s*(?:a|por|:)\s*(.+)$/i.exec(String(input ?? '').trim())
+  const message = match?.[1]?.trim().slice(0, 200)
+  return message || null
+}
+
 async function projectRoot(params, ctx) {
   const work = ctx.work
   const mode = work?.context?.()
@@ -71,7 +77,8 @@ export const gitAction = {
       pull: '¿Hago git pull en el proyecto seleccionado?',
       push: '¿Hago git push en el proyecto seleccionado?'
     }
-    return `${what[operation] ?? '¿Ejecuto esta operación Git?'} Confirmá antes de que la haga.`
+    const editHint = operation === 'commit' ? ' Si querés cambiarlo, decime «cambiá el mensaje a …».' : ''
+    return `${what[operation] ?? '¿Ejecuto esta operación Git?'}${editHint} Confirmá antes de que la haga.`
   },
   aiTool: {
     name: 'work_git',

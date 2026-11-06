@@ -43,6 +43,7 @@ import { compareVersions, updateText } from './changelog.js'
 import { installExtensionFiles, olderThan } from './extension-files.js'
 import { createHands } from './hands.js'
 import { createWork } from './work/index.js'
+import { editedCommitMessage, gitAction } from './work/git.js'
 import { textToWrite } from './control.js'
 
 const FALLBACK_SHORTCUTS = ['Control+Shift+Space', 'Alt+Shift+P']
@@ -591,6 +592,14 @@ async function askInner(text) {
   if (pending) {
     const waiting = pending
     pending = null
+    if (waiting.action === 'work_git' && waiting.params?.operation === 'commit') {
+      const message = editedCommitMessage(input)
+      if (message) {
+        waiting.params.message = message
+        pending = waiting
+        return { text: gitAction.confirmText(waiting.params), face: 'idle', confirm: true }
+      }
+    }
     if (isYes(input)) return runAction(waiting.action, waiting.params, ctx)
     if (isNo(input)) return { text: 'Listo, no hago nada.', face: 'happy' }
   }

@@ -10,6 +10,7 @@ import { createMemory } from '../src/main/memory.js'
 import { createWork } from '../src/main/work/index.js'
 import { documentationAction, readProjectDocumentation, searchDocumentation } from '../src/main/work/documentation.js'
 import { createProjectAction } from '../src/main/work/create-project.js'
+import { editedCommitMessage } from '../src/main/work/git.js'
 
 const fresh = () => {
   const file = join(mkdtempSync(join(tmpdir(), 'pixie-work-')), 'memoria.json')
@@ -209,6 +210,13 @@ test('Git trabaja solo en proyectos conocidos y confirma operaciones riesgosas',
   assert.match(unsafePath.text, /Solo puedo agregar archivos dentro/)
   const arbitrary = await runAction('work_git', { operation: 'reset --hard' }, ctx)
   assert.match(arbitrary.text, /no está permitida/)
+})
+
+test('permite editar el mensaje propuesto para un commit antes de confirmarlo', () => {
+  assert.equal(editedCommitMessage('cambiá el mensaje a arregla el formulario'), 'arregla el formulario')
+  assert.equal(editedCommitMessage('no, usá el mensaje del commit por agrega validación'), 'agrega validación')
+  assert.equal(editedCommitMessage('sí'), null)
+  assert.equal(editedCommitMessage('cambiá el mensaje a   '), null)
 })
 
 test('respalda los datos de trabajo sin incluir claves', () => {
