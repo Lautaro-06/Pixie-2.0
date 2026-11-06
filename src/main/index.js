@@ -592,16 +592,26 @@ async function askInner(text) {
   if (pending) {
     const waiting = pending
     pending = null
-    if (waiting.action === 'work_git' && waiting.params?.operation === 'commit') {
-      const message = editedCommitMessage(input)
-      if (message) {
-        waiting.params.message = message
-        pending = waiting
-        return { text: gitAction.confirmText(waiting.params), face: 'idle', confirm: true }
+    if (waiting.action === 'work_profile_suggestion') {
+      const answer = String(input).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const response = isYes(input) ? 'yes' : isNo(input) ? 'no' : /^no volver a preguntar$/.test(answer) ? 'never' : null
+      if (response) {
+        const result = work?.answerSuggestion(waiting.params.profileId, response)
+        return { text: result?.message ?? result?.error ?? 'No pude actualizar esa preferencia.', face: result?.ok ? 'happy' : 'confused' }
       }
+      pending = waiting
+    } else {
+      if (waiting.action === 'work_git' && waiting.params?.operation === 'commit') {
+        const message = editedCommitMessage(input)
+        if (message) {
+          waiting.params.message = message
+          pending = waiting
+          return { text: gitAction.confirmText(waiting.params), face: 'idle', confirm: true }
+        }
+      }
+      if (isYes(input)) return runAction(waiting.action, waiting.params, ctx)
+      if (isNo(input)) return { text: 'Listo, no hago nada.', face: 'happy' }
     }
-    if (isYes(input)) return runAction(waiting.action, waiting.params, ctx)
-    if (isNo(input)) return { text: 'Listo, no hago nada.', face: 'happy' }
   }
 
   const options = { customApps: getConfig().apps ?? [] }
@@ -984,6 +994,7 @@ if (!app.requestSingleInstanceLock()) {
       setPending: (intent) => {
         pending = intent
       },
+      hasPending: () => Boolean(pending),
       memory: mind.memory,
       backup,
       awareness: mind.snapshot,

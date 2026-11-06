@@ -11,6 +11,8 @@ import { createWork } from '../src/main/work/index.js'
 import { documentationAction, readProjectDocumentation, searchDocumentation } from '../src/main/work/documentation.js'
 import { createProjectAction } from '../src/main/work/create-project.js'
 import { editedCommitMessage } from '../src/main/work/git.js'
+import { knowledgeAction } from '../src/main/work/knowledge.js'
+import { createPapersAction } from '../src/main/work/papers.js'
 
 const fresh = () => {
   const file = join(mkdtempSync(join(tmpdir(), 'pixie-work-')), 'memoria.json')
@@ -51,7 +53,7 @@ test('combina perfiles activos y omite los inactivos', () => {
   work.setEnabled(true)
   const context = work.context()
   assert.deepEqual(context.perfiles.map((item) => item.id), ['uno', 'dos'])
-  assert.deepEqual(Object.keys(context.acciones), ['accion_uno', 'accion_dos'])
+  assert.deepEqual(Object.keys(context.acciones), ['accion_uno', 'accion_dos', 'work_knowledge'])
   assert.equal(context.instruccionesIA, 'Instrucciones de Uno.\n\nInstrucciones de Dos.')
   assert.equal(context.instruccionesIA.includes('Inactivo'), false)
 })
@@ -87,6 +89,102 @@ test('olvidar el modo de trabajo borra su estado', () => {
   work.setFreeDescription('Diseño')
   work.clear()
   assert.equal(createWork({ memory }).getState().descripcionLibre, '')
+})
+
+test('guarda fuentes elegidas por perfil y solo las expone con ese perfil activo', () => {
+  const work = createWork()
+  const source = { nombre: 'Manual de referencia', carpeta: 'C:\\Fuentes\\Manual', perfilId: 'libre' }
+  assert.equal(work.setKnowledgeSources([source]).ok, true)
+  assert.deepEqual(work.context().fuentesConocimiento, [])
+
+  work.setActiveProfiles(['libre'])
+  work.setEnabled(true)
+  assert.deepEqual(work.context().fuentesConocimiento.map(({ nombre }) => nombre), ['Manual de referencia'])
+  assert.equal(work.setKnowledgeSources([{ ...source, perfilId: 'desconocido' }]).ok, false)
+})
+
+test('consulta solo carpetas seleccionadas en fuentes de trabajo', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'pixie-knowledge-'))
+  mkdirSync(join(folder, 'docs'))
+  writeFileSync(join(folder, 'manual.md'), '# Manual\n\nLa política de seguridad exige revisar cada cambio.')
+  writeFileSync(join(folder, 'docs', 'procedimiento.md'), 'Documentación de referencia para responder consultas.')
+  writeFileSync(join(folder, 'secreto.js'), 'La política de seguridad no debe leer este código.')
+  const work = createWork()
+  work.setKnowledgeSources([{ nombre: 'Manual', carpeta: folder, perfilId: 'libre' }])
+  work.setActiveProfiles(['libre'])
+  work.setEnabled(true)
+
+  const result = await knowledgeAction.run({ query: 'política de seguridad' }, { work })
+
+  assert.match(result.text, /revisar cada cambio/)
+  assert.match(result.text, /Manual/)
+})
+
+test('busca publicaciones reales y guarda una referencia verificada como lectura pendiente', async () => {
+  const { memory } = fresh()
+  const work = createWork({ memory })
+  work.setActiveProfiles(['cientifico'])
+  work.setEnabled(true)
+  const action = createPapersAction({
+    fetchImpl: async (url) => {
+      assert.match(String(url), /^https:\/\/api\.crossref\.org\/works\?/)
+      return {
+        ok: true,
+        json: async () => ({
+          message: {
+            items: [{
+              DOI: '10.1234/pixie.2026.1',
+              title: ['A verified research paper'],
+              author: [{ given: 'Ada', family: 'Lovelace' }],
+              published: { 'date-parts': [[2026, 1, 2]] }
+            }]
+          }
+        })
+      }
+    }
+  })
+  const ctx = { work, memory }
+
+  const results = await action.run({ operacion: 'buscar', tema: 'software testing' }, ctx)
+  assert.match(results.text, /A verified research paper/)
+  assert.match(results.text, /Ada Lovelace · 2026/)
+  assert.match(results.text, /https:\/\/doi\.org\/10\.1234\/pixie\.2026\.1/)
+  assert.match((await action.run({ operacion: 'guardar', numero: 1 }, ctx)).text, /lectura pendiente/)
+  assert.match(memory.listTodos()[0].texto, /10\.1234\/pixie\.2026\.1/)
+  assert.match((await action.run({ operacion: 'guardar_interes', tema: 'cognition' }, ctx)).text, /interesa investigar cognition/)
+  assert.match(memory.listFacts()[0].texto, /me interesa investigar cognition/)
+})
+
+test('no inventa resultados de papers si Crossref no está disponible', async () => {
+  await assert.rejects(() => createPapersAction({ fetchImpl: async () => { throw new Error('offline') } }).run(
+    { operacion: 'buscar', tema: 'climate' },
+    { work: { context: () => ({ habilitado: true, perfiles: [{ id: 'cientifico' }] }) } }
+  ), /Crossref/)
+})
+
+test('sugiere perfiles por uso agregado una vez al día y respeta rechazo y confirmación', () => {
+  const work = createWork()
+  const now = new Date('2026-11-05T12:00:00.000Z')
+  assert.equal(work.suggestionForUsage({ apps: { 'VS Code': 3599 } }, now), null)
+  const suggestion = work.suggestionForUsage({ apps: { 'VS Code': 3600 } }, now)
+  assert.equal(suggestion.id, 'programador')
+  work.recordSuggestion(suggestion.id, now)
+  assert.equal(work.suggestionForUsage({ apps: { 'VS Code': 7200 } }, now), null)
+
+  const rejected = createWork()
+  assert.equal(rejected.answerSuggestion('programador', 'no').ok, true)
+  assert.equal(rejected.suggestionForUsage({ apps: { 'VS Code': 7200 } }, new Date('2026-11-06T12:00:00.000Z')), null)
+
+  const accepted = createWork()
+  assert.equal(accepted.answerSuggestion('programador', 'yes').ok, true)
+  assert.equal(accepted.getState().habilitado, true)
+  assert.deepEqual(accepted.getState().perfilesActivos, ['programador'])
+})
+
+test('desactiva permanentemente las sugerencias si la persona lo pide', () => {
+  const work = createWork()
+  assert.equal(work.answerSuggestion('cientifico', 'never').ok, true)
+  assert.equal(work.suggestionForUsage({ apps: { Zotero: 7200 } }, new Date('2026-11-05T12:00:00.000Z')), null)
 })
 
 test('valida y deduplica proyectos por ruta sin leer la carpeta', () => {

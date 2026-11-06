@@ -195,6 +195,8 @@ function WorkSection({ s, setS, change, say }) {
     const perfilesActivos = [...active]
     update({ perfilesActivos, habilitado: perfilesActivos.length ? true : work.habilitado })
   }
+  const activeProfiles = work.perfiles.filter((profile) => profile.activo)
+  const programmerActive = activeProfiles.some((profile) => profile.id === 'programador')
   const addProject = () => {
     const nombre = projectName.trim()
     const carpeta = projectFolder.trim()
@@ -216,6 +218,9 @@ function WorkSection({ s, setS, change, say }) {
         <Row label="Modo Trabajo" hint="Combina las instrucciones y herramientas de los perfiles activos.">
           <Toggle label="Modo Trabajo" on={work.habilitado} onChange={(habilitado) => update({ habilitado })} />
         </Row>
+        <Row label="Sugerencias de perfiles" hint="Pixie puede sugerir un perfil según el tiempo acumulado por app; nunca lo activa sin tu respuesta.">
+          <Toggle label="Sugerencias de perfiles" on={!work.deteccion?.deshabilitada} onChange={(sugerenciasPerfiles) => update({ sugerenciasPerfiles })} />
+        </Row>
         <div className="work-profiles">
           {work.perfiles.map((profile) => (
             <label className="work-profile" key={profile.id}>
@@ -227,34 +232,72 @@ function WorkSection({ s, setS, change, say }) {
             </label>
           ))}
         </div>
-        {work.perfilesActivos.includes('libre') && (
-          <div className="work-description">
-            <label htmlFor="work-description">¿En qué consiste tu trabajo?</label>
-            <TextSetting id="work-description" value={work.descripcionLibre} placeholder="Contame a qué te dedicás" onSave={(descripcionLibre) => update({ descripcionLibre })} />
-          </div>
-        )}
         <Row label="Estoy buscando trabajo" hint="Se guarda como preferencia; todavía no activa recomendaciones de empleo.">
           <Toggle label="Estoy buscando trabajo" on={work.buscandoTrabajo} onChange={(buscandoTrabajo) => update({ buscandoTrabajo })} />
         </Row>
       </Card>
-      <Card title="Proyectos conocidos" note="Se guarda el nombre y la ruta. Pixie solo leerá documentación cuando conectes un proyecto en el perfil Programador.">
-        {work.proyectos.length ? (
-          <ul className="work-projects">
-            {work.proyectos.map((project) => (
-              <li key={project.carpeta}>
-                <span><strong>{project.nombre}</strong><small>{project.carpeta}</small></span>
-                <button type="button" className="button secondary" onClick={() => update({ proyectos: work.proyectos.filter((item) => item.carpeta !== project.carpeta) })}>Quitar</button>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="hint">Todavía no agregaste proyectos.</p>}
-        <div className="work-project-form">
-          <TextSetting id="work-project-name" value={projectName} placeholder="Nombre del proyecto" onSave={setProjectName} />
-          <TextSetting id="work-project-folder" value={projectFolder} placeholder="Ruta de la carpeta" onSave={setProjectFolder} />
-          <button type="button" className="button secondary" onClick={addProject}>Agregar proyecto</button>
-        </div>
-      </Card>
-      <Card title="Datos del Modo Trabajo" note="Borra los perfiles elegidos, la descripción, los proyectos y las preferencias de detección. No se puede deshacer.">
+      {activeProfiles.map((profile) => (
+        <Card key={profile.id} title={`Funciones: ${profile.nombre}`}>
+          {profile.id === 'programador' && (
+            <>
+              <p>Git con una lista cerrada de operaciones y confirmación para cambios; creación de proyectos con archivos iniciales; búsqueda en documentación. Pedile estas tareas por el chat de Pixie.</p>
+              <ul className="work-feature-list">
+                <li>Estado, diff, historial, ramas, agregar archivos y commit, pull o push.</li>
+                <li>Crear un proyecto con README, .gitignore, carpetas iniciales e inicio de Git.</li>
+                <li>Buscar en README y docs; funciona sin IA con coincidencias por palabras clave.</li>
+              </ul>
+              <p className="hint">Ejemplos: «git status», «creá un proyecto llamado demo en la carpeta de proyectos» y «buscá en la documentación sobre instalación».</p>
+            </>
+          )}
+          {profile.id === 'cientifico' && (
+            <>
+              <p>Busca publicaciones reales en Crossref y muestra título, autores, año y DOI; solo recomienda resultados que devolvió la fuente. También puede recordar temas de interés y guardar lecturas pendientes.</p>
+              <p className="hint">Ejemplos: «buscá papers sobre sueño y memoria», «guardá la lectura 1» y «anotá que me interesa investigar sueño». La búsqueda requiere internet, no una clave de IA.</p>
+            </>
+          )}
+          {profile.id === 'disenador' && (
+            <>
+              <p>Con IA, ayuda a armar briefs, explorar ideas, proponer paletas y combinaciones tipográficas, y separar referencias de propuestas creativas.</p>
+              <p className="hint">Ejemplos: «armemos el brief de una app para…» y «proponeme una paleta accesible para…».</p>
+            </>
+          )}
+          {profile.id === 'libre' && (
+            <>
+              <div className="work-description">
+                <label htmlFor="work-description">¿En qué consiste tu trabajo?</label>
+                <TextSetting id="work-description" value={work.descripcionLibre} placeholder="Describí tu rubro, tareas y contexto" onSave={(descripcionLibre) => update({ descripcionLibre })} />
+              </div>
+              <p>Podés describir cualquier profesión o actividad. Pixie adaptará la conversación sin suponer que su conocimiento es exhaustivo o está actualizado; elegí documentación de referencia si querés que la consulte.</p>
+            </>
+          )}
+          <KnowledgeSourceEditor
+            profile={profile}
+            sources={work.fuentesConocimiento ?? []}
+            save={(fuentesConocimiento) => update({ fuentesConocimiento })}
+            say={say}
+          />
+        </Card>
+      ))}
+      {programmerActive && (
+        <Card title="Proyectos de programación" note="Pixie solo consultará documentación de carpetas que agregues acá.">
+          {work.proyectos.length ? (
+            <ul className="work-projects">
+              {work.proyectos.map((project) => (
+                <li key={project.carpeta}>
+                  <span><strong>{project.nombre}</strong><small>{project.carpeta}</small></span>
+                  <button type="button" className="button secondary" onClick={() => update({ proyectos: work.proyectos.filter((item) => item.carpeta !== project.carpeta) })}>Quitar</button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="hint">Todavía no agregaste proyectos.</p>}
+          <div className="work-project-form">
+            <TextSetting id="work-project-name" value={projectName} placeholder="Nombre del proyecto" onSave={setProjectName} />
+            <TextSetting id="work-project-folder" value={projectFolder} placeholder="Ruta de la carpeta" onSave={setProjectFolder} />
+            <button type="button" className="button secondary" onClick={addProject}>Agregar proyecto</button>
+          </div>
+        </Card>
+      )}
+      <Card title="Datos del Modo Trabajo" note="Borra los perfiles elegidos, descripciones, proyectos, fuentes y preferencias de detección. No se puede deshacer.">
         {confirmClear ? (
           <div className="buttons">
             <button type="button" className="button danger" onClick={clear}>Sí, borrar los datos</button>
@@ -263,6 +306,42 @@ function WorkSection({ s, setS, change, say }) {
         ) : <button type="button" className="button secondary" onClick={() => setConfirmClear(true)}>Borrar datos del Modo Trabajo</button>}
       </Card>
     </>
+  )
+}
+
+function KnowledgeSourceEditor({ profile, sources, save, say }) {
+  const [name, setName] = useState('')
+  const [folder, setFolder] = useState('')
+  const ownSources = sources.filter((source) => source.perfilId === profile.id)
+  const add = () => {
+    const nombre = name.trim()
+    const carpeta = folder.trim()
+    if (!nombre || !carpeta) return say('Poné un nombre y la ruta de la carpeta de documentación.')
+    save([...sources, { id: crypto.randomUUID(), nombre, carpeta, perfilId: profile.id }])
+    setName('')
+    setFolder('')
+  }
+  return (
+    <div className="work-knowledge">
+      <h3>Fuentes de referencia elegidas</h3>
+      <p className="hint">Pixie solo leerá estas carpetas cuando consultes. Busca documentos de texto (por ejemplo, Markdown) en la carpeta y sus subcarpetas; no lee código.</p>
+      {ownSources.length > 0 && (
+        <ul className="work-projects">
+          {ownSources.map((source) => (
+            <li key={source.id ?? source.carpeta}>
+              <span><strong>{source.nombre}</strong><small>{source.carpeta}</small></span>
+              <button type="button" className="button secondary" onClick={() => save(sources.filter((item) => item !== source))}>Quitar</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="work-project-form">
+        <TextSetting id={`work-source-name-${profile.id}`} value={name} placeholder="Nombre de la fuente" label="Nombre de la fuente" onSave={setName} />
+        <TextSetting id={`work-source-folder-${profile.id}`} value={folder} placeholder="Ruta absoluta de la carpeta" label="Ruta absoluta de la carpeta" onSave={setFolder} />
+        <button type="button" className="button secondary" onClick={add}>Agregar fuente</button>
+      </div>
+      {ownSources.length > 0 && <p className="hint">Ejemplo: «buscá en mis fuentes sobre normas de seguridad».</p>}
+    </div>
   )
 }
 

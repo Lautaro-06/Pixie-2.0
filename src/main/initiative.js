@@ -284,6 +284,13 @@ export function createInitiative(times = TIMES, rng = Math.random) {
         s.ultimaNoticia = t
         memory.markDone(`noticias-${newsToday(now, snap, memory) + 1}`, now)
         notices.push({ kind: 'noticias' })
+      } else if (snap.workSuggestion && !snap.pomodoro) {
+        notices.push({
+          kind: 'work_profile_suggestion',
+          text: `Te veo usando ${snap.workSuggestion.apps.join(' y ')}. ¿Querés activar el perfil ${snap.workSuggestion.nombre}?`,
+          face: 'happy',
+          suggestions: ['Sí', 'No', 'No volver a preguntar']
+        })
       } else if (wantsToChat(now, snap, memory)) {
         const hoy = dayKey(now)
         if (s.charlas.dia !== hoy) s.charlas = { dia: hoy, n: 0 }

@@ -110,10 +110,12 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
     if (snap.actividad && snap.inactivoSeg < 120 && !snap.bloqueada) {
       memory.addUsage(now, snap.actividad.categoria, snap.actividad.app, TICK_MS / 1000)
     }
+    const workSuggestion = ctx.hasPending?.() ? null : ctx.work?.suggestionForUsage?.(memory.getUsage(now), now) ?? null
     const { notices, presence } = initiative.tick(
       now,
       {
         ...snap,
+        workSuggestion,
         silencioHasta: quietUntil,
         pomodoro: isPomodoroRunning(),
         pomodoroAvisos: ctx.getConfig().pomodoroDistracciones !== false,
@@ -126,6 +128,12 @@ export function createMind({ ctx, sendEvent, notify, log, showWindow }) {
       },
       memory
     )
+    for (const notice of notices) {
+      if (notice.kind === 'work_profile_suggestion') {
+        ctx.work?.recordSuggestion?.(workSuggestion.id, now)
+        ctx.setPending?.({ action: 'work_profile_suggestion', params: { profileId: workSuggestion.id } })
+      }
+    }
     if (presence) sendEvent({ type: 'presence', away: presence === 'ausente', bloqueada: Boolean(snap.bloqueada) })
     updateScene(snap)
     for (const n of notices) deliver(n).catch((err) => console.error(err))

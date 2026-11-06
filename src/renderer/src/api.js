@@ -70,6 +70,7 @@ let fakeSettings = {
     perfilesActivos: [],
     descripcionLibre: '',
     proyectos: [],
+    fuentesConocimiento: [],
     perfilesDescartados: [],
     buscandoTrabajo: false,
     deteccion: {},
@@ -240,7 +241,7 @@ const previewSettings = {
     return { ...fakeSettings, mensaje: que === 'todo' ? 'Listo, me olvidé de todo.' : 'Listo, me olvidé de nuestras charlas.' }
   },
   clearWork: async () => {
-    fakeSettings = { ...fakeSettings, trabajo: { ...fakeSettings.trabajo, habilitado: false, trabaja: null, perfilesActivos: [], descripcionLibre: '', proyectos: [], buscandoTrabajo: false } }
+    fakeSettings = { ...fakeSettings, trabajo: { ...fakeSettings.trabajo, habilitado: false, trabaja: null, perfilesActivos: [], descripcionLibre: '', proyectos: [], fuentesConocimiento: [], buscandoTrabajo: false, deteccion: {} } }
     return { ...fakeSettings, mensaje: 'Borré los datos del Modo Trabajo.' }
   },
   onView: () => () => {}

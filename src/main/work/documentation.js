@@ -20,7 +20,7 @@ const inside = (root, path) => {
   return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
 }
 
-async function collectFiles(root) {
+async function collectFiles(root, allDocumentation = false) {
   const candidates = []
   const add = async (path, entry) => {
     if (entry.isSymbolicLink() || !entry.isFile()) return
@@ -52,6 +52,10 @@ async function collectFiles(root) {
     }
   }
 
+  if (allDocumentation) {
+    await walk(root)
+    return candidates
+  }
   const entries = await readdir(root, { withFileTypes: true })
   for (const entry of entries) {
     const path = resolve(root, entry.name)
@@ -62,7 +66,7 @@ async function collectFiles(root) {
   return candidates
 }
 
-export async function readProjectDocumentation(folder) {
+export async function readProjectDocumentation(folder, { allDocumentation = false } = {}) {
   let root
   try {
     root = await realpath(resolve(folder))
@@ -70,7 +74,7 @@ export async function readProjectDocumentation(folder) {
   } catch {
     throw new FriendlyError('No encontré la carpeta del proyecto o no puedo leerla.')
   }
-  const files = await collectFiles(root)
+  const files = await collectFiles(root, allDocumentation)
   const documents = []
   let total = 0
   for (const file of files) {

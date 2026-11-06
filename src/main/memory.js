@@ -22,6 +22,7 @@ const EMPTY = () => ({
     perfilesActivos: [],
     descripcionLibre: '',
     proyectos: [],
+    fuentesConocimiento: [],
     perfilesDescartados: [],
     buscandoTrabajo: false,
     deteccion: {}

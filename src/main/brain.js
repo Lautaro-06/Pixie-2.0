@@ -251,6 +251,10 @@ const RULES = [
     return m ? intent('work_create_project', { name: m[1].trim(), parent }) : null
   },
   (t) => {
+    const m = /^(?:busca|buscame|consulta) (?:en )?(?:mis )?fuentes(?: de referencia)? (?:sobre |acerca de |: )(.+)$/.exec(t)
+    return m ? intent('work_knowledge', { query: m[1].trim() }) : null
+  },
+  (t) => {
     const m = /^(?:busca|buscame|revisa|revisame|consulta) (?:en )?(?:la )?(?:documentacion|docs)(?: de (.+?))? (?:sobre |acerca de |: )?(.+)$/.exec(t)
     return m ? intent('work_docs', { ...(m[1] ? { project: m[1] } : {}), query: m[2].trim() }) : null
   },
@@ -270,6 +274,12 @@ const RULES = [
     if (m) return intent('work_git', { operation: 'commit', ...(m[2] ? { message: m[2] } : {}) })
     if (/^(git )?pull$/.test(t)) return intent('work_git', { operation: 'pull' })
     if (/^(git )?push$/.test(t)) return intent('work_git', { operation: 'push' })
+    m = /^(?:busca|buscame|consulta|recomiendame) (?:papers?|publicaciones|investigaciones|estudios) (?:sobre |acerca de |de )(.+)$/.exec(t)
+    if (m) return intent('work_papers', { operacion: 'buscar', tema: m[1].trim() })
+    m = /^(?:guarda|anota) (?:la )?(?:lectura|publicacion|paper) (\d+)$/.exec(t)
+    if (m) return intent('work_papers', { operacion: 'guardar', numero: Number(m[1]) })
+    m = /^(?:guarda|anota) (?:que )?me interesa investigar (.+)$/.exec(t)
+    if (m) return intent('work_papers', { operacion: 'guardar_interes', tema: m[1].trim() })
     return null
   },
   // Pixie misma: actualizarse, su versión y el informe de diagnóstico

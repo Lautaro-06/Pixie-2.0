@@ -81,6 +81,19 @@ test('no molesta en pantalla completa ni en modo no molestar', () => {
   assert.deepEqual(kinds(ini.tick(at(10, 1), base, mem)), ['resumen'])
 })
 
+test('sugiere un perfil solo cuando no está en foco ni en silencio', () => {
+  const mem = memory()
+  mem.markDone('resumen', at(9))
+  const ini = createInitiative(onlyFollowUps)
+  const suggestion = { id: 'programador', nombre: 'Programador', apps: ['VS Code'] }
+  const result = ini.tick(at(11), { ...base, workSuggestion: suggestion }, mem)
+  assert.deepEqual(kinds(result), ['work_profile_suggestion'])
+  assert.deepEqual(result.notices[0].suggestions, ['Sí', 'No', 'No volver a preguntar'])
+
+  assert.deepEqual(kinds(ini.tick(at(11, 1), { ...base, pantallaCompleta: true, workSuggestion: suggestion }, mem)), [])
+  assert.deepEqual(kinds(ini.tick(at(11, 2), { ...base, pomodoro: true, workSuggestion: suggestion }, mem)), [])
+})
+
 test('batería baja e internet', () => {
   const mem = memory()
   mem.markDone('resumen', at(9))

@@ -88,6 +88,10 @@ const CASES = [
   // Git del perfil Programador
   ['creá un proyecto llamado demo en C:\\Proyectos', 'work_create_project', { name: 'demo', parent: 'c:\\proyectos' }],
   ['buscá en la documentación sobre instalación', 'work_docs', { query: 'instalacion' }],
+  ['buscá en mis fuentes sobre normas de seguridad', 'work_knowledge', { query: 'normas de seguridad' }],
+  ['buscá papers sobre sueño y memoria', 'work_papers', { operacion: 'buscar', tema: 'sueno y memoria' }],
+  ['guardá la lectura 2', 'work_papers', { operacion: 'guardar', numero: 2 }],
+  ['anotá que me interesa investigar sueño', 'work_papers', { operacion: 'guardar_interes', tema: 'sueno' }],
   ['git status', 'work_git', { operation: 'status' }],
   ['mostrame el diff', 'work_git', { operation: 'diff' }],
   ['git log', 'work_git', { operation: 'log' }],

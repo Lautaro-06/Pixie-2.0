@@ -116,7 +116,13 @@ El perfil **Programador** trabaja únicamente con proyectos que agregaste en Aju
 
 También podés pedirle que cree una estructura inicial de proyecto con `README.md`, `.gitignore` y carpetas elegidas. Para consultar documentación, Pixie busca en el `README` y en `docs`; sin IA muestra coincidencias y, con IA, comparte solo unos fragmentos relevantes, nunca el proyecto entero.
 
-Ejemplos: «git status», «mostrame el diff», «lista las ramas», «git add README.md», «git commit agrega la guía», «buscá en la documentación sobre instalación». La memoria de documentación y la búsqueda por palabras clave funcionan sin IA.
+Cada perfil activo muestra sus herramientas y opciones propias en Ajustes → Trabajo. **Científico** puede buscar publicaciones en Crossref con título, autores, año y DOI verificados, guardar resultados como lecturas pendientes y recordar temas de investigación. **Diseñador** puede pedirle a la IA ayuda para organizar briefs, ideas, paletas, tipografías, proyectos y entregas.
+
+Para cualquier otro rubro, elegí **Otro / personalizado** y describí el trabajo. Pixie adapta la conversación, pero no promete saberlo todo ni estar siempre actualizada. Podés asociar carpetas de referencia a cada perfil; Pixie solo las consulta cuando se lo pedís y solo lee archivos de documentación (por ejemplo, Markdown o texto), no código. En proyectos de Programador busca el README y `docs`; en las fuentes que agregás para otros perfiles busca documentos en la carpeta y sus subcarpetas. Las carpetas se eligen explícitamente en Ajustes, y las consultas funcionan sin IA mediante búsqueda por palabras clave.
+
+Pixie puede sugerir perfiles según el tiempo agregado por aplicación que ya observa (por ejemplo, VS Code o Figma), con un máximo de una sugerencia por día. Nunca activa un perfil sola: podés aceptar, rechazarlo o apagar futuras sugerencias. No lee la pantalla para detectar tu rubro.
+
+Ejemplos: «git status», «mostrame el diff», «lista las ramas», «git add README.md», «git commit agrega la guía», «buscá en la documentación sobre instalación», «buscá papers sobre sueño y memoria», «guardá la lectura 1», «anotá que me interesa investigar sueño» y «buscá en mis fuentes sobre normas de seguridad».
 
 ### Si el atajo no anda
 

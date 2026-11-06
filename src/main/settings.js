@@ -92,6 +92,7 @@ export function createSettings({
       perfilesActivos: [],
       descripcionLibre: '',
       proyectos: [],
+      fuentesConocimiento: [],
       perfilesDescartados: [],
       buscandoTrabajo: false,
       deteccion: {}
@@ -218,9 +219,14 @@ export function createSettings({
         const result = work?.setProjects(change.proyectos)
         if (result && !result.ok) mensajes.push(result.error)
       }
+      if (Array.isArray(change.fuentesConocimiento)) {
+        const result = work?.setKnowledgeSources(change.fuentesConocimiento)
+        if (result && !result.ok) mensajes.push(result.error)
+      }
       const preferences = {}
       if (typeof change.trabaja === 'boolean' || change.trabaja === null) preferences.trabaja = change.trabaja
       if (typeof change.buscandoTrabajo === 'boolean') preferences.buscandoTrabajo = change.buscandoTrabajo
+      if (typeof change.sugerenciasPerfiles === 'boolean') preferences.sugerenciasPerfiles = change.sugerenciasPerfiles
       if (Object.keys(preferences).length) work?.updatePreferences(preferences)
       if (profilesAccepted && typeof change.habilitado === 'boolean') work?.setEnabled(change.habilitado)
     }

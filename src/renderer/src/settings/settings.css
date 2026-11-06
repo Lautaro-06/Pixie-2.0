@@ -176,6 +176,19 @@ body.ventana-ajustes #root {
   flex-basis: 100%;
   font-weight: 600;
 }
+.ventana-ajustes .work-knowledge {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-line);
+}
+.ventana-ajustes .work-knowledge h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.ventana-ajustes .work-feature-list {
+  padding-left: 22px;
+  line-height: 1.6;
+}
 .ventana-ajustes .work-projects {
   margin: 0;
   padding: 0;
