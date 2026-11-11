@@ -48,7 +48,7 @@ export async function searchCrossref(query, fetchImpl = (...args) => fetch(...ar
   let response
   try {
     response = await fetchImpl(url, {
-      headers: { 'User-Agent': 'Pixie/0.17.0 (desktop assistant)', Accept: 'application/json' },
+      headers: { 'User-Agent': 'Pixie/0.16.4 (desktop assistant)', Accept: 'application/json' },
       signal: AbortSignal.timeout(10000)
     })
   } catch {
